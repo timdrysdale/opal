@@ -3,8 +3,39 @@
 #include <stdlib.h>
 
 #define CHM() if (sceneManager==nullptr) return OPAL_NO_SCENE_MANAGER; //Check manager
+ 
+ 
 using namespace optix;
 namespace opal {
+
+	int handle() {
+		try {
+			throw;
+		}
+		catch (opal::Exception& e) {
+#ifdef OPALDEBUG
+			std::ofstream myfile;
+			myfile.open(logFile, std::ifstream::app);
+			myfile << "Init: error occurred with message " << e.getErrorString() << std::endl;
+			myfile.close();
+#endif // OPALDEBUG
+
+			return OPAL_EXCEPTION;
+		}
+		catch (optix::Exception& e) {
+#ifdef OPALDEBUG
+			std::ofstream myfile;
+			myfile.open(logFile, std::ifstream::app);
+			myfile << "Init: error occurred with error code "
+				<< e.getErrorCode() << " and message "
+				<< e.getErrorString() << std::endl;
+			myfile.close();
+#endif // OPALDEBUG
+			return OPTIX_EXCEPTION;
+		}
+
+	}
+
 	void printMatrix(opal::UnityMatrix4x4& u, std::ofstream& s) {
 		s << "UnityMatrix4x4 -----" << std::endl;
 
@@ -84,12 +115,18 @@ namespace opal {
 	}
 	OPAL_API int Exit()
 	{
+		try {
 
-		if (sceneManager != nullptr) {
-			
-			delete sceneManager;
+			if (sceneManager != nullptr) {
+
+				delete sceneManager;
+				sceneManager = nullptr;
+			}
+			return 0;
 		}
-		return 0;
+		catch (...) {
+			handle();
+		}
 	}
 	OPAL_API int SetMaxReflections(unsigned int m)
 	{
@@ -106,7 +143,21 @@ namespace opal {
 			UnityToOptixMatrix4x4(translationMatrix, transformationMatrix);
 			//When transforming to MaterialEMProperties conductivity is multiplied by -60*wavelenght
 			MaterialEMProperties prop;
-			prop.dielectricConstant = make_float2(emProp.relativePermitivity,-60.0f*sceneManager->defaultChannel.waveLength*emProp.conductivity);
+			float relativePermitivity;
+			if (emProp.b==0) {
+				relativePermitivity = emProp.a;
+			}
+			else {
+				relativePermitivity=emProp.a*powf((sceneManager->defaultChannel.frequency / 1.0e9f), emProp.b); //Frequency in GHz
+			}
+			float conductivity;
+			if (emProp.d == 0) {
+				conductivity = emProp.c;
+			}
+			else {
+				conductivity = emProp.c*powf((sceneManager->defaultChannel.frequency / 1.0e9f), emProp.d); //Frequency in GHz
+			}
+			prop.dielectricConstant = make_float2(relativePermitivity,-60.0f*sceneManager->defaultChannel.waveLength*conductivity);
 		
 			sceneManager->addStaticMesh(meshVertexCount, meshVertices, meshTriangleCount, meshTriangles, translationMatrix, prop);
 
@@ -173,7 +224,22 @@ namespace opal {
 			
 			//When transforming to MaterialEMProperties conductivity is multiplied by -60*wavelenght
 			MaterialEMProperties prop;
-			prop.dielectricConstant = make_float2(emProp.relativePermitivity, -60.0f*sceneManager->defaultChannel.waveLength*emProp.conductivity);
+			float relativePermitivity;
+			if (emProp.b == 0) {
+				relativePermitivity = emProp.a;
+			}
+			else {
+				relativePermitivity = emProp.a*powf((sceneManager->defaultChannel.frequency / 1.0e9f), emProp.b); //Frequency in GHz
+			}
+			float conductivity;
+			if (emProp.d == 0) {
+				conductivity = emProp.c;
+			}
+			else {
+				conductivity = emProp.c*powf((sceneManager->defaultChannel.frequency / 1.0e9f), emProp.d); //Frequency in GHz
+			}
+			prop.dielectricConstant = make_float2(relativePermitivity, -60.0f*sceneManager->defaultChannel.waveLength*conductivity);
+
 
 			sceneManager->addMeshToGroup(id, meshVertexCount, meshVertices, meshTriangleCount, meshTriangles,  prop);
 
@@ -297,6 +363,16 @@ namespace opal {
 			myfile.close();
 #endif // OPALDEBUG
 			return OPTIX_EXCEPTION;
+		}
+	}
+	OPAL_API int SetUsageReport()
+	{
+		CHM();
+		try {
+			sceneManager->setUsageReport();
+		}
+		catch (...) {
+			handle();
 		}
 	}
 	OPAL_API int FillRaySphere2D(int elevationSteps, int azimuthSteps, optix::float3* rayDirections)
@@ -561,6 +637,64 @@ namespace opal {
 			std::ofstream myfile;
 			myfile.open(logFile, std::ifstream::app);
 			myfile << "RemoveReceiverFromUnity:" << id<<" error occurred with error code "
+				<< e.getErrorCode() << " and message "
+				<< e.getErrorString() << std::endl;
+			myfile.close();
+#endif // OPALDEBUG
+			return OPTIX_EXCEPTION;
+		}
+	}
+	OPAL_API int FinishDynamicMeshGroup(int id) {
+		CHM();
+		try {
+
+			sceneManager->finishDynamicMeshGroup(id);
+			return 0;
+		}
+		catch (opal::Exception& e) {
+#ifdef OPALDEBUG
+			std::ofstream myfile;
+			myfile.open(logFile, std::ifstream::app);
+			myfile << "FinishDynamicMeshGroup:" << id << " error occurred with message: " << e.getErrorString() << std::endl;
+			myfile.close();
+#endif // OPALDEBUG
+
+			return OPAL_EXCEPTION;
+		}
+		catch (optix::Exception& e) {
+#ifdef OPALDEBUG
+			std::ofstream myfile;
+			myfile.open(logFile, std::ifstream::app);
+			myfile << "FinishDynamicMeshGroup:" << id << " error occurred with error code "
+				<< e.getErrorCode() << " and message "
+				<< e.getErrorString() << std::endl;
+			myfile.close();
+#endif // OPALDEBUG
+			return OPTIX_EXCEPTION;
+		}
+	}
+	OPAL_API int RemoveDynamicMeshGroup(int id) {
+		CHM();
+		try {
+
+			sceneManager->removeDynamicMeshGroup(id);
+			return 0;
+		}
+		catch (opal::Exception& e) {
+#ifdef OPALDEBUG
+			std::ofstream myfile;
+			myfile.open(logFile, std::ifstream::app);
+			myfile << "RemoveDynamicMeshGroup:" << id << " error occurred with message: " << e.getErrorString() << std::endl;
+			myfile.close();
+#endif // OPALDEBUG
+
+			return OPAL_EXCEPTION;
+		}
+		catch (optix::Exception& e) {
+#ifdef OPALDEBUG
+			std::ofstream myfile;
+			myfile.open(logFile, std::ifstream::app);
+			myfile << "RemoveDynamicMeshGroup:" << id << " error occurred with error code "
 				<< e.getErrorCode() << " and message "
 				<< e.getErrorString() << std::endl;
 			myfile.close();

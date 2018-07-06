@@ -199,9 +199,14 @@ RT_PROGRAM void closestHitTriangle()
 	
 			
 		//Reflection info log (to be used in external programs)
-		float2 tR = complex_prod(rayPayload.prodReflectionCoefficient, R);
-		//rtPrintf("S\t%u\t%u\t%d\t%d\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n", launchIndexTriangle.x, launchIndexTriangle.y,  rayPayload.reflections, rayPayload.faceId, argument.x, argument.y, root.x, root.y, R.x, R.y, tR.x, tR.y);
-
+	
+		/*if (launchIndexTriangle.x == 987 && launchIndexTriangle.y == 3218) {
+			float2 tR = complex_prod(rayPayload.prodReflectionCoefficient, R);
+		//if (rayPayload.faceId >= 25) {
+			rtPrintf("S\t%u\t%u\t%d\t%d\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n", launchIndexTriangle.x, launchIndexTriangle.y, rayPayload.reflections, rayPayload.faceId, argument.x, argument.y, root.x, root.y, R.x, R.y, tR.x, tR.y);
+		}
+		*/
+		
 	}
 	else {
 		//Angle between tx and normal in 0 and 45 degrees
@@ -230,13 +235,19 @@ RT_PROGRAM void closestHitTriangle()
 
 
 		//Reflection info log (to be used in external programs)
-		/*float2 tR = complex_prod(rayPayload.prodReflectionCoefficient, R);
-		if (launchIndexTriangle.x == 1118 && launchIndexTriangle.y == 900) {
-			float mycos = dot(-ray.direction, n);
-			rtPrintf("N\t%u\t%u\t%d\t%d\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n", launchIndexTriangle.x, launchIndexTriangle.y, rayPayload.reflections, rayPayload.faceId, argument.x, argument.y, root.x, root.y, R.x, R.y, tR.x,tR.y);
-			rtPrintf("N dot=%f angle=%f hp=(%f,%f,%f)per=(%f,%f)rayR=(%f,%f)\n",mycos,  acosf(mycos), rayPayload.hitPoint.x, rayPayload.hitPoint.y, rayPayload.hitPoint.z, EMProperties.dielectricConstant.x, EMProperties.dielectricConstant.y, rayPayload.prodReflectionCoefficient.x, rayPayload.prodReflectionCoefficient.y);
+		
+		
 			
-		}*/
+		/*if (launchIndexTriangle.x == 987 && launchIndexTriangle.y == 3218) {
+			float2 tR = complex_prod(rayPayload.prodReflectionCoefficient, R);
+			//if (rayPayload.faceId>=25) {
+			float mycos = dot(-ray.direction, n);
+			rtPrintf("N\t%u\t%u\t%d\t%d\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n", launchIndexTriangle.x, launchIndexTriangle.y, rayPayload.reflections, rayPayload.faceId, argument.x, argument.y, root.x, root.y, R.x, R.y, tR.x, tR.y);
+			rtPrintf("NN dot=%f angle=%f hp=(%f,%f,%f)per=(%f,%f)rayR=(%f,%f)\n",mycos,  acosf(mycos), rayPayload.hitPoint.x, rayPayload.hitPoint.y, rayPayload.hitPoint.z, EMProperties.dielectricConstant.x, EMProperties.dielectricConstant.y, rayPayload.prodReflectionCoefficient.x, rayPayload.prodReflectionCoefficient.y);
+		}
+		*/
+		
+		
 	}
 	
 	

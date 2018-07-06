@@ -21,9 +21,11 @@ rtBuffer<Transmitter,1> tx_origin;
 //rtBuffer<rtBufferId<uint, 3>, 1> duplicatesBuffer; //Filter duplicates buffer [[elevationBlockSize, azimuthBlockSize, transmitter],receiver ]
 
 
+
+//TODO: these buffers consume a lot of memory if there are many receivers. This could be replaced by recursive tracing inside the sphere or any other solution that should be tried
 rtBuffer<rtBufferId<int, 3>, 1> internalRaysBuffer; //Filter internal rays buffer  [[elevationSteps, azimuthSteps, transmitter],receiver]
 
-rtBuffer<uint, 2> facesBuffer; //Face-based duplicates [faceId,receiver]
+//rtBuffer<uint, 2> facesBuffer; //Face-based duplicates [faceId,receiver]
 rtBuffer<int, 3> bufferMinD; //minDistance ray to receiver [reflections, faceId,receiver];
 rtBuffer<DuplicateReflection, 3> bufferMinE; //Buffer with the Electric field of the minimum distance ray [reflections, faceId,receiver];
 rtBuffer<ReceptionInfo, 2> receptionInfoBuffer; //Results buffer [receiver,transmitter]
@@ -84,8 +86,13 @@ rtDeclareVariable(uint2, raySphereSize, , );
 
 }
 */
+
+
 RT_PROGRAM void initializeBuffersFaceBased() {
-	//rtPrintf("Initializing reception buff  tx_rx=(%u,%u)\n", tx_rx.x, tx_rx.y);
+	//rtPrintf("Initializing reception buff  tx_rx=(%u,%u) index=(%u,%u,%u)\n", tx_rx.x, tx_rx.y, launchIndex.x, launchIndex.y, launchIndex.z);
+
+
+	//TODO: all done by index=(0,0,0) for a high number of faces and receivers it takes a lot of time. Parallelize it
 	if (launchIndex == make_uint3(0, 0, 0)) {
 		
 		for (unsigned int i = 0; i < tx_rx.y; ++i)
@@ -106,8 +113,8 @@ RT_PROGRAM void initializeBuffersFaceBased() {
 			}
 			for (unsigned int k = 0; k < number_of_faces; ++k)
 			{
-				uint2 idf = make_uint2(k, i);
-				facesBuffer[idf] = 0u;
+				//uint2 idf = make_uint2(k, i);
+			//	facesBuffer[idf] = 0u;
 				for (unsigned int  l = 0; l < max_interactions; ++l) 
 				{
 					
@@ -115,7 +122,7 @@ RT_PROGRAM void initializeBuffersFaceBased() {
 					bufferMinD[idmd] = 2147483647;
 					bufferMinE[idmd].E = make_float2(0.0f, 0.0f);
 					bufferMinE[idmd].r = 0;
-				//	rtPrintf("Initializing faces buff idm=(%u,%u,%u)=%d \n", idmd.x,idmd.y,idmd.z, bufferMinD[idmd]);
+					//rtPrintf("Initializing faces buff idmd=(%u,%u,%u)=%d \n", idmd.x,idmd.y,idmd.z, bufferMinD[idmd]);
 
 					
 				}
@@ -132,7 +139,7 @@ RT_PROGRAM void initializeBuffersFaceBased() {
 		
 		rtBufferId<int, 3>& ib = internalRaysBuffer[i];
 		ib[launchIndex] = -1;
-		//rtPrintf("i=%u db[%u,%u,%u]=%u ib=%d \n", i, launchIndex.x, launchIndex.y, launchIndex.z, db[launchIndex], ib[launchIndex]);
+		//rtPrintf("i=%u db[%u,%u,%u]=%u ib=%d \n", i, launchIndex.x, launchIndex.y, launchIndex.z, ib[launchIndex]);
 
 	}
 
@@ -832,7 +839,7 @@ RT_PROGRAM void closestHitReceiverFaceMinHoldReflections()
 		float oldEy = atomicAdd(&receptionInfoBuffer[index].sumRxElectricField.y, E.y);
 		//rtPrintf("DR. Direct hit   i.x=%u i.y=%u  Ep=(%f,%f) E=(%f,%f) En=(%f,%f) rId=%d \n", receiverLaunchIndex.x, receiverLaunchIndex.y, oldEx,oldEy, E.x, E.y, receptionInfoBuffer[index].sumRxElectricField.x, receptionInfoBuffer[index].sumRxElectricField.y, receiverId);
 		//Direct hit info log (to be used in external programs)
-		rtPrintf("DH\t%u\t%u\t%u\t%f\t%f\t%f\t%f\t%f\t%f\t%d\n", receiverLaunchIndex.x, receiverLaunchIndex.y, receiverLaunchIndex.z, oldEx, oldEy, E.x, E.y, receptionInfoBuffer[index].sumRxElectricField.x, receptionInfoBuffer[index].sumRxElectricField.y, receiverId);
+		//rtPrintf("DH\t%u\t%u\t%u\t%f\t%f\t%f\t%f\t%f\t%f\t%d\n", receiverLaunchIndex.x, receiverLaunchIndex.y, receiverLaunchIndex.z, oldEx, oldEy, E.x, E.y, receptionInfoBuffer[index].sumRxElectricField.x, receptionInfoBuffer[index].sumRxElectricField.y, receiverId);
 
 		//receptionInfoBuffer[index].hasDirectContribution = true;
 		//rtPrintf("%f\t%f\n", E.x, E.y);
@@ -893,7 +900,9 @@ RT_PROGRAM void closestHitReceiverFaceMinHoldReflections()
 		float Eprevx = atomicExch(drx, E.x);
 		float Eprevy = atomicExch(dry, E.y);
 		float2 Eprev = make_float2(Eprevx, Eprevy);
-		rtPrintf("FF\t%u\t%u\t%u\t%f\t%d\t%d\t%f\t%f\t%f\t%f\n", receiverLaunchIndex.x, receiverLaunchIndex.y, reflections, dm, dmt, oldd, E.x, E.y, Eprev.x, Eprev.y);
+		//rtPrintf("FR\t%u\t%u\t%u\t%u\t%f\t%f\n", receiverLaunchIndex.x, receiverLaunchIndex.y, hitPayload.faceId, reflections, hitPayload.prodReflectionCoefficient.x, hitPayload.prodReflectionCoefficient.y);
+
+		//rtPrintf("FF\t%u\t%u\t%u\t%u\t%d\t%d\t%f\t%f\t%f\t%f\t%f\t%f\n", receiverLaunchIndex.x, receiverLaunchIndex.y, hitPayload.faceId, reflections,  dmt, oldd, E.x, E.y, Eprev.x, Eprev.y, prevTd, length(prx - ptx));
 
 		//Remove Electric field from previous minimum distance hit
 		/*E -= Eprev;

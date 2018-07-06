@@ -70,8 +70,13 @@ namespace opal {
 	};
 
 	struct UnityMaterialEMProperties {
-		float relativePermitivity;
-		float conductivity;
+		//ITU parameters: depend on frequency
+		//RelativePermitivity
+		 float a;
+		 float b;
+		//Conductivity
+		 float c;
+		 float d;
 		
 	};
 
@@ -96,6 +101,7 @@ namespace opal {
 
 	extern "C" OPAL_API int SetPrintEnabled(int bufferSize);
 
+	extern "C" OPAL_API int SetUsageReport();
 
 	extern "C" OPAL_API int FillRaySphere2D(int elevationSteps, int azimuthSteps, optix::float3 * rayDirections);
 
@@ -120,7 +126,10 @@ namespace opal {
 
 	extern "C" OPAL_API int  UpdateTransformInGroup(int id, UnityMatrix4x4 transformationMatrix);
 
-	//extern "C" OPAL_API int SetDuplicateBlockSize(optix::uint elevationBlockSize, optix::uint azimuthBlockSize);
+	extern "C" OPAL_API int  FinishDynamicMeshGroup(int id);
+
+	extern "C" OPAL_API int  RemoveDynamicMeshGroup(int id);
+	
 
 
 

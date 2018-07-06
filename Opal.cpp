@@ -48,7 +48,7 @@ OpalSceneManager::OpalSceneManager(float f, bool holdReflections)
 	this->txOriginBuffer = nullptr;
 
 	this->internalRaysBuffer = nullptr;
-	this->facesBuffer = nullptr;
+	//this->facesBuffer = nullptr;
 	this->facesMinDBuffer = nullptr;;
 	this->facesMinEBuffer = nullptr;;
 
@@ -57,11 +57,18 @@ OpalSceneManager::OpalSceneManager(float f, bool holdReflections)
 
 opal::OpalSceneManager::~OpalSceneManager()
 {
-	context->destroy();
-#ifdef OPALDEBUG
-	outputFile.close();
-#endif // OPALDEBUG
+	try {
+		if (context) {
+			context->destroy();
+		}
 
+#ifdef OPALDEBUG
+		outputFile.close();
+#endif // OPALDEBUG
+	}
+	catch (optix::Exception e) {
+		std::cout << "exception at ~OpalSceneManager():" << e.getErrorString() << "with code:" << e.getErrorCode() << std::endl;
+	}
 }
 
 
@@ -153,12 +160,15 @@ void OpalSceneManager::addMeshToGroup(int id, int meshVertexCount, optix::float3
 	}
 	OpalMesh mesh = createMesh(meshVertexCount, meshVertices, meshTriangleCount, meshTriangles,  defaultPrograms.at("meshIntersection"), defaultPrograms.at("meshBounds"), defaultMeshMaterial);
 	setMeshEMProperties(mesh.geom_instance, emProp);
+	
 	dmg->geom_group->addChild(mesh.geom_instance);
 	dmg->geom_group->getAcceleration()->markDirty();
 	if (sceneGraphCreated) {
 		rootGroup->getAcceleration()->markDirty();
 	}
-
+	if (sceneFinished) {
+		updateFacesBuffers();
+	}
 }
 void  OpalSceneManager::updateTransformInGroup(int id, optix::Matrix4x4 transformationMatrix) {
 	OpalDynamicMeshGroup* dmg;
@@ -191,7 +201,7 @@ void opal::OpalSceneManager::finishDynamicMeshGroup(int id)
 		rootGroup->addChild(dmg->transform);
 		rootGroup->getAcceleration()->markDirty();
 	}
-	updateFacesBuffers();
+	
 
 }
 
@@ -244,12 +254,13 @@ void OpalSceneManager::extractFaces(optix::float3* meshVertices, std::vector<std
 			triangleIndexBuffer[i].second = (*(ret.first)).second;
 		}
 	}
-	//std::cout << "size=" << normals.size() <<"numberOfFaces="<< numberOfFaces<< std::endl;
-	for (auto v: normals)
+	std::cout  << normals.size() <<" faces added=. numberOfFaces="<< numberOfFaces<< std::endl;
+	/*for (auto v: normals)
 	{
 		std::cout << "face normal=" << v.first << "id=" << v.second << std::endl;
 
-	}
+	}*/
+	
 
 	
 	
@@ -379,7 +390,7 @@ OpalDynamicMeshGroup* OpalSceneManager::addDynamicMeshGroup(int id) {
 void OpalSceneManager::removeDynamicMeshGroup(int id) {
 	//Remove this mesh from the scene graph
 	//TODO: the faces buffers are not modified, since we would have to remap all the faces to the internal buffers. Basically rebuild the graph. 
-	//It just increases in size as dynamic meshes are added but never decreases
+	//The buffer just increases in size as dynamic meshes are added but never decreases
 	OpalDynamicMeshGroup* dmg;
 	try {
 		dmg = dynamicMeshes.at(id);
@@ -411,7 +422,7 @@ OpalMesh OpalSceneManager::createMesh(int meshVertexCount, optix::float3* meshVe
 
 	// Create a float3 formatted buffer (each triplet of floats in the array is now a vector3 in the order x,y,z)
 
-
+	std::cout << " Creating mesh with " << meshVertexCount << "vertices and " << meshTriangleCount << " indices" << std::endl;
 	//Make int3s
 	if (meshTriangleCount % 3 != 0) {
 		throw  opal::Exception("Error: Number of triangle indices is not a multiple of 3");
@@ -470,6 +481,7 @@ OpalMesh OpalSceneManager::createMesh(int meshVertexCount, optix::float3* meshVe
 
 		//Should we use Transform?
 		//std::cout <<"vertex=("<< meshVertices[i].x <<","<< meshVertices[i].y <<","<< meshVertices[i].z <<")"<< std::endl;
+
 		const float3 v = meshVertices[i];
 		//#ifdef OPALDEBUG
 		//			outputFile << "v=(" << v.x << "," << v.y << "," << v.z << ")" << std::endl;
@@ -516,6 +528,7 @@ void OpalSceneManager::setMeshEMProperties(optix::GeometryInstance geom_instance
 #ifdef OPALDEBUG
 	outputFile << "mesh EM="<< emProp.dielectricConstant << std::endl;
 #endif
+	
 	geom_instance["EMProperties"]->setUserData(sizeof(MaterialEMProperties), &emProp);
 }
 
@@ -1049,8 +1062,11 @@ void OpalSceneManager::removeReceiver(int id) {
 
 	//context->validate();
 	delete rx;
-	//Swap contents in the buffers
-	receivers[index] = receivers[receivers.size() - 1];
+	//Swap contents in the buffers if not last
+	if (index != (receivers.size() - 1)) {
+		receivers[index] = receivers[receivers.size() - 1];
+		receiverExtToBufferId.at(receivers[index]->externalId) = index;
+	}
 	receivers.pop_back();
 	receiverExtToBufferId.erase(id);
 	//Update buffers
@@ -1154,40 +1170,26 @@ void OpalSceneManager::removeReceiver(int id) {
  }
 
 void OpalSceneManager::transmit(int txId, float txPower,  float3 origin, float3 polarization) {
-	//std::ofstream myfile;
-	//myfile.open("D:\\log.txt", std::ifstream::app);
-	//myfile << "Transmitting from (" <<origin.x<<","<<origin.y<<","<<origin.z<<") "<< txId << std::endl;
-		//sceneManager->sceneContext["ray_origin"]->setFloat(origin); //Create buffer for tx
-
 	
-		//printInternalBuffersState();
+	    printInternalBuffersState();
+
+		//TODO:: Change if transmit in batches. Otherwise, always map to 0
 		Transmitter* host_tx = reinterpret_cast<Transmitter*>  (txOriginBuffer->map());
-		host_tx[txId].origin = origin;
-		host_tx[txId].polarization = polarization;
+		host_tx[0].origin = origin;
+		host_tx[0].polarization = polarization;
 		txOriginBuffer->unmap();
-		
 		context["tx_rx"]->setUint(make_uint2(1u, static_cast<uint>(receivers.size()))); //Move to add/remove transmitters and receiver
-		//sceneManager->outputFile << sceneManager->transmissions<< "Tx from (" << origin.x << ","<<origin.y <<","<< origin.z << ")"<<std::endl;
-		transmissions++;	
-	
-
-		//Update receiver radius
-		/*for (int i = 0; i < receivers.size(); i++)
-		{
-			float distance = length(origin - receivers[i]->position);
-			float radius = 10.0f*deg2rad*distance/sqrt(3.0f);
-
-			std::cout << "d="<<distance<<"radius=" << radius << std::endl;
-			receivers[i]->geomInstance["sphere"]->setFloat(make_float4(receivers[i]->position,radius));
-
-		}*/
 		
+
 		//First initialize
 		context->launch(0, raySphere.elevationSteps, raySphere.azimuthSteps, 1);//Launch 3D (elevation, azimut,transmitters)
-		//context["initialize"]->setUint(0u);
-
 		
+
+		std::cout << "transmit initialized" << std::endl;
+	
 		context->launch(1, raySphere.elevationSteps, raySphere.azimuthSteps, 1);
+
+		transmissions++;
 		//One ray
 		//sceneManager->sceneContext->launch(0, 1, 1, 1);
 
@@ -1206,7 +1208,7 @@ void OpalSceneManager::transmit(int txId, float txPower,  float3 origin, float3 
 		int hitCount = 0;
 		unsigned int width = static_cast<unsigned int>(receivers.size());
 		//myfile << "receivers =" << width << std::endl;
-		for (unsigned int  x = 0; x < width; ++x)
+		for (unsigned int x = 0; x < width; ++x)
 		{
 			for (unsigned int y = 0; y < 1; ++y)
 			{
@@ -1214,23 +1216,24 @@ void OpalSceneManager::transmit(int txId, float txPower,  float3 origin, float3 
 				if (host_hits[index].directHits > 0 || host_hits[index].reflections > 0) {
 					//Compute power and callback
 					float2 E = host_hits[index].sumRxElectricField;
-					
+
 #ifdef OPALDEBUG
 					//used with hold reflections for debug
 					if (holdReflections) {
-						std::cout <<"DH E=" << E << std::endl;
+						std::cout << "DH E=" << E << std::endl;
 						E += sumReflections(ref_host, x);
 					}
 #endif // OPALDEBUG
 
-				
+
 
 					float power = defaultChannel.eA*((E.x*E.x) + (E.y*E.y))*txPower;
-					std::cout << "rx=" << receivers[x]->position <<".r="<<receivers[x]->radius <<". tx=" << origin << ".eA=" << defaultChannel.eA << ". txPower=" << txPower << "E=(" << E.x << "," << E.y << ")" << "p=" << power << "dh=" << host_hits[index].directHits << "rf=" << host_hits[index].reflections << "d=" << length(origin - receivers[x]->position) << std::endl;
+					std::cout << "rx=" << receivers[x]->position << ".r=" << receivers[x]->radius << ". tx=" << origin << ".eA=" << defaultChannel.eA << ". txPower=" << txPower << "E=(" << E.x << "," << E.y << ")" << "p=" << power << "dh=" << host_hits[index].directHits << "rf=" << host_hits[index].reflections << "d=" << length(origin - receivers[x]->position) << std::endl;
 #ifdef OPALDEBUG
-					outputFile << "rx=" << receivers[x]->position << ".r=" << receivers[x]->radius << ". tx=" << origin << ".eA=" << defaultChannel.eA << ". txPower=" << txPower << "E=(" << E.x << "," << E.y << ")" << "p=" << power <<"dh="<< host_hits[index].directHits <<"rf="<< host_hits[index].reflections <<"d="<< length(origin - receivers[x]->position) << std::endl;
+					outputFile << "rx=" << receivers[x]->position << ".r=" << receivers[x]->radius << ". tx=" << origin << ".eA=" << defaultChannel.eA << ". txPower=" << txPower << "E=(" << E.x << "," << E.y << ")" << "p=" << power << "dh=" << host_hits[index].directHits << "rf=" << host_hits[index].reflections << "d=" << length(origin - receivers[x]->position) << std::endl;
 #endif // OPALDEBUG
-					receivers[x]->callback(power,y);
+
+					receivers[x]->callback(power, y);
 				}
 			}
 
@@ -1246,10 +1249,11 @@ void OpalSceneManager::transmit(int txId, float txPower,  float3 origin, float3 
 
 		//used with hold reflections for debug
 		//facesMinEBuffer->unmap();
-	
-		//myfile.close();
-	
 
+		//myfile.close();
+
+	
+	
 
 }
 
@@ -1279,7 +1283,7 @@ void OpalSceneManager::updateReceiverBuffers(uint oldReceivers, uint newReceiver
 	
 		receptionInfoBuffer->setSize(newReceivers, 1u);
 		
-		facesBuffer->setSize(numberOfFaces, newReceivers);
+		//facesBuffer->setSize(numberOfFaces, newReceivers);
 		
 	
 		facesMinDBuffer->setSize(maxReflections, numberOfFaces, newReceivers);
@@ -1339,7 +1343,7 @@ void OpalSceneManager::updateReceiverBuffers(uint oldReceivers, uint newReceiver
 void OpalSceneManager::recreateReceiverBuffers() {
 	
 	receptionInfoBuffer->destroy();
-	facesBuffer->destroy();
+	//facesBuffer->destroy();
 	facesMinDBuffer->destroy();
 	facesMinEBuffer->destroy();
 
@@ -1354,7 +1358,7 @@ void OpalSceneManager::recreateReceiverBuffers() {
 	receptionInfoBuffer = setReceptionInfoBuffer(static_cast<uint>(receivers.size()), 1);
 	//txOriginBuffer = setTransmittersOriginBuffer(1);
 	//setDuplicatesBuffer(static_cast<uint>(receivers.size()), 1u, duplicates.duplicateBlockSize);
-	facesBuffer = setFacesBuffer(static_cast<uint>(receivers.size()));
+	//facesBuffer = setFacesBuffer(static_cast<uint>(receivers.size()));
 	facesMinDBuffer = setFacesMinDBuffer(static_cast<uint>(receivers.size()));
 	facesMinEBuffer = setFacesMinEBuffer(static_cast<uint>(receivers.size()));
 	internalRaysBuffer = setInternalRaysBuffer(static_cast<uint>(receivers.size()), 1u);
@@ -1365,7 +1369,7 @@ void OpalSceneManager::recreateReceiverBuffers() {
 void opal::OpalSceneManager::updateFacesBuffers()
 {
 	if (sceneFinished) {
-		facesBuffer->setSize(numberOfFaces, static_cast<unsigned int>(receivers.size()));
+		//facesBuffer->setSize(numberOfFaces, static_cast<unsigned int>(receivers.size()));
 
 
 		facesMinDBuffer->setSize(maxReflections, numberOfFaces, static_cast<unsigned int>(receivers.size()));
@@ -1379,25 +1383,44 @@ void opal::OpalSceneManager::updateFacesBuffers()
 
 void opal::OpalSceneManager::printInternalBuffersState()
 {
+
+
+	unsigned long long totalBytes = 0;
+	unsigned long long sb;
+	std::cout << "--Internal buffers" << std::endl;
 	RTsize w;
 	RTsize h;
 	RTsize d;
 	receptionInfoBuffer->getSize(w,h);
-	std::cout << "receptionInfoBuffer=(" << w<<","<< h<<")"<< std::endl;
-	facesBuffer->getSize(w, h);
-	std::cout << "facesBuffer=(" << w << "," << h << ")" << std::endl;
+	sb = sizeof(ReceptionInfo)*w*h;
+	totalBytes += sb;
+	std::cout << "\t receptionInfoBuffer=(" << w<<","<< h<<"). size="<<(sb/1024.f)<<"KB"<< std::endl;
+	//facesBuffer->getSize(w, h);
+	//std::cout << "\t facesBuffer=(" << w << "," << h << ")" << std::endl;
 	facesMinDBuffer->getSize(w, h,d);
-	std::cout << "facesMinDBuffer=(" << w << "," << h<< ","<<d<<")" << std::endl;
+	sb = sizeof(int)*w*h*d;
+	totalBytes += sb;
+	std::cout << "\t facesMinDBuffer=(" << w << "," << h<< ","<<d<<"). size=" << (sb / 1024.f) << "KB" << std::endl;
 	facesMinEBuffer->getSize(w, h, d);
-	std::cout << "facesMinEBuffer=(" << w << "," << h << "," << d << ")" << std::endl;
+	sb = sizeof(DuplicateReflection)*w*h*d;
+	totalBytes += sb;
+	std::cout << "\t facesMinEBuffer=(" << w << "," << h << "," << d << "). size=" << (sb / 1024.f) << "KB"<< std::endl;
 	internalRaysBuffer->getSize(w);
-	std::cout << "internalRaysBuffer=(" << w << ")" << std::endl;
+	std::cout << "\t internalRaysBuffer=(" << w << ")" << std::endl;
+	sb = 0;
 	for (size_t i = 0; i < internalRays.size(); i++)
 	{
 		internalRays[i]->getSize(w, h, d);
-		std::cout << "internalRays["<<i<<"]=(" << w << "," << h << "," << d << ")" << std::endl;
+		sb = sizeof(int)*w*h*d;
+		totalBytes += sb;
+		std::cout << "\t internalRays["<<i<<"]=(" << w << "," << h << "," << d << "). size=" << (sb / 1024.f) << "KB" << std::endl;
 	}
+	//Check memory usage
+	std::cout << "Total memory in internal buffers" << (totalBytes / (1024.f*1024.f)) << " MB" << std::endl;
+
+
 }
+
 
 void OpalSceneManager::finishSceneContext() {
 	
@@ -1412,7 +1435,7 @@ void OpalSceneManager::finishSceneContext() {
 	receptionInfoBuffer = setReceptionInfoBuffer(static_cast<uint>(receivers.size()), 1);
 	txOriginBuffer = setTransmittersOriginBuffer(1);
 	//setDuplicatesBuffer(static_cast<uint>(receivers.size()), 1u, duplicates.duplicateBlockSize);
-	facesBuffer=setFacesBuffer(static_cast<uint>(receivers.size()));
+	//facesBuffer=setFacesBuffer(static_cast<uint>(receivers.size()));
 	facesMinDBuffer=setFacesMinDBuffer(static_cast<uint>(receivers.size()));
 
 #ifdef OPALDEBUG
@@ -1441,14 +1464,46 @@ void OpalSceneManager::finishSceneContext() {
 	context->validate();
 	//context->setExceptionEnabled(RT_EXCEPTION_BUFFER_INDEX_OUT_OF_BOUNDS, true);
 	sceneFinished = true;
-	std::cout << "finishSceneContext()-- Summary---" << std::endl;
-	std::cout << "numberOfFaces=" << numberOfFaces << ". minEpsilon= " << minEpsilon << ". maxReflections=" << maxReflections << std::endl;
-	std::cout << "Receivers=" << receivers.size() << ". Trasnmitters=" << transmitters.size() << std::endl;
-	std::cout << "RayCount=" << raySphere.rayCount << "azimuthSteps=" << raySphere.azimuthSteps << "elevationSteps" << raySphere.elevationSteps << std::endl;
-	printInternalBuffersState();
-	std::cout << "-----" << std::endl;
+	printSceneReport();
+	
 }
 
+
+void  opal::OpalSceneManager::printSceneReport() {
+	std::cout << "--- Scene Summary ---" << std::endl;
+	std::cout << "\t numberOfFaces=" << numberOfFaces << ". minEpsilon= " << minEpsilon << ". maxReflections=" << maxReflections << std::endl;
+	std::cout << "\t Receivers=" << receivers.size() << ". Transmitters=" << transmitters.size() << std::endl;
+	std::cout << "\t RayCount=" << raySphere.rayCount << ". azimuthSteps=" << raySphere.azimuthSteps << ". elevationSteps=" << raySphere.elevationSteps << std::endl;
+	std::cout << "-- Scene Graph" << std::endl;
+	std::cout << "\t rootGroup. Children=" << rootGroup->getChildCount() << std::endl;
+	std::cout << "\t max_interactions=" << context["max_interactions"]->getUint() << "number_of_faces=" << context["number_of_faces"]->getUint() << std::endl;
+	optix::GeometryGroup gg  = rootGroup->getChild<optix::GeometryGroup>(0);
+	//Static meshes 
+	for (unsigned int i = 0; i <gg->getChildCount(); i++)
+	{
+		optix::GeometryInstance gi = gg->getChild(i);
+		MaterialEMProperties em;
+		gi["EMProperties"]->getUserData(sizeof(MaterialEMProperties), &em);
+
+		std::cout << "\t StaticMesh[" << i << "].EMProperties=" << em.dielectricConstant << std::endl;
+	}
+	//Receivers
+	gg = rootGroup->getChild<optix::GeometryGroup>(1);
+	for (unsigned int i = 0; i < gg->getChildCount(); i++)
+	{
+		optix::GeometryInstance gi = gg->getChild(i);
+		std::cout << "\t Receiver[" << i << "].sphere=" << gi["sphere"]->getFloat4()<<".internalBufferId="<<gi["receiverId"]->getUint()<<".externalId="<< gi["externalId"]->getUint() << std::endl;
+	}
+	for (unsigned int i = 2; i < rootGroup->getChildCount(); i++)
+	{
+		optix::Transform t = rootGroup->getChild<optix::Transform>(i);
+		gg= t->getChild<optix::GeometryGroup>();
+		std::cout << "\t DynamicMesh[" << (i - 2) << "].children=" << gg->getChildCount() << std::endl;
+	}
+	printInternalBuffersState();
+	std::cout << "-----" << std::endl;
+
+}
 void opal::OpalSceneManager::setPrintEnabled(int bufferSize)
 {
 
@@ -1486,7 +1541,7 @@ void OpalSceneManager::buildSceneGraph()
 	{
 		receiversGroup->setChild(cindex, val->geomInstance);
 #ifdef OPALDEBUG
-		outputFile << "Receiver[ " << cindex << "].position=" << val->position << std::endl;
+		outputFile << "Receiver[ " << cindex << "].position=" << val->position <<". radius="<<val->radius <<std::endl;
 #endif // OPALDEBUG
 		++cindex;
 
@@ -1512,10 +1567,10 @@ void OpalSceneManager::buildSceneGraph()
 
 	rootGroup->setAcceleration(context->createAcceleration("Trbvh")); //All Groups and GeometryGroups MUST have an acceleration
 	context["root"]->set(rootGroup);
-
+	
 	sceneGraphCreated = true;
 #ifdef OPALDEBUG
-	outputFile << "Building scene graph. Static  meshes: " << staticMeshes.size() << ". Receivers: " << receivers.size() << std::endl;
+	outputFile << "Building scene graph. Static  meshes: " << staticMeshes.size() << ". Receivers: " << receivers.size() << ". Dynamic meshes:"<< dynamicMeshes.size() <<std::endl;
 #endif // OPALDEBUG
 
 	
@@ -1557,13 +1612,14 @@ int main(int argc, char** argv)
 		//m_timer.restart();
 		//const double timeInit = m_timer.getTime();
 
-		
+		sceneManager = crossingTestAndVehicle(std::move(sceneManager));
 		//sceneManager = addRemoveDynamicMeshes(std::move(sceneManager));
+		//sceneManager = addCompoundDynamicMeshes(std::move(sceneManager));
 		//sceneManager = addRemoveReceivers(std::move(sceneManager));
 		
 		//sceneManager = planeTest(std::move(sceneManager));
 		//sceneManager = moveReceivers(std::move(sceneManager));
-		sceneManager = crossingTest(std::move(sceneManager));
+		//sceneManager = crossingTest(std::move(sceneManager));
 		//const double timeLaunch = m_timer.getTime();
 		//std::cout << "Rx=" << rx.x << "+j" << rx.y << std::endl;
 		/*std::cout << "initScene(): " << timeLaunch - timeInit << " seconds overall" << std::endl;
@@ -1594,6 +1650,94 @@ int main(int argc, char** argv)
 }
 
 
+//Adding compund dynamic meshes
+std::unique_ptr<OpalSceneManager> addCompoundDynamicMeshes(std::unique_ptr<OpalSceneManager> sceneManager) {
+	try {
+
+		//Quad
+		int quadind[6] = { 0,1,2,1,0,3 };
+		optix::float3 quadv[4] = { make_float3(-0.5f,-0.5f,0.f),make_float3(0.5f,0.5f,0.f) ,make_float3(0.5f,-0.5f,0.f) ,make_float3(-0.5f,0.5f,0.f) };
+
+		//45-degrees  x-titled down -0.7 quad with respect to parent
+		
+		optix::float3 quadt[4] = { make_float3(-0.5f, -1.1f, -0.9f),make_float3(0.5f, -0.3f, -0.1f) ,make_float3(0.5f, -0.3f, -0.1f) ,make_float3(0.5f, -0.3f, -0.1f) };
+
+		Matrix4x4 tm;
+		tm.setRow(0, make_float4(1, 0, 0, 0.f));
+		tm.setRow(1, make_float4(0, 1, 0, 2.f));
+		tm.setRow(2, make_float4(0, 0, 1, 75.f));
+		tm.setRow(3, make_float4(0, 0, 0.f, 1));
+		MaterialEMProperties emProp1;
+		emProp1.dielectricConstant = make_float2(3.75f, -60.0f*sceneManager->defaultChannel.waveLength*0.038f);
+
+		//Creation of dynamic meshes  requires calling these 4 functions
+		sceneManager->addDynamicMeshGroup(0);
+		sceneManager->addMeshToGroup(0, 4, quadv, 6, quadind, emProp1);  //Call for each new mesh in the group
+		sceneManager->addMeshToGroup(0, 4, quadt, 6, quadind, emProp1);  //Call for each new mesh in the group
+		sceneManager->updateTransformInGroup(0, tm);
+		sceneManager->finishDynamicMeshGroup(0);
+
+
+		sceneManager->createRaySphere2D(1, 1);
+		//sceneManager->createRaySphere2DSubstep(1, 1);
+		//receivers
+		optix::float3 posrx = make_float3(0.0f, 2.0f, 50.0f);
+
+
+		optix::float3 postx = make_float3(0.0f, 2.0f, 0.0f);
+
+		sceneManager->addReceiver(1, posrx, 5.0f, printPower);
+
+
+		sceneManager->finishSceneContext();
+		sceneManager->setPrintEnabled(1024 * 1024 * 1024);
+		optix::float3 polarization = make_float3(0.0f, 1.0f, 0.0f); //Perpendicular to the floor. Assuming as in Unity that forward is z-axis and up is y-axis
+
+		sceneManager->transmit(0, 1.0f, postx, polarization);
+
+
+		//Translated and rotated 180 degrees, ends up symmetric to the previous position
+		Matrix4x4 tm1;
+		tm1.setRow(0, make_float4(-1.f, 0, 0, 0.f));
+		tm1.setRow(1, make_float4(0, 1, 0, 2.f));
+		tm1.setRow(2, make_float4(0, 0, -1.0f, -75.f));
+		tm1.setRow(3, make_float4(0, 0, 0.f, 1));
+		sceneManager->updateTransformInGroup(0, tm1);
+
+		std::cout << "Only quad moved. Transmit again" << std::endl;
+		sceneManager->transmit(0, 1.0f, postx, polarization);
+
+		posrx = make_float3(0.0f, 2.0f, -50.0f);
+		sceneManager->updateReceiver(1, posrx);
+
+		std::cout << "Symmetric situation if everything has transformed well. Expect the  same power as first transmission. Transmit again" << std::endl;
+		sceneManager->transmit(0, 1.0f, postx, polarization);
+
+
+		return sceneManager;
+	}
+	catch (optix::Exception& e) {
+		std::cout << "addCompoundDynamicMeshes occurred with error code "
+			<< e.getErrorCode() << " and message "
+			<< e.getErrorString() << std::endl;
+
+		return 0;
+	}
+	catch (opal::Exception& e) {
+		std::cout << "addCompoundDynamicMeshes occurred with  message "
+			<< e.getErrorString()
+			<< std::endl;
+
+		return 0;
+	}
+
+
+}
+
+
+
+
+
 //Adding, moving and removing dynamic meshes
 std::unique_ptr<OpalSceneManager> addRemoveDynamicMeshes(std::unique_ptr<OpalSceneManager> sceneManager) {
 	try {
@@ -1618,6 +1762,7 @@ std::unique_ptr<OpalSceneManager> addRemoveDynamicMeshes(std::unique_ptr<OpalSce
 	sceneManager->updateTransformInGroup(0, tm); 
 	sceneManager->finishDynamicMeshGroup(0);
 
+	
 	sceneManager->createRaySphere2D(1, 1);
 	//sceneManager->createRaySphere2DSubstep(1, 1);
 	//receivers
@@ -1645,7 +1790,7 @@ std::unique_ptr<OpalSceneManager> addRemoveDynamicMeshes(std::unique_ptr<OpalSce
 	posrx = make_float3(0.0f, 2.0f, -50.0f);
 	sceneManager->updateReceiver(1, posrx);
 
-	std::cout << "transmit again" << std::endl;
+	std::cout << "Symmetric situation if everything has transformed well. Expect the same power as first transmission. Transmit again" << std::endl;
 	sceneManager->transmit(0, 1.0f, postx, polarization);
 
 	//Add a new quad 
@@ -1654,7 +1799,7 @@ std::unique_ptr<OpalSceneManager> addRemoveDynamicMeshes(std::unique_ptr<OpalSce
 	sceneManager->updateTransformInGroup(1, tm);
 	sceneManager->finishDynamicMeshGroup(1);
 
-	std::cout << "transmit with new quad. Num quads= "<< sceneManager->dynamicMeshes.size() << std::endl;
+	std::cout << "Transmit with new quad. Num quads= "<< sceneManager->dynamicMeshes.size() << std::endl;
 	sceneManager->transmit(0, 1.0f, postx, polarization);
 
 	//Remove first quad
@@ -1662,7 +1807,7 @@ std::unique_ptr<OpalSceneManager> addRemoveDynamicMeshes(std::unique_ptr<OpalSce
 	
 	posrx = make_float3(0.0f, 2.0f, 50.0f);
 	sceneManager->updateReceiver(1, posrx);
-	std::cout << "transmit again  Num quads= " << sceneManager->dynamicMeshes.size() << std::endl;
+	std::cout << "Removing first quad. Expect again the first power. Transmit again.  Num quads= " << sceneManager->dynamicMeshes.size() << std::endl;
 	Matrix4x4 mym;
 	Matrix4x4 mymi;
 	sceneManager->dynamicMeshes.at(1)->transform->getMatrix(0, mym.getData(), mymi.getData());
@@ -1887,16 +2032,16 @@ std::unique_ptr<OpalSceneManager> crossingTest(std::unique_ptr<OpalSceneManager>
 	std::cout << "Adding Plane. Em=" << emProp1.dielectricConstant << std::endl;
 	sceneManager->addStaticMesh(static_cast<int>(planever.size()), planever.data(), static_cast<int>(planeind.size()), planeind.data(), tm, emProp1);
 
-	sceneManager->createRaySphere2D(1, 1);
-	//sceneManager->createRaySphere2DSubstep(1, 1);
+	//sceneManager->createRaySphere2D(1, 1);
+	sceneManager->createRaySphere2DSubstep(1, 1);
 	
 	//receivers
 
-	optix::float3 posrx = make_float3(0.0f, 10.0f, 100.0f);
-	sceneManager->addReceiver(1, posrx, 5.f, printPower);
+	optix::float3 posrx = make_float3(0.0f, 2.0f, 100.0f);
+	sceneManager->addReceiver(1, posrx, 1.f, printPower);
 
 
-	sceneManager->setMaxReflections(4u);
+	sceneManager->setMaxReflections(3u);
 
 	sceneManager->finishSceneContext();
 
@@ -1909,7 +2054,7 @@ std::unique_ptr<OpalSceneManager> crossingTest(std::unique_ptr<OpalSceneManager>
 																
 	for (int i = -50; i <= 50; ++i)
 	{
-		postx = make_float3(i, 10.0f, 50.0f);
+		postx = make_float3(i, 1.43f, 50.0f);
 
 		sceneManager->transmit(0, 1.0f, postx, polarization);
 
@@ -2016,6 +2161,147 @@ std::unique_ptr<OpalSceneManager> quadTest(std::unique_ptr<OpalSceneManager> sce
 }
 
 
+
+//Street crossing test. Cubes are intended to be buildings and a plane is the floor. A complex vehicle mesh is moved
+std::unique_ptr<OpalSceneManager> crossingTestAndVehicle(std::unique_ptr<OpalSceneManager> sceneManager) {
+	//Cubes
+	std::vector<int> cubeind = loadTrianglesFromFile("D:\\tricube.txt");
+	std::vector<float3> cubevert = loadVerticesFromFile("D:\\vertcube.txt");
+	//std::cout << "indices=" << cubeind.size() << "vertices=" << cubevert.size() << std::endl;
+	//Cube(4) NW
+	Matrix4x4 tm;
+	tm.setRow(0, make_float4(40.0f, 0, 0, -30.0f));
+	tm.setRow(1, make_float4(0, 40.0f, 0, 20.0f));
+	tm.setRow(2, make_float4(0, 0, 40.0f, 80.0f));
+	tm.setRow(3, make_float4(0, 0, 0, 1));
+	MaterialEMProperties emProp1;
+	emProp1.dielectricConstant = make_float2(3.75f, -60.0f*sceneManager->defaultChannel.waveLength*0.038f);
+	//emProp1.dielectricConstant = make_float2(3.75f, -0.4576f);
+	std::cout << "Adding NW. Em=" << emProp1.dielectricConstant << std::endl;
+	sceneManager->addStaticMesh(static_cast<int>(cubevert.size()), cubevert.data(), static_cast<int>(cubeind.size()), cubeind.data(), tm, emProp1);
+
+	//Cube SW
+	tm.setRow(0, make_float4(40.0f, 0, 0, -30.0f));
+	tm.setRow(1, make_float4(0, 40.0f, 0, 20.0f));
+	tm.setRow(2, make_float4(0, 0, 40.0f, 20.0f));
+	tm.setRow(3, make_float4(0, 0, 0, 1));
+	std::cout << "Adding SW. Em = " << emProp1.dielectricConstant << std::endl;
+	sceneManager->addStaticMesh(static_cast<int>(cubevert.size()), cubevert.data(), static_cast<int>(cubeind.size()), cubeind.data(), tm, emProp1);
+	//Cube(2) NE
+
+	tm.setRow(0, make_float4(40.0f, 0, 0, 30.0f));
+	tm.setRow(1, make_float4(0, 40.0f, 0, 20.0f));
+	tm.setRow(2, make_float4(0, 0, 40.0f, 80.0f));
+	tm.setRow(3, make_float4(0, 0, 0, 1));
+	std::cout << "Adding NE. Em = " << emProp1.dielectricConstant << std::endl;
+	sceneManager->addStaticMesh(static_cast<int>(cubevert.size()), cubevert.data(), static_cast<int>(cubeind.size()), cubeind.data(), tm, emProp1);
+
+	//Cube(1) SE
+
+	tm.setRow(0, make_float4(40.0f, 0, 0, 30.0f));
+	tm.setRow(1, make_float4(0, 40.0f, 0, 20.0f));
+	tm.setRow(2, make_float4(0, 0, 40.0f, 20.0f));
+	tm.setRow(3, make_float4(0, 0, 0, 1));
+	std::cout << "Adding SE. Em = " << emProp1.dielectricConstant << std::endl;
+	sceneManager->addStaticMesh(static_cast<int>(cubevert.size()), cubevert.data(), static_cast<int>(cubeind.size()), cubeind.data(), tm, emProp1);
+
+	//Horizontal plane
+	std::vector<int> planeind = loadTrianglesFromFile("D:\\tri.txt");
+	std::vector<float3> planever = loadVerticesFromFile("D:\\vert.txt");
+	//std::cout << "indices=" << planeind.size() << "vertices=" << planever.size() << std::endl;
+
+	tm.setRow(0, make_float4(10.0f, 0, 0, 0.0f));
+	tm.setRow(1, make_float4(0, 1, 0, 0.0f));
+	tm.setRow(2, make_float4(0, 0, 10.0f, 50.0f));
+	tm.setRow(3, make_float4(0, 0, 0, 1));
+
+	//emProp1.dielectricConstant = make_float2(3.75f, -60.0f*sceneManager->defaultChannel.waveLength*0.15f);
+	std::cout << "Adding Plane. Em=" << emProp1.dielectricConstant << std::endl;
+	sceneManager->addStaticMesh(static_cast<int>(planever.size()), planever.data(), static_cast<int>(planeind.size()), planeind.data(), tm, emProp1);
+
+
+
+	//Create vehicle group
+	std::vector<int> bodyi = loadTrianglesFromFile("D:\\CC_ME_Body_R4-i.txt");
+	std::vector<float3> bodyv = loadVerticesFromFile("D:\\CC_ME_Body_R4-v.txt");
+	std::vector<int> wheeli = loadTrianglesFromFile("D:\\CC_ME_Wheel_FL-i.txt");
+	std::vector<float3> wheelv = loadVerticesFromFile("D:\\CC_ME_Wheel_FL-v.txt");
+
+
+	//Creation of dynamic meshes  requires calling these 4 functions
+	sceneManager->addDynamicMeshGroup(0);
+	sceneManager->addMeshToGroup(0, static_cast<int>(bodyv.size()), bodyv.data(), static_cast<int>(bodyi.size()),bodyi.data(), emProp1);  //Call for each new mesh in the group
+	sceneManager->addMeshToGroup(0, static_cast<int>(wheelv.size()), wheelv.data(), static_cast<int>(wheeli.size()), wheeli.data(),emProp1);  //Call for each new mesh in the group
+	 wheeli = loadTrianglesFromFile("D:\\CC_ME_Wheel_FR-i.txt");
+	 wheelv = loadVerticesFromFile("D:\\CC_ME_Wheel_FR-v.txt");
+	 sceneManager->addMeshToGroup(0, static_cast<int>(wheelv.size()), wheelv.data(), static_cast<int>(wheeli.size()), wheeli.data(), emProp1);  //Call for each new mesh in the group
+
+	 wheeli = loadTrianglesFromFile("D:\\CC_ME_Wheel_BL-i.txt");
+	 wheelv = loadVerticesFromFile("D:\\CC_ME_Wheel_BL-v.txt");
+	 sceneManager->addMeshToGroup(0, static_cast<int>(wheelv.size()), wheelv.data(), static_cast<int>(wheeli.size()), wheeli.data(), emProp1);  //Call for each new mesh in the group
+	 wheeli = loadTrianglesFromFile("D:\\CC_ME_Wheel_BR-i.txt");
+	 wheelv = loadVerticesFromFile("D:\\CC_ME_Wheel_BR-v.txt");
+	 sceneManager->addMeshToGroup(0, static_cast<int>(wheelv.size()), wheelv.data(), static_cast<int>(wheeli.size()), wheeli.data(), emProp1);  //Call for each new mesh in the group
+	 
+
+	 tm.setRow(0, make_float4(0.0f, 0.f, 1.0f, -50.0f));
+	 tm.setRow(1, make_float4(0.f, 1.0f, 0.f, 0.6f));
+	 tm.setRow(2, make_float4(-1.f, 0.f, 0.0f, 50.0f));
+	 tm.setRow(3, make_float4(0, 0, 0, 1));
+
+	 /*
+	 tm.setRow(0, make_float4(0.0f, 0.f, 0.f, -50.0f));
+	 tm.setRow(1, make_float4(0.f, 1.0f, 0.f, 0.6f));
+	 tm.setRow(2, make_float4(-1.f, 0.f, 0.0f, 50.0f));
+	 tm.setRow(3, make_float4(0, 0, 0, 1));
+
+	 */
+	sceneManager->updateTransformInGroup(0, tm);
+	sceneManager->finishDynamicMeshGroup(0);
+
+
+
+	//sceneManager->createRaySphere2D(1, 1);
+	sceneManager->createRaySphere2DSubstep(1, 1);
+
+	//receivers
+
+	optix::float3 posrx = make_float3(0.0f, 2.0f, 100.0f);
+	sceneManager->addReceiver(1, posrx, 1.f, printPower);
+
+
+	sceneManager->setMaxReflections(3u);
+
+	sceneManager->finishSceneContext();
+
+
+	sceneManager->setPrintEnabled(1024 * 1024 * 1024);
+
+
+	optix::float3 postx;
+	optix::float3 polarization = make_float3(0.0f, 1.0f, 0.0f); //Perpendicular to the floor. Assuming as in Unity that forward is z-axis and up is y-axis
+
+	for (int i = -50; i <= 50; ++i)
+	{
+		postx = make_float3(i-2, 1.1f, 50.0f);//On top of the vehicle
+		tm.setRow(0, make_float4(-1.19209e-07f, 0.f, 1.0f, i));
+		tm.setRow(2, make_float4(-1.f, 0.f, -1.19209e-07f, 50.0f));
+		//std::cout << "tm=" << tm << std::endl;
+		sceneManager->updateTransformInGroup(0, tm);
+		sceneManager->transmit(0, 1.0f, postx, polarization);
+
+
+	}
+	//postx = make_float3(-50.0f, 1.43f, 50.0f); //On top of the vehicle
+	//postx = make_float3(-50.0f, 3.f, 50.0f); //On top of the vehicle
+	//sceneManager->transmit(0, 1.0f, postx, polarization);
+
+	return sceneManager;
+
+}
+
+
+
 std::vector<float3>  loadVerticesFromFile(const char* file) {
 	std::ifstream infile(file);
 	float x, y, z;
@@ -2051,6 +2337,7 @@ std::vector<float3>  loadVerticesFromFile(const char* file) {
 
 		vertices.push_back(make_float3(x, y, z));
 	}
+	std::cout << "Loaded " << vertices.size() << " vertices from " << file << std::endl;
 	infile.close();
 	
 	return vertices;
@@ -2064,6 +2351,7 @@ std::vector<int>  loadTrianglesFromFile(const char* file) {
 		//std::cout << i << std::endl;
 		triangles.push_back(i);
 	}
+	std::cout << "Loaded " << triangles.size() << "indices from " << file << std::endl;
 	infile.close();
 	return triangles;
 }

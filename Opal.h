@@ -90,7 +90,7 @@ namespace opal {
 		bool isDirty;
 	};
 
-	//Compare mesh faces. Differences below epsilon are consider equal to avoid precision problem
+	//Compare mesh faces. Differences below epsilon are consider equal to avoid precision problems
 	struct face_compare
 	{
 		const float epsilon = 1e-6f;
@@ -126,7 +126,7 @@ namespace opal {
 		//optix::Buffer minReflectionE;
 		optix::Buffer internalRaysBuffer;
 		std::vector<optix::Buffer> internalRays;
-		optix::Buffer facesBuffer;
+		//optix::Buffer facesBuffer;
 		optix::Buffer facesMinDBuffer;
 		optix::Buffer facesMinEBuffer;
 
@@ -262,6 +262,7 @@ namespace opal {
 		void recreateReceiverBuffers();
 		void updateFacesBuffers();
 		void printInternalBuffersState();
+		void printSceneReport();
 		static void callbackUsageReport(int level, const char* tag, const char* msg, void* cbdata);
 	};
 
@@ -341,3 +342,5 @@ std::unique_ptr<opal::OpalSceneManager> quadTest(std::unique_ptr<opal::OpalScene
 std::unique_ptr<opal::OpalSceneManager> addRemoveReceivers(std::unique_ptr<opal::OpalSceneManager> sceneManager);
 std::unique_ptr<opal::OpalSceneManager> moveReceivers(std::unique_ptr<opal::OpalSceneManager> sceneManager);
 std::unique_ptr<opal::OpalSceneManager> addRemoveDynamicMeshes(std::unique_ptr<opal::OpalSceneManager> sceneManager);
+std::unique_ptr<opal::OpalSceneManager> addCompoundDynamicMeshes(std::unique_ptr<opal::OpalSceneManager> sceneManager);
+std::unique_ptr<opal::OpalSceneManager> crossingTestAndVehicle(std::unique_ptr<opal::OpalSceneManager> sceneManager);
