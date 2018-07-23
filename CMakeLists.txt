@@ -43,3 +43,32 @@ OPTIX_add_sample_executable( opal
 target_link_libraries( opal
      ${CUDA_LIBRARIES}
   )
+set(sources
+  Opal.cpp
+  Opal.h
+  Common.h
+  Unity.h
+  Unity.cpp
+  propagationKernels.cu
+  triangle.cu
+  sphere.cu
+)
+set(opal_target "opal_s")
+if(CUDA_NVRTC_ENABLED)
+  add_library(${opal_target} ${sources})
+endif()
+# Use gcc rather than g++ to link if we are linking statically against libgcc_s and libstdc++
+if(USING_GNU_C OR USING_GNU_CXX)
+  if(GCC_LIBSTDCPP_HACK)
+    set_target_properties(${opal_target} PROPERTIES LINKER_LANGUAGE "C")
+    target_link_libraries(${opal_target} LINK_PRIVATE ${STATIC_LIBSTDCPP})
+  endif()
+endif()
+  if(USING_GNU_CXX)
+    target_link_libraries( ${opal_target} m ) # Explicitly link against math library (C samples don't do that by default)
+  endif()
+target_link_libraries(${opal_target}
+  optix
+  optixu
+  sutil_sdk
+  )

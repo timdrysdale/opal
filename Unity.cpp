@@ -73,7 +73,7 @@ namespace opal {
 			_putenv_s("OPTIX_SAMPLES_SDK_DIR", cudaDir);
 			
 #else
-			setenv("OPTIX_SAMPLES_SDK_DIR", cudaDir);
+			setenv("OPTIX_SAMPLES_SDK_DIR", cudaDir, 1);
 #endif // _WIN32
 
 
@@ -142,8 +142,8 @@ namespace opal {
 			optix::Matrix4x4 translationMatrix;
 			UnityToOptixMatrix4x4(translationMatrix, transformationMatrix);
 			//When transforming to MaterialEMProperties conductivity is multiplied by -60*wavelenght
-			MaterialEMProperties prop;
-			float relativePermitivity;
+			MaterialEMProperties prop = sceneManager->ITUparametersToMaterial(emProp.a,emProp.b,emProp.c,emProp.d);
+			/*float relativePermitivity;
 			if (emProp.b==0) {
 				relativePermitivity = emProp.a;
 			}
@@ -158,7 +158,7 @@ namespace opal {
 				conductivity = emProp.c*powf((sceneManager->defaultChannel.frequency / 1.0e9f), emProp.d); //Frequency in GHz
 			}
 			prop.dielectricConstant = make_float2(relativePermitivity,-60.0f*sceneManager->defaultChannel.waveLength*conductivity);
-		
+		*/
 			sceneManager->addStaticMesh(meshVertexCount, meshVertices, meshTriangleCount, meshTriangles, translationMatrix, prop);
 
 			return 0;
@@ -223,23 +223,7 @@ namespace opal {
 		try {
 			
 			//When transforming to MaterialEMProperties conductivity is multiplied by -60*wavelenght
-			MaterialEMProperties prop;
-			float relativePermitivity;
-			if (emProp.b == 0) {
-				relativePermitivity = emProp.a;
-			}
-			else {
-				relativePermitivity = emProp.a*powf((sceneManager->defaultChannel.frequency / 1.0e9f), emProp.b); //Frequency in GHz
-			}
-			float conductivity;
-			if (emProp.d == 0) {
-				conductivity = emProp.c;
-			}
-			else {
-				conductivity = emProp.c*powf((sceneManager->defaultChannel.frequency / 1.0e9f), emProp.d); //Frequency in GHz
-			}
-			prop.dielectricConstant = make_float2(relativePermitivity, -60.0f*sceneManager->defaultChannel.waveLength*conductivity);
-
+			MaterialEMProperties prop = sceneManager->ITUparametersToMaterial(emProp.a,emProp.b,emProp.c,emProp.d);
 
 			sceneManager->addMeshToGroup(id, meshVertexCount, meshVertices, meshTriangleCount, meshTriangles,  prop);
 

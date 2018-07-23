@@ -8,7 +8,6 @@
 #include <optixu/optixu_math_namespace.h>
 #include <optixu/optixu_matrix_namespace.h> 
 #include <optixu/optixpp_namespace.h>
-#include <optixu\optixu_quaternion_namespace.h>
 #include "sutil.h"
 
 #include <algorithm>
@@ -26,32 +25,14 @@ using namespace optix;
  // Init Optix Functions
  // -------------------------------------------------------------------------------------
 
+OpalSceneManager::OpalSceneManager() {
+	initMembers();
+
+}
 OpalSceneManager::OpalSceneManager(float f, bool holdReflections)
 {
-#ifdef OPALDEBUG
-	this->holdReflections = holdReflections;
-	outputFile.open("opal_log.txt");
-#endif // OPALDEBUG
-	setFrequency(f);
-	createSceneContext();
-	setDefaultPrograms();
-	this->maxReflections = 10u;
-	this->minEpsilon = 1.e-4f;
-
-	this->numberOfFaces = 0u; //Increased every time a new face is added to the scene. TODO: a MAX_FACE_ID should be added to limit the buffers size
-	this->sceneGraphCreated = false;
-	this->sceneFinished = false;
-
-
-	this->receptionInfoBuffer = nullptr;
-	this->txPowerBuffer = nullptr;
-	this->txOriginBuffer = nullptr;
-
-	this->internalRaysBuffer = nullptr;
-	//this->facesBuffer = nullptr;
-	this->facesMinDBuffer = nullptr;;
-	this->facesMinEBuffer = nullptr;;
-
+	initMembers();
+	initContext(f,holdReflections);
 
 }
 
@@ -70,14 +51,39 @@ opal::OpalSceneManager::~OpalSceneManager()
 		std::cout << "exception at ~OpalSceneManager():" << e.getErrorString() << "with code:" << e.getErrorCode() << std::endl;
 	}
 }
+void OpalSceneManager::initMembers() {
+	this->maxReflections = 10u;
+	this->minEpsilon = 1.e-4f;
+
+	this->numberOfFaces = 0u; //Increased every time a new face is added to the scene. TODO: a MAX_FACE_ID should be added to limit the buffers size
+	this->sceneGraphCreated = false;
+	this->sceneFinished = false;
 
 
+	this->receptionInfoBuffer = nullptr;
+	this->txPowerBuffer = nullptr;
+	this->txOriginBuffer = nullptr;
+
+	this->internalRaysBuffer = nullptr;
+	//this->facesBuffer = nullptr;
+	this->facesMinDBuffer = nullptr;;
+	this->facesMinEBuffer = nullptr;;
+}
+void OpalSceneManager::initContext(float f, bool holdReflections) {
+#ifdef OPALDEBUG
+	this->holdReflections = holdReflections;
+	outputFile.open("opal_log.txt");
+#endif // OPALDEBUG
+	setFrequency(f);
+	createSceneContext();
+	setDefaultPrograms();
+}	
 
 void OpalSceneManager::setFrequency(float f)
 {
 	this->defaultChannel.frequency = f;
-	//this->defaultChannel.waveLength = 299792458.0f / f; // c/f
-	this->defaultChannel.waveLength = 3.0e8f / f;
+	this->defaultChannel.waveLength = 299792458.0f / f; // c/f
+	//this->defaultChannel.waveLength = 3.0e8f / f;
 	this->defaultChannel.k = 2 * 3.14159265358979323846f / this->defaultChannel.waveLength; //wavenumber (2*pi/lambda)
 	this->defaultChannel.eA = 1.0f / ((2 * this->defaultChannel.k)*(2 * this->defaultChannel.k)); //Effective Area of the antenna (lambda/4*pi)^2
 	
@@ -113,7 +119,7 @@ void opal::OpalSceneManager::setDefaultPrograms()
 	defaultPrograms.insert(std::pair<std::string, optix::Program>("complex_div", createComplexDiv()));
 	defaultPrograms.insert(std::pair<std::string, optix::Program>("complex_exp_only_imaginary", createComplexExpImaginary()));
 
-
+	//TODO: we could add an intersection program for planes (ideal infinite planes), typically used to represent flat grounds, should be more efficient than a mesh
 	defaultPrograms.insert(std::pair<std::string, optix::Program>("meshClosestHit", createClosestHitMesh()));
 	defaultPrograms.insert(std::pair<std::string, optix::Program>("meshIntersection", createIntersectionTriangle()));
 	defaultPrograms.insert(std::pair<std::string, optix::Program>("meshBounds", createBoundingBoxTriangle()));
@@ -204,6 +210,29 @@ void opal::OpalSceneManager::finishDynamicMeshGroup(int id)
 	
 
 }
+//Create material EM properties from ITU parameters (ITU-R P.2040-1)
+MaterialEMProperties OpalSceneManager::ITUparametersToMaterial(float a, float b, float c, float d) {
+	MaterialEMProperties prop;
+	float relativePermitivity;
+	if (b==0) {
+		relativePermitivity = a;
+	}
+	else {
+		relativePermitivity=a*powf((defaultChannel.frequency / 1.0e9f), b); //Frequency in GHz
+	}
+	float conductivity;
+	if (d == 0) {
+		conductivity = c;
+	}
+	else {
+		conductivity = c*powf((defaultChannel.frequency / 1.0e9f), d); //Frequency in GHz
+	}
+	prop.dielectricConstant = make_float2(relativePermitivity,-60.0f*defaultChannel.waveLength*conductivity);
+	return prop;
+
+}
+
+
 
 //Creates and add a static mesh with default programs and material
 OpalMesh OpalSceneManager::addStaticMesh(int meshVertexCount, optix::float3* meshVertices, int meshTriangleCount, int* meshTriangles, optix::Matrix4x4 transformationMatrix, MaterialEMProperties emProp) {
@@ -219,7 +248,15 @@ void OpalSceneManager::addStaticMesh(OpalMesh mesh) {
 	outputFile << "adding mesh =" << staticMeshes.size() << std::endl;
 #endif
 	staticMeshes.push_back(mesh);
+	if (sceneGraphCreated) {
+		staticMeshesGroup->addChild(mesh.geom_instance);
+		staticMeshesGroup->getAcceleration()->markDirty();
+		rootGroup->getAcceleration()->markDirty();
+	}
 
+	if (sceneFinished) {
+		updateFacesBuffers();
+	}
 }
 
 
@@ -255,11 +292,11 @@ void OpalSceneManager::extractFaces(optix::float3* meshVertices, std::vector<std
 		}
 	}
 	std::cout  << normals.size() <<" faces added=. numberOfFaces="<< numberOfFaces<< std::endl;
-	/*for (auto v: normals)
+	for (auto v: normals)
 	{
 		std::cout << "face normal=" << v.first << "id=" << v.second << std::endl;
 
-	}*/
+	}
 	
 
 	
@@ -1171,7 +1208,7 @@ void OpalSceneManager::removeReceiver(int id) {
 
 void OpalSceneManager::transmit(int txId, float txPower,  float3 origin, float3 polarization) {
 	
-	    printInternalBuffersState();
+//	std::cout<<printInternalBuffersState()<<std::endl;
 
 		//TODO:: Change if transmit in batches. Otherwise, always map to 0
 		Transmitter* host_tx = reinterpret_cast<Transmitter*>  (txOriginBuffer->map());
@@ -1381,43 +1418,43 @@ void opal::OpalSceneManager::updateFacesBuffers()
 	}
 }
 
-void opal::OpalSceneManager::printInternalBuffersState()
+std::string opal::OpalSceneManager::printInternalBuffersState()
 {
 
-
+	std::ostringstream stream;
 	unsigned long long totalBytes = 0;
 	unsigned long long sb;
-	std::cout << "--Internal buffers" << std::endl;
+	stream << "--Internal buffers" << std::endl;
 	RTsize w;
 	RTsize h;
 	RTsize d;
 	receptionInfoBuffer->getSize(w,h);
 	sb = sizeof(ReceptionInfo)*w*h;
 	totalBytes += sb;
-	std::cout << "\t receptionInfoBuffer=(" << w<<","<< h<<"). size="<<(sb/1024.f)<<"KB"<< std::endl;
+	stream << "\t receptionInfoBuffer=(" << w<<","<< h<<"). size="<<(sb/1024.f)<<"KB"<< std::endl;
 	//facesBuffer->getSize(w, h);
-	//std::cout << "\t facesBuffer=(" << w << "," << h << ")" << std::endl;
+	//stream << "\t facesBuffer=(" << w << "," << h << ")" << std::endl;
 	facesMinDBuffer->getSize(w, h,d);
 	sb = sizeof(int)*w*h*d;
 	totalBytes += sb;
-	std::cout << "\t facesMinDBuffer=(" << w << "," << h<< ","<<d<<"). size=" << (sb / 1024.f) << "KB" << std::endl;
+	stream << "\t facesMinDBuffer=(" << w << "," << h<< ","<<d<<"). size=" << (sb / 1024.f) << "KB" << std::endl;
 	facesMinEBuffer->getSize(w, h, d);
 	sb = sizeof(DuplicateReflection)*w*h*d;
 	totalBytes += sb;
-	std::cout << "\t facesMinEBuffer=(" << w << "," << h << "," << d << "). size=" << (sb / 1024.f) << "KB"<< std::endl;
+	stream << "\t facesMinEBuffer=(" << w << "," << h << "," << d << "). size=" << (sb / 1024.f) << "KB"<< std::endl;
 	internalRaysBuffer->getSize(w);
-	std::cout << "\t internalRaysBuffer=(" << w << ")" << std::endl;
+	stream << "\t internalRaysBuffer=(" << w << ")" << std::endl;
 	sb = 0;
 	for (size_t i = 0; i < internalRays.size(); i++)
 	{
 		internalRays[i]->getSize(w, h, d);
 		sb = sizeof(int)*w*h*d;
 		totalBytes += sb;
-		std::cout << "\t internalRays["<<i<<"]=(" << w << "," << h << "," << d << "). size=" << (sb / 1024.f) << "KB" << std::endl;
+		stream << "\t internalRays["<<i<<"]=(" << w << "," << h << "," << d << "). size=" << (sb / 1024.f) << "KB" << std::endl;
 	}
 	//Check memory usage
-	std::cout << "Total memory in internal buffers" << (totalBytes / (1024.f*1024.f)) << " MB" << std::endl;
-
+	stream << "Total memory in internal buffers" << (totalBytes / (1024.f*1024.f)) << " MB" << std::endl;
+	return stream.str();
 
 }
 
@@ -1464,19 +1501,20 @@ void OpalSceneManager::finishSceneContext() {
 	context->validate();
 	//context->setExceptionEnabled(RT_EXCEPTION_BUFFER_INDEX_OUT_OF_BOUNDS, true);
 	sceneFinished = true;
-	printSceneReport();
+	//std::cout<<printSceneReport();
 	
 }
 
 
-void  opal::OpalSceneManager::printSceneReport() {
-	std::cout << "--- Scene Summary ---" << std::endl;
-	std::cout << "\t numberOfFaces=" << numberOfFaces << ". minEpsilon= " << minEpsilon << ". maxReflections=" << maxReflections << std::endl;
-	std::cout << "\t Receivers=" << receivers.size() << ". Transmitters=" << transmitters.size() << std::endl;
-	std::cout << "\t RayCount=" << raySphere.rayCount << ". azimuthSteps=" << raySphere.azimuthSteps << ". elevationSteps=" << raySphere.elevationSteps << std::endl;
-	std::cout << "-- Scene Graph" << std::endl;
-	std::cout << "\t rootGroup. Children=" << rootGroup->getChildCount() << std::endl;
-	std::cout << "\t max_interactions=" << context["max_interactions"]->getUint() << "number_of_faces=" << context["number_of_faces"]->getUint() << std::endl;
+std::string opal::OpalSceneManager::printSceneReport()  {
+	std::ostringstream stream;
+	stream << "--- Scene Summary ---" << std::endl;
+	stream << "\t numberOfFaces=" << numberOfFaces << ". minEpsilon= " << minEpsilon << ". maxReflections=" << maxReflections << std::endl;
+	stream << "\t Receivers=" << receivers.size() << ". Transmitters=" << transmitters.size() << std::endl;
+	stream << "\t RayCount=" << raySphere.rayCount << ". azimuthSteps=" << raySphere.azimuthSteps << ". elevationSteps=" << raySphere.elevationSteps << std::endl;
+	stream << "-- Scene Graph" << std::endl;
+	stream << "\t rootGroup. Children=" << rootGroup->getChildCount() << std::endl;
+	stream << "\t max_interactions=" << context["max_interactions"]->getUint() << "number_of_faces=" << context["number_of_faces"]->getUint() << std::endl;
 	optix::GeometryGroup gg  = rootGroup->getChild<optix::GeometryGroup>(0);
 	//Static meshes 
 	for (unsigned int i = 0; i <gg->getChildCount(); i++)
@@ -1485,23 +1523,24 @@ void  opal::OpalSceneManager::printSceneReport() {
 		MaterialEMProperties em;
 		gi["EMProperties"]->getUserData(sizeof(MaterialEMProperties), &em);
 
-		std::cout << "\t StaticMesh[" << i << "].EMProperties=" << em.dielectricConstant << std::endl;
+		stream << "\t StaticMesh[" << i << "].EMProperties=" << em.dielectricConstant << std::endl;
 	}
 	//Receivers
 	gg = rootGroup->getChild<optix::GeometryGroup>(1);
 	for (unsigned int i = 0; i < gg->getChildCount(); i++)
 	{
 		optix::GeometryInstance gi = gg->getChild(i);
-		std::cout << "\t Receiver[" << i << "].sphere=" << gi["sphere"]->getFloat4()<<".internalBufferId="<<gi["receiverId"]->getUint()<<".externalId="<< gi["externalId"]->getUint() << std::endl;
+		stream << "\t Receiver[" << i << "].sphere=" << gi["sphere"]->getFloat4()<<".internalBufferId="<<gi["receiverId"]->getUint()<<".externalId="<< gi["externalId"]->getUint() << std::endl;
 	}
 	for (unsigned int i = 2; i < rootGroup->getChildCount(); i++)
 	{
 		optix::Transform t = rootGroup->getChild<optix::Transform>(i);
 		gg= t->getChild<optix::GeometryGroup>();
-		std::cout << "\t DynamicMesh[" << (i - 2) << "].children=" << gg->getChildCount() << std::endl;
+		stream << "\t DynamicMesh[" << (i - 2) << "].children=" << gg->getChildCount() << std::endl;
 	}
-	printInternalBuffersState();
-	std::cout << "-----" << std::endl;
+	stream<<printInternalBuffersState()<<std::endl;
+	stream << "-----" << std::endl;
+	return stream.str();
 
 }
 void opal::OpalSceneManager::setPrintEnabled(int bufferSize)
@@ -1686,7 +1725,8 @@ std::unique_ptr<OpalSceneManager> addCompoundDynamicMeshes(std::unique_ptr<OpalS
 
 		optix::float3 postx = make_float3(0.0f, 2.0f, 0.0f);
 
-		sceneManager->addReceiver(1, posrx, 5.0f, printPower);
+		std::function<void(float,int)> cb=&printPower;
+		sceneManager->addReceiver(1, posrx, 5.0f, cb);
 
 
 		sceneManager->finishSceneContext();
@@ -2165,8 +2205,8 @@ std::unique_ptr<OpalSceneManager> quadTest(std::unique_ptr<OpalSceneManager> sce
 //Street crossing test. Cubes are intended to be buildings and a plane is the floor. A complex vehicle mesh is moved
 std::unique_ptr<OpalSceneManager> crossingTestAndVehicle(std::unique_ptr<OpalSceneManager> sceneManager) {
 	//Cubes
-	std::vector<int> cubeind = loadTrianglesFromFile("D:\\tricube.txt");
-	std::vector<float3> cubevert = loadVerticesFromFile("D:\\vertcube.txt");
+	std::vector<int> cubeind = loadTrianglesFromFile("meshes/tricube.txt");
+	std::vector<float3> cubevert = loadVerticesFromFile("meshes/vertcube.txt");
 	//std::cout << "indices=" << cubeind.size() << "vertices=" << cubevert.size() << std::endl;
 	//Cube(4) NW
 	Matrix4x4 tm;
@@ -2206,8 +2246,8 @@ std::unique_ptr<OpalSceneManager> crossingTestAndVehicle(std::unique_ptr<OpalSce
 	sceneManager->addStaticMesh(static_cast<int>(cubevert.size()), cubevert.data(), static_cast<int>(cubeind.size()), cubeind.data(), tm, emProp1);
 
 	//Horizontal plane
-	std::vector<int> planeind = loadTrianglesFromFile("D:\\tri.txt");
-	std::vector<float3> planever = loadVerticesFromFile("D:\\vert.txt");
+	std::vector<int> planeind = loadTrianglesFromFile("meshes/tri.txt");
+	std::vector<float3> planever = loadVerticesFromFile("meshes/vert.txt");
 	//std::cout << "indices=" << planeind.size() << "vertices=" << planever.size() << std::endl;
 
 	tm.setRow(0, make_float4(10.0f, 0, 0, 0.0f));
@@ -2222,25 +2262,25 @@ std::unique_ptr<OpalSceneManager> crossingTestAndVehicle(std::unique_ptr<OpalSce
 
 
 	//Create vehicle group
-	std::vector<int> bodyi = loadTrianglesFromFile("D:\\CC_ME_Body_R4-i.txt");
-	std::vector<float3> bodyv = loadVerticesFromFile("D:\\CC_ME_Body_R4-v.txt");
-	std::vector<int> wheeli = loadTrianglesFromFile("D:\\CC_ME_Wheel_FL-i.txt");
-	std::vector<float3> wheelv = loadVerticesFromFile("D:\\CC_ME_Wheel_FL-v.txt");
+	std::vector<int> bodyi = loadTrianglesFromFile("meshes/CC_ME_Body_R4-i.txt");
+	std::vector<float3> bodyv = loadVerticesFromFile("meshes/CC_ME_Body_R4-v.txt");
+	std::vector<int> wheeli = loadTrianglesFromFile("meshes/CC_ME_Wheel_FL-i.txt");
+	std::vector<float3> wheelv = loadVerticesFromFile("meshes/CC_ME_Wheel_FL-v.txt");
 
 
 	//Creation of dynamic meshes  requires calling these 4 functions
 	sceneManager->addDynamicMeshGroup(0);
 	sceneManager->addMeshToGroup(0, static_cast<int>(bodyv.size()), bodyv.data(), static_cast<int>(bodyi.size()),bodyi.data(), emProp1);  //Call for each new mesh in the group
 	sceneManager->addMeshToGroup(0, static_cast<int>(wheelv.size()), wheelv.data(), static_cast<int>(wheeli.size()), wheeli.data(),emProp1);  //Call for each new mesh in the group
-	 wheeli = loadTrianglesFromFile("D:\\CC_ME_Wheel_FR-i.txt");
-	 wheelv = loadVerticesFromFile("D:\\CC_ME_Wheel_FR-v.txt");
+	 wheeli = loadTrianglesFromFile("meshes/CC_ME_Wheel_FR-i.txt");
+	 wheelv = loadVerticesFromFile("meshes/CC_ME_Wheel_FR-v.txt");
 	 sceneManager->addMeshToGroup(0, static_cast<int>(wheelv.size()), wheelv.data(), static_cast<int>(wheeli.size()), wheeli.data(), emProp1);  //Call for each new mesh in the group
 
-	 wheeli = loadTrianglesFromFile("D:\\CC_ME_Wheel_BL-i.txt");
-	 wheelv = loadVerticesFromFile("D:\\CC_ME_Wheel_BL-v.txt");
+	 wheeli = loadTrianglesFromFile("meshes/CC_ME_Wheel_BL-i.txt");
+	 wheelv = loadVerticesFromFile("meshes/CC_ME_Wheel_BL-v.txt");
 	 sceneManager->addMeshToGroup(0, static_cast<int>(wheelv.size()), wheelv.data(), static_cast<int>(wheeli.size()), wheeli.data(), emProp1);  //Call for each new mesh in the group
-	 wheeli = loadTrianglesFromFile("D:\\CC_ME_Wheel_BR-i.txt");
-	 wheelv = loadVerticesFromFile("D:\\CC_ME_Wheel_BR-v.txt");
+	 wheeli = loadTrianglesFromFile("meshes/CC_ME_Wheel_BR-i.txt");
+	 wheelv = loadVerticesFromFile("meshes/CC_ME_Wheel_BR-v.txt");
 	 sceneManager->addMeshToGroup(0, static_cast<int>(wheelv.size()), wheelv.data(), static_cast<int>(wheeli.size()), wheeli.data(), emProp1);  //Call for each new mesh in the group
 	 
 

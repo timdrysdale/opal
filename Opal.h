@@ -159,8 +159,6 @@ namespace opal {
 		std::ofstream outputFile;
 		bool holdReflections;
 #endif // OPALDEBUG
-
-
 		
 
 
@@ -171,8 +169,11 @@ namespace opal {
 
 
 	public:
+		OpalSceneManager();
 		OpalSceneManager(float f, bool holdReflections=false);
 		virtual ~OpalSceneManager();
+		void initContext(float f, bool holdReflections=false);
+		void initMembers();
 		void setFrequency(float f);
 		void setMaxReflections(unsigned int m);
 		void setMeshEMProperties(optix::GeometryInstance geom_instance, MaterialEMProperties emProp);
@@ -187,7 +188,7 @@ namespace opal {
 
 		OpalMesh addStaticMesh(int meshVertexCount, optix::float3* meshVertices, int meshTriangleCount, int* meshTriangles, optix::Matrix4x4 transformationMatrix, MaterialEMProperties emProp);
 		void addStaticMesh(OpalMesh mesh);
-		
+		MaterialEMProperties ITUparametersToMaterial(float a, float b, float c, float d);
 
 
 		void createRaySphere2D(int elevationSteps, int azimutSteps, optix::float3 * rayDirections);
@@ -261,8 +262,8 @@ namespace opal {
 		void updateReceiverBuffers(optix::uint oldReceivers, optix::uint newReceivers);
 		void recreateReceiverBuffers();
 		void updateFacesBuffers();
-		void printInternalBuffersState();
-		void printSceneReport();
+		std::string printInternalBuffersState();
+		std::string printSceneReport();
 		static void callbackUsageReport(int level, const char* tag, const char* msg, void* cbdata);
 	};
 

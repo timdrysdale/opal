@@ -84,9 +84,12 @@ namespace opal {
 
 	void printMatrix(UnityMatrix4x4& u, std::ofstream& s);
 	void UnityToOptixMatrix4x4(optix::Matrix4x4& m, UnityMatrix4x4& u);
-
+#ifdef _WIN32
+	
 	typedef void(__stdcall *receiverCallback)(float, int);
-
+#else
+	typedef  std::function<void(float,int)> receiverCallback;
+#endif //_WIN32
 
 	
 	extern "C" OPAL_API int Transmit(int txId, float txPower, optix::float3 origin, optix::float3 polarization);
