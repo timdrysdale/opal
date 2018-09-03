@@ -54,6 +54,7 @@ struct EMWavePayload {
 struct Transmitter {
 	optix::float3 origin;
 	optix::float3 polarization;
+	int externalId;
 };
 
 struct TriangleHit
