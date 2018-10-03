@@ -3,6 +3,7 @@
 #include <stdlib.h>
 
 #define CHM() if (sceneManager==nullptr) return OPAL_NO_SCENE_MANAGER; //Check manager
+#define CHMT() if (sceneManager==nullptr) { return OPAL_NO_SCENE_MANAGER;} else {if (MultiTransmitter==false) return OPAL_NO_MULTI_TRANSMITTER_MANAGER;}  //Check manager
  
  
 using namespace optix;
@@ -58,13 +59,13 @@ namespace opal {
 	}
 
 	//Initializes Optix.
-	//Note that CUDA programs are compiled in execution time with NVRTC. They are read from the OPTIX_SAMPLES_SDK_DIR location as set here (see below). See also sutil.cpp line 848 and 335
+	//Note that CUDA programs are compiled in execution time with NVRTC. They are read from the OPTIX_SAMPLES_SDK_DIR location as set here (see below). See also sutil.cpp in the Optix SDK, line 848 and 335
 	//In that directory you should put all the .cu and the Common.h files. They can be changed without recompiling all the plugin.
 	//Any change made in the .cu files in VS is ignored unless copied to that location.
 
 	//When building an executable with Unity, you have either to use a specific script to create the cudaDir and copy the .cu and .h files to it, or just create and copy manually after the build is done
 	//In the end, along with the Unity executable and files you need to have this specific folder and files some way
-	OPAL_API int Init(float frequency, bool holdReflections)
+	OPAL_API int Init(float frequency, bool holdReflections, bool multiTransmitter)
 	{
 		try {
 			//First, set the environment to read the CUDA program files from our Plugins directory.
@@ -78,9 +79,20 @@ namespace opal {
 
 
 #ifdef OPALDEBUG
-			sceneManager = new OpalSceneManager(frequency, holdReflections);
+			if (multiTransmitter) {
+				MultiTransmitter=true;
+				sceneManager = new OpalSceneManagerMultiTransmitter(frequency,holdReflections);
+			} else {
+				sceneManager = new OpalSceneManager(frequency, holdReflections);
+			}
 #else
-			sceneManager = new OpalSceneManager(frequency);
+			if (multiTransmitter) {
+				MultiTransmitter=true;
+				sceneManager = new OpalSceneManagerMultiTransmitter(frequency,holdReflections);
+			} else {
+
+				sceneManager = new OpalSceneManager(frequency);
+			}
 #endif
 
 
@@ -679,6 +691,157 @@ namespace opal {
 			std::ofstream myfile;
 			myfile.open(logFile, std::ifstream::app);
 			myfile << "RemoveDynamicMeshGroup:" << id << " error occurred with error code "
+				<< e.getErrorCode() << " and message "
+				<< e.getErrorString() << std::endl;
+			myfile.close();
+#endif // OPALDEBUG
+			return OPTIX_EXCEPTION;
+		}
+	}
+
+OPAL_API int AddTransmitter(int txId, optix::float3 origin, optix::float3 polarization, float transmitPower) { 
+		CHMT();
+		try {
+		
+			dynamic_cast<OpalSceneManagerMultiTransmitter*>(sceneManager)->addTransmitter(txId, origin,  polarization,  transmitPower);  
+
+			return 0;
+		}
+		catch (opal::Exception& e) {
+#ifdef OPALDEBUG
+			std::ofstream myfile;
+			myfile.open(logFile, std::ifstream::app);
+			myfile << "AddTransmitter:" << id << " error occurred with message: " << e.getErrorString() << std::endl;
+			myfile.close();
+#endif // OPALDEBUG
+
+			return OPAL_EXCEPTION;
+		}
+		catch (optix::Exception& e) {
+#ifdef OPALDEBUG
+			std::ofstream myfile;
+			myfile.open(logFile, std::ifstream::app);
+			myfile << "AddTransmitter:" << id << " error occurred with error code "
+				<< e.getErrorCode() << " and message "
+				<< e.getErrorString() << std::endl;
+			myfile.close();
+#endif // OPALDEBUG
+			return OPTIX_EXCEPTION;
+		}
+	}
+OPAL_API int RemoveTransmitter(int txId ) { 
+		CHMT();
+		try {
+		
+			dynamic_cast<OpalSceneManagerMultiTransmitter*>(sceneManager)->removeTransmitter(txId);  
+
+			return 0;
+		}
+		catch (opal::Exception& e) {
+#ifdef OPALDEBUG
+			std::ofstream myfile;
+			myfile.open(logFile, std::ifstream::app);
+			myfile << "RemoveTransmitter:" << id << " error occurred with message: " << e.getErrorString() << std::endl;
+			myfile.close();
+#endif // OPALDEBUG
+
+			return OPAL_EXCEPTION;
+		}
+		catch (optix::Exception& e) {
+#ifdef OPALDEBUG
+			std::ofstream myfile;
+			myfile.open(logFile, std::ifstream::app);
+			myfile << "RemoveTransmitter:" << id << " error occurred with error code "
+				<< e.getErrorCode() << " and message "
+				<< e.getErrorString() << std::endl;
+			myfile.close();
+#endif // OPALDEBUG
+			return OPTIX_EXCEPTION;
+		}
+	}
+OPAL_API int AddTransmitterToGroup(int txId,float transmitPower, optix::float3 origin,optix::float3 polarization) { 
+		CHMT();
+		try {
+		
+			dynamic_cast<OpalSceneManagerMultiTransmitter*>(sceneManager)->addTransmitterToGroup(txId,  transmitPower, origin, polarization);  
+
+			return 0;
+		}
+		catch (opal::Exception& e) {
+#ifdef OPALDEBUG
+			std::ofstream myfile;
+			myfile.open(logFile, std::ifstream::app);
+			myfile << "AddTransmitterToGroup:" << id << " error occurred with message: " << e.getErrorString() << std::endl;
+			myfile.close();
+#endif // OPALDEBUG
+
+			return OPAL_EXCEPTION;
+		}
+		catch (optix::Exception& e) {
+#ifdef OPALDEBUG
+			std::ofstream myfile;
+			myfile.open(logFile, std::ifstream::app);
+			myfile << "AddTransmitterToGroup:" << id << " error occurred with error code "
+				<< e.getErrorCode() << " and message "
+				<< e.getErrorString() << std::endl;
+			myfile.close();
+#endif // OPALDEBUG
+			return OPTIX_EXCEPTION;
+		}
+	}
+OPAL_API int ClearGroup() { 
+		CHMT();
+		try {
+		
+			dynamic_cast<OpalSceneManagerMultiTransmitter*>(sceneManager)->clearGroup();
+
+			return 0;
+		}
+		catch (opal::Exception& e) {
+#ifdef OPALDEBUG
+			std::ofstream myfile;
+			myfile.open(logFile, std::ifstream::app);
+			myfile << "ClearGroup:" << id << " error occurred with message: " << e.getErrorString() << std::endl;
+			myfile.close();
+#endif // OPALDEBUG
+
+			return OPAL_EXCEPTION;
+		}
+		catch (optix::Exception& e) {
+#ifdef OPALDEBUG
+			std::ofstream myfile;
+			myfile.open(logFile, std::ifstream::app);
+			myfile << "ClearGroup:" << id << " error occurred with error code "
+				<< e.getErrorCode() << " and message "
+				<< e.getErrorString() << std::endl;
+			myfile.close();
+#endif // OPALDEBUG
+			return OPTIX_EXCEPTION;
+		}
+	}
+OPAL_API int GroupTransmit() { 
+		CHMT();
+		try {
+		
+			dynamic_cast<OpalSceneManagerMultiTransmitter*>(sceneManager)->groupTransmit();
+
+			return 0;
+		}
+		catch (opal::Exception& e) {
+#ifdef OPALDEBUG
+			std::ofstream myfile;
+			myfile.open(logFile, std::ifstream::app);
+			myfile << "GroupTransmit:" << id << " error occurred with message: " << e.getErrorString() << std::endl;
+			myfile.close();
+#endif // OPALDEBUG
+
+			return OPAL_EXCEPTION;
+		}
+		catch (optix::Exception& e) {
+#ifdef OPALDEBUG
+			std::ofstream myfile;
+			myfile.open(logFile, std::ifstream::app);
+			myfile << "GroupTransmit:" << id << " error occurred with error code "
 				<< e.getErrorCode() << " and message "
 				<< e.getErrorString() << std::endl;
 			myfile.close();

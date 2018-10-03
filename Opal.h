@@ -131,14 +131,11 @@ namespace opal {
 		InternalBuffersParameters currentInternalBuffersState;
 
 		optix::Buffer receptionInfoBuffer;
-		optix::Buffer txOriginBuffer;
 		optix::Buffer internalRaysBuffer;
 		std::vector<optix::Buffer> internalRays;
 		
 		optix::Buffer facesMinDBuffer;
-		std::vector<optix::Buffer> rxFacesMinDBuffers;
 		optix::Buffer facesMinEBuffer;
-		std::vector<optix::Buffer> rxFacesMinEBuffers;
 
 		//Scene graph variables
 		optix::GeometryGroup receiversGroup;
@@ -150,11 +147,9 @@ namespace opal {
 		std::map<int, unsigned int> receiverExtToBufferId; //External id to receptionInfo buffer Id
 		std::vector<SphereReceiver*> receivers; //receivers info (mapped to receptionInfo buffer)
 		std::map<int, BaseTransmitter*> transmitterExtToBase; //Map from externalId to transmitterBase
-		std::vector<BaseTransmitter*> activeTransmitters; //Map from launchIndex.z to transmitterBase. Used for grouping transmissions (batches)
 	public:
 		bool sceneGraphCreated;
 		bool sceneFinished;
-		bool transmitterGroupBuffers;
 		int transmissions;
 		RaySphere raySphere;
 		ChannelParameters defaultChannel;
@@ -187,7 +182,7 @@ namespace opal {
 		OpalSceneManager(float f, bool holdReflections=false);
 		virtual ~OpalSceneManager();
 		void initContext(float f, bool holdReflections=false);
-		void initMembers();
+		virtual void initMembers();
 		void setFrequency(float f);
 		void setMaxReflections(unsigned int m);
 		void setMeshEMProperties(optix::GeometryInstance geom_instance, MaterialEMProperties emProp);
@@ -215,29 +210,20 @@ namespace opal {
 		void removeReceiver(int id);
 		void updateReceiver(int id, optix::float3 position);
 		void updateReceiver(int id, optix::float3 position, float radius);
-		void addTransmitter(int txId, optix::float3 origin, optix::float3 polarization, float transmitPower) ;
-		void removeTransmitter(int txId) ;
-		void addTransmitterToGroup(int txId,float transmitPower, optix::float3 origin,optix::float3 polarization); 
-		void addTransmitterToGroup(int txId,float transmitPower, optix::float3 origin); 
-		void clearGroup(); 
-	
-
-
-
+		
 		void transmit(int txId, float txPower, optix::float3 origin, optix::float3 polarization);
-		void groupTransmit() ;
+		
 
 		void finishSceneContext();
 
 		void setPrintEnabled(int bufferSize);
 		void setUsageReport();
-		std::string printInternalBuffersState();
-		std::string printSceneReport();
+		virtual std::string printInternalBuffersState();
+		virtual std::string printSceneReport();
 	
 	protected:
 		
-		//optix::float2 sumReflections(DuplicateReflection* ref_host, unsigned int receiver);
-		optix::float2 sumReflections(unsigned int tx, unsigned int receiver);
+		optix::float2 sumReflections(unsigned int receiver);
 		void extractFaces(optix::float3* meshVertices, std::vector<std::pair<optix::int3, unsigned int>> &triangleIndexBuffer);
 
 
@@ -250,9 +236,9 @@ namespace opal {
 			
 		optix::Program createClosestHitMesh();
 
-		optix::Program createClosestHitReceiver();
+		virtual optix::Program createClosestHitReceiver();
 
-		optix::Program createClosestHitReceiverHoldReflections();
+		virtual optix::Program createClosestHitReceiverHoldReflections();
 
 		optix::Program createBoundingBoxTriangle();
 
@@ -262,11 +248,11 @@ namespace opal {
 
 		optix::Program createIntersectionSphere();
 
-		optix::Program createMissProgram();
+		virtual optix::Program createMissProgram();
 
-		optix::Program createRayGenerationProgram();
+		virtual optix::Program createRayGenerationProgram();
 
-		optix::Program createInitializationProgram();
+		virtual optix::Program createInitializationProgram();
 
 		//Complex functions and arithmetic programs
 		optix::Program createComplexScaProd();
@@ -276,17 +262,16 @@ namespace opal {
 		optix::Program createComplexProd();
 
 
-		void setInternalBuffers();
-		void checkInternalBuffers();
-		void clearInternalBuffers();
-		optix::Buffer setReceptionInfoBuffer(optix::uint receivers, optix::uint tx);
-		optix::Buffer setTransmittersOriginBuffer(optix::uint tx);
-		optix::Buffer setInternalRaysBuffer(optix::uint rx, optix::uint tx, optix::uint elevationSteps, optix::uint azimuthSteps); 
-		optix::Buffer setFacesMinDBuffer(optix::uint rx, optix::uint tx, optix::uint reflections, optix::uint faces);
-		optix::Buffer setFacesMinEBuffer(optix::uint rx, optix::uint tx, optix::uint reflections, optix::uint faces);
-		optix::Buffer setFacesMinEBufferHoldReflections(optix::uint rx, optix::uint tx, optix::uint reflections, optix::uint faces);
+		virtual void setInternalBuffers();
+		virtual void checkInternalBuffers();
+		virtual void clearInternalBuffers();
+		optix::Buffer setReceptionInfoBuffer(optix::uint rx);
+		optix::Buffer setInternalRaysBuffer(optix::uint rx,  optix::uint elevationSteps, optix::uint azimuthSteps); 
+		optix::Buffer setFacesMinDBuffer(optix::uint rx, optix::uint reflections, optix::uint faces);
+		optix::Buffer setFacesMinEBuffer(optix::uint rx,  optix::uint reflections, optix::uint faces);
+		optix::Buffer setFacesMinEBufferHoldReflections(optix::uint rx,  optix::uint reflections, optix::uint faces);
 		
-		void updateReceiverBuffers(optix::uint oldReceivers, optix::uint newReceivers);
+		virtual void updateReceiverBuffers(optix::uint oldReceivers, optix::uint newReceivers);
 		void recreateReceiverBuffers();
 		void updateFacesBuffers();
 		void updateTransmitterBuffers(unsigned int tx); 
@@ -294,7 +279,60 @@ namespace opal {
 	};
 
 
-	
+
+	//Derived class for multi-transmitter and multi-receiver operation. Supports parallel transmission of multiple nodes 
+	class OpalSceneManagerMultiTransmitter : public OpalSceneManager {
+		public:
+		virtual void initMembers() override;
+		OpalSceneManagerMultiTransmitter(float f, bool holdReflections=false);
+
+		void addTransmitter(int txId, optix::float3 origin, optix::float3 polarization, float transmitPower) ;
+		void removeTransmitter(int txId) ;
+		void addTransmitterToGroup(int txId,float transmitPower, optix::float3 origin,optix::float3 polarization); 
+		void addTransmitterToGroup(int txId,float transmitPower, optix::float3 origin); 
+		void clearGroup(); 
+		void groupTransmit() ;
+		
+		virtual std::string printInternalBuffersState() override;
+		virtual std::string printSceneReport() override;
+		
+		protected:
+
+
+		//We have to split the minimum-distance electric field internal buffer (for duplicate removal) into two buffers: for real and imaginary parts of the Electric filed. 
+		//Otherwise we get invalid memory access on the device side. See the multiTransmitter.cu for an explanation
+		optix::Buffer facesMinExBuffer;
+		optix::Buffer facesMinEyBuffer;
+		std::vector<optix::Buffer> rxFacesMinExBuffers;
+		std::vector<optix::Buffer> rxFacesMinEyBuffers;
+		std::vector<optix::Buffer> rxFacesMinDBuffers;
+
+
+		std::vector<BaseTransmitter*> activeTransmitters; //Map from launchIndex.z to transmitterBase. Used for grouping transmissions (batches)
+		optix::Buffer txOriginBuffer;
+
+		optix::float2 sumReflections(unsigned int tx, unsigned int receiver);
+		
+		virtual optix::Program createClosestHitReceiver() override;
+		virtual optix::Program createClosestHitReceiverHoldReflections() override;
+		virtual optix::Program createMissProgram() override;
+
+		virtual optix::Program createRayGenerationProgram() override;
+
+		virtual optix::Program createInitializationProgram() override;
+		
+		virtual void setInternalBuffers() override;
+		virtual void checkInternalBuffers() override;
+		virtual void clearInternalBuffers() override;
+		
+		optix::Buffer setReceptionInfoBuffer(optix::uint receivers, optix::uint tx);
+		optix::Buffer setTransmittersOriginBuffer(optix::uint tx);
+		optix::Buffer setInternalRaysBuffer(optix::uint rx, optix::uint tx, optix::uint elevationSteps, optix::uint azimuthSteps); 
+		optix::Buffer setFacesMinDBuffer(optix::uint rx, optix::uint tx, optix::uint reflections, optix::uint faces);
+		optix::Buffer setFacesMinEBuffers(optix::uint rx, optix::uint tx, optix::uint reflections, optix::uint faces);
+		optix::Buffer setFacesMinEBuffersHoldReflections(optix::uint rx, optix::uint tx, optix::uint reflections, optix::uint faces);
+		virtual void updateReceiverBuffers(optix::uint oldReceivers, optix::uint newReceivers) override;
+	};	
 
 #ifndef TIMER_H
 #define TIMER_H
@@ -371,4 +409,4 @@ std::unique_ptr<opal::OpalSceneManager> moveReceivers(std::unique_ptr<opal::Opal
 std::unique_ptr<opal::OpalSceneManager> addRemoveDynamicMeshes(std::unique_ptr<opal::OpalSceneManager> sceneManager);
 std::unique_ptr<opal::OpalSceneManager> addCompoundDynamicMeshes(std::unique_ptr<opal::OpalSceneManager> sceneManager);
 std::unique_ptr<opal::OpalSceneManager> crossingTestAndVehicle(std::unique_ptr<opal::OpalSceneManager> sceneManager);
-std::unique_ptr<opal::OpalSceneManager> seqParallelTxTest(std::unique_ptr<opal::OpalSceneManager> sceneManager);
+std::unique_ptr<opal::OpalSceneManagerMultiTransmitter> seqParallelTxTest(std::unique_ptr<opal::OpalSceneManagerMultiTransmitter> sceneManager);

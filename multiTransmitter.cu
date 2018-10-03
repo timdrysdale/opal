@@ -11,9 +11,7 @@ using namespace optix;
 //Ray Sphere buffer
 rtBuffer<float3> raySphere;
 rtBuffer<float3, 2> raySphere2D;
-//rtBuffer<TriangleHit, 2>  hits;
 
-//rtBuffer<int, 1> init;
 rtBuffer<Transmitter,1> tx_origin;
 
 
@@ -22,15 +20,15 @@ rtBuffer<Transmitter,1> tx_origin;
 
 
 //TODO: these buffers consume a lot of memory if there are many receivers. This could be replaced by recursive tracing inside the sphere or any other solution that should be tried
-rtBuffer<rtBufferId<int, 3>, 1> internalRaysBuffer; //Filter internal rays buffer  [[elevationSteps, azimuthSteps, transmitter],receiver]
+rtBuffer<rtBufferId<int, 3>, 1> internalRaysBuffer; //Filter internal rays buffer  [[elevationSteps, azimuthSteps, receiver],transmitter]
 
-rtBuffer<rtBufferId<int, 3>,1> bufferMinD; //minDistance ray to receiver [[reflections, faceId,receiver],transmitter[;
-//rtBuffer<rtBufferId<DuplicateReflection, 3>,1> bufferMinE; //Buffer with the Electric field of the minimum distance ray [[reflections, faceId,receiver], transmitter];
-rtBuffer<rtBufferId<float2, 3>,1> bufferMinE; //Buffer with the Electric field of the minimum distance ray [[reflections, faceId,receiver], transmitter];
+rtBuffer<rtBufferId<int, 3>,1> bufferMinD; //minDistance ray to receiver [[reflections, faceId,receiver],transmitter];
+
+//TODO: using rtBufferId and float2 plus the AtomicExch() seems to cause problems: segmentation faults from device and WARNING: Raw pointer access. Separating into two buffers seems to solve it
+rtBuffer<rtBufferId<float, 3>,1> bufferMinEx; //Buffer with the real part of the Electric field of the minimum distance ray [[reflections, faceId,receiver], transmitter];
+rtBuffer<rtBufferId<float, 3>,1> bufferMinEy; //Buffer with the imaginary part of the Electric field of the minimum distance ray [[reflections, faceId,receiver], transmitter];
 
 
-//rtBuffer<int, 3> bufferMinD; //minDistance ray to receiver [reflections, faceId,receiver];
-//rtBuffer<DuplicateReflection, 3> bufferMinE; //Buffer with the Electric field of the minimum distance ray [reflections, faceId,receiver];
 rtBuffer<ReceptionInfo, 2> receptionInfoBuffer; //Results buffer [receiver,transmitter]
 
 
@@ -48,47 +46,6 @@ rtDeclareVariable(unsigned int, number_of_faces, , );
 
 rtDeclareVariable(uint2, raySphereSize, , );
 //rtDeclareVariable(uint, initialize, , );
-
-/*RT_PROGRAM void initializeBuffers() {
-	
-	if (launchIndex == make_uint3(0, 0, 0)) {
-		for (unsigned int i = 0; i < tx_rx.y; ++i)
-		{
-			for (unsigned int j = 0; j < tx_rx.x; ++j)
-			{
-				uint2 index = make_uint2(i, j);
-
-				//rtPrintf("Initializing reception buff  Ep0[%u,%u]=(%f,%f)  \n", index.x, index.y, receptionInfoBuffer[index].sumRxElectricField.x, receptionInfoBuffer[index].sumRxElectricField.y);
-				receptionInfoBuffer[index].sumRxElectricField = make_float2(0.0f, 0.0f);
-				receptionInfoBuffer[index].directHits = 0;
-				receptionInfoBuffer[index].reflections = 0;
-				//rtPrintf("Initializing reception buff  Ep0[%u,%u]=(%f,%f)  \n", index.x, index.y, receptionInfoBuffer[index].sumRxElectricField.x, receptionInfoBuffer[index].sumRxElectricField.y);
-
-
-
-			}
-
-		}
-	}
-	//Each launch initializes its element in the receivers buffer
-	//rtPrintf("Initializing buffers tx_rx=(%u,%u)\n", tx_rx.x, tx_rx.y);
-
-
-	for (unsigned int i = 0; i < tx_rx.y; ++i)
-	{	
-		if (launchIndex.y < 180) {
-			rtBufferId<uint, 3>& db = duplicatesBuffer[i];
-			uint3 iddb = make_uint3(launchIndex.x / duplicateBlockSize.x, launchIndex.y / duplicateBlockSize.y, launchIndex.z);
-			db[iddb] = 0u;
-		}
-		rtBufferId<int, 3>& ib = internalRaysBuffer[i];
-		ib[launchIndex] = -1;
-		//rtPrintf("i=%u db[%u,%u,%u]=%u ib=%d \n", i, launchIndex.x, launchIndex.y, launchIndex.z, db[launchIndex], ib[launchIndex]);
-
-	}
-
-}
-*/
 
 
 RT_PROGRAM void initializeBuffersFaceBased() {
@@ -156,7 +113,8 @@ RT_PROGRAM void initializeBuffersFaceBased() {
 			//rtPrintf("Initializing reception buff  Ep0[%u,%u]=(%f,%f)  \n", index.x, index.y, receptionInfoBuffer[index].sumRxElectricField.x, receptionInfoBuffer[index].sumRxElectricField.y);
 			rtBufferId<int, 3>& ifm =bufferMinD[transmitter];
 			//rtBufferId<DuplicateReflection, 3>& ife=bufferMinE[transmitter]; 
-			rtBufferId<float2, 3>& ife=bufferMinE[transmitter]; 
+			rtBufferId<float, 3>& ifex=bufferMinEx[transmitter]; 
+			rtBufferId<float, 3>& ifey=bufferMinEy[transmitter]; 
 			for (unsigned int k = 0; k < number_of_faces; ++k)
 			{
 				//uint2 idf = make_uint2(k, i);
@@ -166,7 +124,9 @@ RT_PROGRAM void initializeBuffersFaceBased() {
 					//		for (unsigned int r=0; r<tx_rx.y; ++r) {
 					uint3 idmd = make_uint3(l, k, r);
 					ifm[idmd] = 2147483647;
-					ife[idmd] = make_float2(0.0f, 0.0f);
+					ifex[idmd] = 0.0f;
+					ifey[idmd] = 0.0f;
+					//ife[idmd] = make_float2(0.0f, 0.0f);
 					//ife[idmd].E = make_float2(0.0f, 0.0f);
 					//ife[idmd].r = 0;
 					//rtPrintf("Initializing faces ifm buff idmd=(%u,%u,%u)%u=%d \n", idmd.x,idmd.y,idmd.z,transmitter, ifm[idmd]);
@@ -444,8 +404,8 @@ RT_PROGRAM void closestHitReceiverFaceMin()
 
 		float dm = length(prx - p3)*1000000.0f;  //Multiply by 1000 000 to truncate later take 6 digits
 		int dmt = __float2int_rz(dm);   //Truncate
-		//int oldd = atomicMin(&bufferMinD[idmd], dmt);
-		int oldd = atomicMin(&min_d_transmitter[idmd], dmt);
+		int oldd = atomicMin(&bufferMinD[transmitterId][idmd], dmt);
+		//int oldd = atomicMin(&min_d_transmitter[idmd], dmt);
 		
 		if (oldd < dmt) {
 			//our distance is greater,return
@@ -485,8 +445,9 @@ RT_PROGRAM void closestHitReceiverFaceMin()
 		//Update min buffer
 //		rtBufferId<DuplicateReflection,3>&  min_e_transmitter =bufferMinE [receiverLaunchIndex.z];
 //		DuplicateReflection dref=min_e_transmitter[idmd];
-//		float*  drx = &(min_e_transmitter[idmd].E.x);
-//		float*  dry = &(min_e_transmitter[idmd].E.y);
+		//rtBufferId<float2,3>&  min_e_transmitter =bufferMinE [transmitterId];
+		//float*  drx = &(min_e_transmitter[idmd].x);
+		//float*  dry = &(min_e_transmitter[idmd].y);
 //		float2 Ebuffer=dref.E;
 //		float ebx=Ebuffer.x;
 //		float eby=Ebuffer.y;
@@ -501,13 +462,16 @@ RT_PROGRAM void closestHitReceiverFaceMin()
 //		float Eprevx = atomicExch(&ebx, E.x);
 //		float Eprevy = atomicExch(&eby, E.y);
 	//	rtPrintf("access index=(%u,%u) idmd=(%u,%u,%u) bmi=(%f,%f)\n",index.x,index.y,idmd.x,idmd.y,idmd.z,bufferMinE[transmitterId][idmd].x,bufferMinE[transmitterId][idmd].y);
-		float Eprevx = atomicExch(&bufferMinE[transmitterId][idmd].x, E.x);
-		float Eprevy = atomicExch(&bufferMinE[transmitterId][idmd].y, E.y);
+		
+		//float Eprevx = atomicExch(&min_e_transmitter[idmd].x, E.x);
+		//float Eprevy = atomicExch(&min_e_transmitter[idmd].y, E.y);
+		float Eprevx = atomicExch(&bufferMinEx[transmitterId][idmd], E.x);
+		float Eprevy = atomicExch(&bufferMinEy[transmitterId][idmd], E.y);
 		float2 Eprev = make_float2(Eprevx, Eprevy);
-		//float2 Eprev = make_float2(0.f,0.f);
+		//float2 Eprev = make_float2(Eprevx,0.f);
 		//rtPrintf("C\t%u\t%u\t%u\t%u\t%d\t%f\t%f\t%f\t%f\t%f\n", receiverLaunchIndex.x, receiverLaunchIndex.y, reflections, hitPayload.faceId,  dmt,  E.x, E.y, hitPayload.prodReflectionCoefficient.x, hitPayload.prodReflectionCoefficient.y, d);
 
-		//rtPrintf("FF\t%u\t%u\t%u\t%u\t%f\t%d\t%d\t%f\t%f\t%f\t%f\t%f\n", receiverLaunchIndex.x, receiverLaunchIndex.y, reflections, hitPayload.faceId, dm, dmt, oldd, E.x, E.y, Eprev.x, Eprev.y, d);
+		rtPrintf("FF\t%u\t%u\t%u\t%u\t%f\t%d\t%d\t%f\t%f\t%f\t%f\t%f\n", receiverLaunchIndex.x, receiverLaunchIndex.y, reflections, hitPayload.faceId, dm, dmt, oldd, E.x, E.y, Eprev.x, Eprev.y, d);
 
 		//Remove Electric field from previous minimum distance hit
 		E -= Eprev; 
@@ -671,16 +635,22 @@ RT_PROGRAM void closestHitReceiverFaceMinHoldReflections()
 		//bufferMinE[idmd].E = E;
 		//Update min buffer
 	//	rtBufferId<DuplicateReflection,3>&  min_e_transmitter =bufferMinE [receiverLaunchIndex.z];
-		rtBufferId<float2,3>&  min_e_transmitter =bufferMinE [receiverLaunchIndex.z];
-		float*  drx = &min_e_transmitter[idmd].x;
-		float*  dry = &min_e_transmitter[idmd].y;
+		
+	
+		//rtBufferId<float2,3>&  min_e_transmitter =bufferMinE [receiverLaunchIndex.z];
+		//float*  drx = &min_e_transmitter[idmd].x;
+		//float*  dry = &min_e_transmitter[idmd].y;
+		
+		
 		//float*  drx = &min_e_transmitter[idmd].E.x;
 		//float*  dry = &min_e_transmitter[idmd].E.y;
 		//float*  drx = &bufferMinE[idmd].E.x;
 		//float*  dry = &bufferMinE[idmd].E.y;
-		float Eprevx = atomicExch(drx, E.x);
-		float Eprevy = atomicExch(dry, E.y);
-		float2 Eprev = make_float2(Eprevx, Eprevy);
+		
+		
+		//float Eprevx = atomicExch(drx, E.x);
+		//float Eprevy = atomicExch(dry, E.y);
+		//float2 Eprev = make_float2(Eprevx, Eprevy);
 		//rtPrintf("FR\t%u\t%u\t%u\t%u\t%f\t%f\n", receiverLaunchIndex.x, receiverLaunchIndex.y, hitPayload.faceId, reflections, hitPayload.prodReflectionCoefficient.x, hitPayload.prodReflectionCoefficient.y);
 
 		//rtPrintf("FF\t%u\t%u\t%u\t%u\t%d\t%d\t%f\t%f\t%f\t%f\t%f\t%f\n", receiverLaunchIndex.x, receiverLaunchIndex.y, hitPayload.faceId, reflections,  dmt, oldd, E.x, E.y, Eprev.x, Eprev.y, prevTd, length(prx - ptx));

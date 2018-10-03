@@ -20,10 +20,6 @@ struct MaterialEMProperties {
 	//}
 };
 
-struct DuplicateReflection {
-	optix::float2 E; //Complex
-	int r;
-};
 
 struct ReceptionInfo {
 	optix::float2 sumRxElectricField; //Complex
@@ -34,6 +30,7 @@ struct ReceptionInfo {
 };
 
 struct EMWavePayload {
+	optix::float2 prodReflectionCoefficient; //Complex
 	optix::float3 geomNormal;
 	optix::float3 nextDirection;
 	optix::float3 hitPoint;
@@ -44,7 +41,6 @@ struct EMWavePayload {
 	int hits;
 	float totalDistance;
 	bool end;
-	optix::float2 prodReflectionCoefficient; //Complex
 	unsigned int faceId;
 
 

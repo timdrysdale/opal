@@ -34,7 +34,9 @@ OPTIX_add_sample_executable( opal
   Common.h
   Unity.h
   Unity.cpp
-  propagationKernels.cu
+  singleTransmitter.cu
+  multiTransmitter.cu
+  #propagationKernels.cu
   triangle.cu
   sphere.cu
 
@@ -49,7 +51,9 @@ set(sources
   Common.h
   Unity.h
   Unity.cpp
-  propagationKernels.cu
+  singleTransmitter.cu
+  multiTransmitter.cu
+  # propagationKernels.cu
   triangle.cu
   sphere.cu
 )

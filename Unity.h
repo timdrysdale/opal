@@ -22,6 +22,7 @@ namespace opal {
 	static const int OPAL_NO_SCENE_MANAGER = 1;
 	static const int OPAL_EXCEPTION= 2;
 	static const int OPTIX_EXCEPTION = 3;
+	static const int OPAL_NO_MULTI_TRANSMITTER_MANAGER = 4;
 	static const char* logFile = "unity_opal.txt";
 
 	//Location of Optix Programs
@@ -81,7 +82,7 @@ namespace opal {
 	};
 
 	static  OpalSceneManager* sceneManager = nullptr;
-
+	static bool MultiTransmitter = false;
 	void printMatrix(UnityMatrix4x4& u, std::ofstream& s);
 	void UnityToOptixMatrix4x4(optix::Matrix4x4& m, UnityMatrix4x4& u);
 #ifdef _WIN32
@@ -96,7 +97,7 @@ namespace opal {
 
 	extern "C" OPAL_API int FinishSceneContext();
 
-	extern "C" OPAL_API int Init(float frequency, bool holdReflections);
+	extern "C" OPAL_API int Init(float frequency, bool holdReflections, bool multiTransmitter);
 
 	extern "C" OPAL_API int SetMaxReflections(unsigned int  m);
 
@@ -133,6 +134,15 @@ namespace opal {
 
 	extern "C" OPAL_API int  RemoveDynamicMeshGroup(int id);
 	
+
+	//Multi-transmitter functions
+
+	extern "C" OPAL_API int AddTransmitter(int txId, optix::float3 origin, optix::float3 polarization, float transmitPower) ;
+	extern "C" OPAL_API int RemoveTransmitter(int txId) ;
+	extern "C" OPAL_API int AddTransmitterToGroup(int txId,float transmitPower, optix::float3 origin,optix::float3 polarization); 
+	//extern "C" OPAL_API int AddTransmitterToGroup(int txId,float transmitPower, optix::float3 origin); 
+	extern "C" OPAL_API int ClearGroup(); 
+	extern "C" OPAL_API int GroupTransmit() ;
 
 
 
