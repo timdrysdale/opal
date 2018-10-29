@@ -38,10 +38,13 @@ struct EMWavePayload {
 	float electricFieldAmplitude;
 	float t;
 	int reflections;
+	int internalRayInitialReflections;
 	int hits;
 	float totalDistance;
+	float totalDistanceTillLastReflection;
 	bool end;
 	unsigned int faceId;
+	int rxBufferIndex;
 
 
 

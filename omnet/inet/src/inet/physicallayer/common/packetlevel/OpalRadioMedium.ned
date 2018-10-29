@@ -22,6 +22,8 @@ module OpalRadioMedium extends RadioMedium
 {
     parameters:
     @class(OpalRadioMedium);
+    @statistic[receptionPower](source="receptionMinSignalPower(signalArrivalStarted)"; record=last,vector);
+     
     double carrierFrequency @unit(Hz) = default(5.9GHz);
     int azimuthDelta = default(1);
     int elevationDelta = default(1);

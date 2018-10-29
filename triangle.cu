@@ -162,6 +162,7 @@ RT_PROGRAM void closestHitTriangle()
 
 	rayPayload.hitPoint = ray.origin + ch_triangle_data.t * ray.direction;
 	rayPayload.totalDistance += ch_triangle_data.t;
+	rayPayload.totalDistanceTillLastReflection = rayPayload.totalDistance;
 	rayPayload.t = ch_triangle_data.t;
 	
 	float3 n = normalize(rtTransformNormal(RT_OBJECT_TO_WORLD, ch_triangle_data.geom_normal));
@@ -176,13 +177,13 @@ RT_PROGRAM void closestHitTriangle()
 	//We use the fabs() because if a ray hits an internal face, the normal is reversed. The cos would be negative. For "closed" meshes this should not happen. However, in the borders, due to precision
 	//it happens: a ray is not detected as hitting a face and gets inside the mesh, hitting an internal face later.
 	float cosA = fabs(dot(-ray.direction, n));
-	/*
-	if (cosA < 0) {
-		rtPrintf("COS\t%u\t%u\t%d\t%f\t%d\t%f\t%f\t%f\n", launchIndexTriangle.x, launchIndexTriangle.y, rayPayload.reflections, cosA, rayPayload.faceId, n.x, n.y, n.z);
-	}
-	*/
+	
+	//if (cosA < 0) {
+	//	rtPrintf("COS\t%u\t%u\t%d\t%f\t%d\t%f\t%f\t%f\n", launchIndexTriangle.x, launchIndexTriangle.y, rayPayload.reflections, cosA, rayPayload.faceId, n.x, n.y, n.z);
+	//}
+	
 
-	//rtPrintf("G\t%u\t%u\t%d\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n", launchIndexTriangle.x, launchIndexTriangle.y, rayPayload.reflections, cosA, ray.direction.x, ray.direction.y, ray.direction.z, n.x, n.y, n.z);
+	rtPrintf("G\t%u\t%u\t%d\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n", launchIndexTriangle.x, launchIndexTriangle.y, rayPayload.reflections, cosA, ray.direction.x, ray.direction.y, ray.direction.z, n.x, n.y, n.z, rayPayload.totalDistanceTillLastReflection);
 	//rtPrintf("Gg\t%u\t%u\t%d\t%f\t%f\t%f\t%f\t%f\t%f\n", launchIndexTriangle.x, launchIndexTriangle.y, rayPayload.reflections, rayPayload.nextDirection.x, rayPayload.nextDirection.y, rayPayload.nextDirection.z, n.x, n.y, n.z);
 
 	//Complex arithmetic: sum

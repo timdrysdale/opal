@@ -21,6 +21,7 @@
 #include "inet/physicallayer/analogmodel/packetlevel/ScalarReception.h"
 #include "inet/physicallayer/contract/packetlevel/IPrintableObject.h"
 #include "Opal.h"
+#include <unordered_set>
 using namespace omnetpp;
 using namespace opal;
 namespace inet::physicallayer {
@@ -64,6 +65,10 @@ namespace inet::physicallayer {
 
 
 
+    public:
+        //Subscribe to position changes for the receivers and transmitters
+        static simsignal_t mobilityStateChangedSignal;
+
     protected:
        /* typedef struct {
             const IRadio *radio;
@@ -83,7 +88,9 @@ namespace inet::physicallayer {
         int azimuthDelta;
         int elevationDelta;
         int maxNumberOfReflections;
-        std::map<const IRadio*, OpalReceiverCallback*> receivers;
+        bool loadFromFiles;
+
+        std::map<const IRadio*, OpalReceiverCallback*> receiversRadios;
 
        //Location of Optix Programs: change to your source directory (can be read as a parameter)
        //Leave  empty to use default directory: optix SDK opal sample directory
@@ -122,6 +129,8 @@ namespace inet::physicallayer {
 
         virtual ISignal *transmitPacket(const IRadio *transmitter, Packet *packet) override;
         virtual void sendToRadio(IRadio *trasmitter, const IRadio *receiver, const ISignal *signal);
+        void finishOpalContext();
+        virtual void receiveSignal(cComponent *source, simsignal_t signal, cObject *value, cObject *details) override;
     };
 
 } //namespace

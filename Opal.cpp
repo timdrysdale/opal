@@ -14,7 +14,7 @@
 #include <functional>
 #include <iostream>
 #include <fstream>
-
+//#include <sstream>
 #include <iomanip>
 
 
@@ -26,13 +26,14 @@ using namespace optix;
 // -------------------------------------------------------------------------------------
 
 OpalSceneManager::OpalSceneManager() {
+	std::cout<<"OpalSceneManager() called"<<std::endl;
 	initMembers();
 
 }
-OpalSceneManager::OpalSceneManager(float f, bool holdReflections)
+OpalSceneManager::OpalSceneManager(float f, bool useInternalTracing,  bool holdReflections)
 {
 	initMembers();
-	initContext(f,holdReflections);
+	initContext(f,useInternalTracing, holdReflections);
 
 }
 
@@ -64,14 +65,18 @@ void OpalSceneManager::initMembers() {
 	this->receptionInfoBuffer = nullptr;
 
 	this->internalRaysBuffer = nullptr;
-	this->facesMinDBuffer = nullptr;;
-	this->facesMinEBuffer = nullptr;;
+	this->facesMinDBuffer = nullptr;
+	this->facesMinEBuffer = nullptr;
+	this->holdReflections = false;
+	this->useInternalTracing=true;
 }
-void OpalSceneManager::initContext(float f, bool holdReflections) {
+void OpalSceneManager::initContext(float f, bool useInternalTracing, bool holdReflections) {
 #ifdef OPALDEBUG
 	outputFile.open("opal_log.txt");
 #endif // OPALDEBUG
 	this->holdReflections = holdReflections;
+	this->useInternalTracing=useInternalTracing;
+
 	setFrequency(f);
 	createSceneContext();
 	setDefaultPrograms();
@@ -103,8 +108,13 @@ void OpalSceneManager::createSceneContext()
 
 	// Set up context
 	context = optix::Context::create();
-	context->setRayTypeCount(1);  //Just one type of ray at the moment
-	context->setEntryPointCount(2); //2 programs: initialization and generation programs
+	if (useInternalTracing) {
+		context->setRayTypeCount(2); //Normal and internal ray
+	} else {
+		//Just one type of ray at the moment
+		context->setRayTypeCount(1);
+	}
+	context->setEntryPointCount(2); //2 programs: initialization and ray generation 
 
 }
 
@@ -130,6 +140,9 @@ void opal::OpalSceneManager::setDefaultPrograms()
 	else {
 
 		defaultPrograms.insert(std::pair<std::string, optix::Program>("receiverClosestHit", createClosestHitReceiver()));
+		if (useInternalTracing) {
+			defaultPrograms.insert(std::pair<std::string, optix::Program>("receiverClosestHitInternalRay", createClosestHitInternalRay()));
+		}
 	}
 //#else
 //
@@ -146,6 +159,10 @@ void opal::OpalSceneManager::setDefaultPrograms()
 
 
 	defaultMeshMaterial = createMeshMaterial(0u,defaultPrograms.at("meshClosestHit"));
+	if (useInternalTracing) {
+		defaultMeshMaterial->setClosestHitProgram(1u, defaultPrograms.at("meshClosestHit"));
+	}
+
 #ifdef OPALDEBUG
 	outputFile << "defaultPrograms size=" << defaultPrograms.size() << std::endl;
 #endif
@@ -274,7 +291,7 @@ void OpalSceneManager::extractFaces(optix::float3* meshVertices, std::vector<std
 		const float3 e1 = p0 - p2;
 
 		optix::float3 normal = cross(e1, e0);
-		//std::cout << "p0=" << p0 << "p1=" << p1 << "p2=" << p2 << "normal=" << normal << std::endl;
+		//std::cout <<"i="<<i<<"t="<<triangleIndexBuffer[i].first<< "p0=" << p0 << "p1=" << p1 << "p2=" << p2 << "normal=" << normal << std::endl;
 
 
 
@@ -295,7 +312,7 @@ void OpalSceneManager::extractFaces(optix::float3* meshVertices, std::vector<std
 	std::cout  << normals.size() <<" faces added=. numberOfFaces="<< numberOfFaces<< std::endl;
 	for (auto v: normals)
 	{
-		std::cout << "face normal=" << v.first << "id=" << v.second << std::endl;
+		std::cout << std::scientific<<"face normal=" << v.first << "id=" << v.second << std::endl;
 
 	}
 
@@ -314,7 +331,8 @@ OpalMesh OpalSceneManager::createStaticMesh (int meshVertexCount, optix::float3*
 
 	//Make int3s
 	if (meshTriangleCount % 3 != 0) {
-		throw  opal::Exception("Error: Number of triangle indices is not a multiple of 3");
+		std::cout<<"Error: Number of triangle indices is not a multiple of 3"<<std::endl;
+	       throw  opal::Exception("Error: Number of triangle indices is not a multiple of 3");
 
 	}
 	std::vector<std::pair<optix::int3,unsigned int>> triangleIndexBuffer;
@@ -409,6 +427,7 @@ OpalMesh OpalSceneManager::createStaticMesh (int meshVertexCount, optix::float3*
 }
 
 OpalDynamicMeshGroup* OpalSceneManager::addDynamicMeshGroup(int id) {
+	std::cout<<"Dynamic mesh group called with "<<id<<std::endl;
 	OpalDynamicMeshGroup* dmg = new OpalDynamicMeshGroup();
 	dmg->geom_group = context->createGeometryGroup();
 	dmg->geom_group->setAcceleration(context->createAcceleration("Trbvh"));
@@ -592,9 +611,29 @@ optix::Program OpalSceneManager::createClosestHitMesh() {
 optix::Program OpalSceneManager::createClosestHitReceiver()
 {
 
+	optix::Program chrx;
+	if (useInternalTracing) {
+		 chrx = context->createProgramFromPTXString(sutil::getPtxString("opal", "singleTransmitterInternalRecursive.cu"), "closestHitReceiver");
+	} else {
+		chrx = context->createProgramFromPTXString(sutil::getPtxString("opal", "singleTransmitter.cu"), "closestHitReceiverFaceMin");
+	}
+
+	//Add programs for complex arithmetic
+	chrx["complex_exp_only_imaginary"]->setProgramId(defaultPrograms.at("complex_exp_only_imaginary"));
+	chrx["sca_complex_prod"]->setProgramId(defaultPrograms.at("sca_complex_prod"));
+	chrx["complex_prod"]->setProgramId(defaultPrograms.at("complex_prod"));
+
+	//Program variable: common value for all receiver instances, since they all share the program. If multichannel is used, this should be set per transmission
+	chrx["k"]->setFloat(defaultChannel.k);
+	return chrx;
+}
+optix::Program OpalSceneManager::createClosestHitInternalRay()
+{
 
 
-	optix::Program chrx = context->createProgramFromPTXString(sutil::getPtxString("opal", "singleTransmitter.cu"), "closestHitReceiverFaceMin");
+
+	//optix::Program chrx = context->createProgramFromPTXString(sutil::getPtxString("opal", "singleTransmitter.cu"), "closestHitReceiverFaceMin");
+	optix::Program chrx = context->createProgramFromPTXString(sutil::getPtxString("opal", "singleTransmitterInternalRecursive.cu"), "closestHitReceiverInternalRay");
 
 	//Add programs for complex arithmetic
 	chrx["complex_exp_only_imaginary"]->setProgramId(defaultPrograms.at("complex_exp_only_imaginary"));
@@ -704,15 +743,19 @@ optix::Program  OpalSceneManager::createRayGenerationProgram()
 {
 
 
-	return context->createProgramFromPTXString(sutil::getPtxString("opal", "singleTransmitter.cu"), "genRayAndReflectionsFromSphereIndex");
+	return context->createProgramFromPTXString(sutil::getPtxString("opal", "singleTransmitterInternalRecursive.cu"), "genRayAndReflectionsFromSphereIndex");
+	//return context->createProgramFromPTXString(sutil::getPtxString("opal", "singleTransmitter.cu"), "genRayAndReflectionsFromSphereIndex");
 
 
 }
 optix::Program  OpalSceneManager::createInitializationProgram()
 {
 
-
-	return context->createProgramFromPTXString(sutil::getPtxString("opal", "singleTransmitter.cu"), "initializeBuffersFaceBased");
+	if (useInternalTracing) {
+		return context->createProgramFromPTXString(sutil::getPtxString("opal", "singleTransmitterInternalRecursive.cu"), "initializeBuffersFaceBased");
+	} else {
+		return context->createProgramFromPTXString(sutil::getPtxString("opal", "singleTransmitter.cu"), "initializeBuffersFaceBased");
+	}
 
 
 }
@@ -968,7 +1011,7 @@ void OpalSceneManager::addReceiver(int id, float3  position, float radius, std::
 	//std::ofstream myfile;
 	//myfile.open("D:\\log.txt", std::ifstream::app);
 	//myfile << "Adding receiver " << id << std::endl;
-	std::cout << "Adding receiver " << id << std::endl;
+	std::cout << "Adding receiver " << id <<" at "<<position<< std::endl;
 	optix::Geometry geometry = context->createGeometry();
 	float4 sphere = make_float4(position.x, position.y, position.z, radius);
 
@@ -979,9 +1022,15 @@ void OpalSceneManager::addReceiver(int id, float3  position, float radius, std::
 	optix::Program chrx = defaultPrograms.at("receiverClosestHit");
 
 
+
 	//chrx["sphere"]->setFloat(sphere);
 	optix::Material mat = context->createMaterial();
 	mat->setClosestHitProgram(0u, chrx);
+	
+	if (useInternalTracing) {
+		optix::Program chrxInternal = defaultPrograms.at("receiverClosestHitInternalRay");
+		mat->setClosestHitProgram(1u, chrxInternal);
+	}
 	optix_materials.push_back(mat);
 
 
@@ -1182,7 +1231,12 @@ void OpalSceneManager::transmit(int txId, float txPower,  float3 origin, float3 
 
 
 	//First initialize
-	context->launch(0, raySphere.elevationSteps, raySphere.azimuthSteps, numReceivers );//Launch 3D (elevation, azimut,receivers)
+	
+	if (useInternalTracing) {
+		context->launch(0, maxReflections, numberOfFaces, numReceivers );//Launch 3D (faces, reflections, receivers)
+	} else {
+		context->launch(0, raySphere.elevationSteps, raySphere.azimuthSteps, numReceivers );//Launch 3D (elevation, azimut,receivers)
+	}
 
 
 //	std::cout << "transmit initialized" << std::endl;
@@ -1226,6 +1280,7 @@ void OpalSceneManager::transmit(int txId, float txPower,  float3 origin, float3 
 
 			float power = defaultChannel.eA*((E.x*E.x) + (E.y*E.y))*txPower;
 			std::cout << "rx["<<receivers[index]->externalId<<"]=" << receivers[index]->position << ".r=" << receivers[index]->radius << "; tx["<<txId<<"]=" << origin << " eA=" << defaultChannel.eA << " txPower=" << txPower << " E=(" << E.x << "," << E.y << ")" << " p=" << power << " dh=" << host_hits[index].directHits << " rf=" << host_hits[index].reflections << " d=" << length(origin - receivers[index]->position) << std::endl;
+			std::cout<<"PR\t"<<power<<std::endl;
 #ifdef OPALDEBUG
 			outputfile << "rx["<<receivers[index]->externalId<<"]=" << receivers[index]->position << ".r=" << receivers[index]->radius << "; tx["<<txId<<"]=" << origin << " eA=" << defaultChannel.eA << " txPower=" << txPower << " E=(" << E.x << "," << E.y << ")" << " p=" << power << " dh=" << host_hits[index].directHits << " rf=" << host_hits[index].reflections << " d=" << length(origin - receivers[index]->position) << std::endl;
 #endif // OPALDEBUG
@@ -1307,8 +1362,12 @@ void OpalSceneManager::updateReceiverBuffers(uint oldReceivers, uint newReceiver
 
 void OpalSceneManager::clearInternalBuffers() {
 	//Should we do this? It is not clear in the Optix documentation whether a resizing a buffer is preferrable to recreating buffers, or whether resizing deletes the previously allocated one
+	//std::cout << "Clear internal buffers: " << std::endl;
+	
 	receptionInfoBuffer->destroy();
-	internalRaysBuffer->destroy();
+	if (useInternalTracing==false) {
+		internalRaysBuffer->destroy();
+	}
 	facesMinDBuffer->destroy();
 	facesMinEBuffer->destroy();
 	
@@ -1357,8 +1416,11 @@ void OpalSceneManager::setInternalBuffers() {
 	facesMinEBuffer = setFacesMinEBuffer(rxSize,reflectionsSize,facesSize);
 #endif // OPALDEBUG
 
-
-	internalRaysBuffer= setInternalRaysBuffer(rxSize, elevationSize,azimuthSize);
+	if (useInternalTracing) {
+		internalRaysBuffer=nullptr;
+	} else {
+		internalRaysBuffer= setInternalRaysBuffer(rxSize, elevationSize,azimuthSize);
+	}
 	context["number_of_faces"]->setUint(numberOfFaces);
 }
 
@@ -1375,7 +1437,8 @@ void OpalSceneManager::checkInternalBuffers() {
 		return;
 	} else {
 		//Re create internal buffers
-		std::cout<<"Reconfiguring internal buffers"<<std::endl;
+		std::cout<<"Reconfiguring internal buffers: "<<std::endl;
+		std::cout << currentInternalBuffersState.tx << ";" << txSize << currentInternalBuffersState.rx << ";" << rxSize << currentInternalBuffersState.faces << ";" << facesSize << currentInternalBuffersState.reflections << ";" << reflectionsSize << currentInternalBuffersState.elevation << ";" << elevationSize << currentInternalBuffersState.azimuth << ";" << azimuthSize;
 		clearInternalBuffers();
 		setInternalBuffers();
 	}
@@ -1472,10 +1535,14 @@ std::string opal::OpalSceneManager::printInternalBuffersState()
 	sb = sizeof(optix::float2)*w*h*d;
 	totalBytes += sb;
 	stream << "\t facesMinEBuffers=(" << w << "," << h << "," << d << "). size=" << (sb / 1024.f) << " KiB"<< std::endl;
-	internalRaysBuffer->getSize(w,h,d);
-	sb = sizeof(int)*w*h*d;
-	totalBytes += sb;
-	stream << "\t internalRays=(" << w << "," << h << "," << d << "). size=" << (sb / 1024.f) << "KiB" << std::endl;
+	if (useInternalTracing) {
+		stream << "\t Internal tracing. No internalRaysBuffer" << std::endl;
+	} else {
+		internalRaysBuffer->getSize(w,h,d);
+		sb = sizeof(int)*w*h*d;
+		totalBytes += sb;
+		stream << "\t internalRays=(" << w << "," << h << "," << d << "). size=" << (sb / 1024.f) << "KiB" << std::endl;
+	}
 	//Check memory usage
 	stream << "Total memory in internal buffers:  " << (totalBytes / (1024.f*1024.f)) << " MiB" << std::endl;
 	return stream.str();
@@ -1502,11 +1569,14 @@ void OpalSceneManager::finishSceneContext() {
 	context->setRayGenerationProgram(0, defaultPrograms.at("initialize"));//Initialization
 	context->setRayGenerationProgram(1, defaultPrograms.at("rayGeneration")); //Generation
 	context->setMissProgram(0, defaultPrograms.at("miss"));
+	if (useInternalTracing) {
+		context->setMissProgram(1, defaultPrograms.at("miss"));
+	}
 	context->validate();
 	//context->setExceptionEnabled(RT_EXCEPTION_BUFFER_INDEX_OUT_OF_BOUNDS, true);
-	context->setExceptionEnabled(RT_EXCEPTION_ALL, true);
+	//context->setExceptionEnabled(RT_EXCEPTION_ALL, true);
 	sceneFinished = true;
-	//std::cout<<printSceneReport();
+	std::cout<<printSceneReport();
 
 }
 
@@ -1514,7 +1584,7 @@ void OpalSceneManager::finishSceneContext() {
 std::string opal::OpalSceneManager::printSceneReport()  {
 	std::ostringstream stream;
 	stream << "--- Scene Summary ---" << std::endl;
-	stream << "\t numberOfFaces=" << numberOfFaces << ". minEpsilon= " << minEpsilon << ". maxReflections=" << maxReflections << std::endl;
+	stream << "\t numberOfFaces=" << numberOfFaces << ". minEpsilon= " << minEpsilon << ". maxReflections=" << maxReflections << "useInternalTracing="<<useInternalTracing<<std::endl;
 	stream << "\t Receivers=" << receivers.size() <<  std::endl;
 	stream << "\t RayCount=" << raySphere.rayCount << ". azimuthSteps=" << raySphere.azimuthSteps << ". elevationSteps=" << raySphere.elevationSteps << std::endl;
 	stream << "-- Scene Graph" << std::endl;
@@ -1704,7 +1774,7 @@ optix::Program  OpalSceneManagerMultiTransmitter::createInitializationProgram()
 
 
 void OpalSceneManagerMultiTransmitter::addTransmitter(int txId, optix::float3 origin, optix::float3 polarization, float transmitPower) {
-	//Add to map
+	//Register transmitter in Opal. Add to map
 	BaseTransmitter* tb = new BaseTransmitter();
 	tb->origin=origin;
 	tb->polarization = polarization;
@@ -1715,7 +1785,7 @@ void OpalSceneManagerMultiTransmitter::addTransmitter(int txId, optix::float3 or
 }
 
 void OpalSceneManagerMultiTransmitter::removeTransmitter(int txId) {
-	//Find transmitter 
+	//Find transmitter and remove from Opal. Cannot transmit anymore 
 	BaseTransmitter* tb;
 	try {
 		tb = transmitterExtToBase.at(txId); //Throw exception if not found
@@ -2304,7 +2374,7 @@ int main(int argc, char** argv)
 
 		//std::cout << "Initializing " << std::endl;
 		float freq = 5.9e9f;
-		std::unique_ptr<OpalSceneManager> sceneManager(new OpalSceneManager(freq));
+		std::unique_ptr<OpalSceneManager> sceneManager(new OpalSceneManager(freq,true));
 
 
 
@@ -2317,9 +2387,10 @@ int main(int argc, char** argv)
 		//sceneManager = addCompoundDynamicMeshes(std::move(sceneManager));
 		//sceneManager = addRemoveReceivers(std::move(sceneManager));
 
-		sceneManager = planeTest(std::move(sceneManager));
+		//sceneManager = planeTest(std::move(sceneManager));
 		//sceneManager = moveReceivers(std::move(sceneManager));
-		//sceneManager = crossingTest(std::move(sceneManager));
+		sceneManager = crossingTest(std::move(sceneManager));
+		//sceneManager = quadTest(std::move(sceneManager));
 		
 		//For multitransmitter test
 		//std::unique_ptr<OpalSceneManagerMultiTransmitter> sceneManagerMT(new OpalSceneManagerMultiTransmitter(freq));
@@ -2683,6 +2754,7 @@ std::unique_ptr<OpalSceneManager> moveReceivers(std::unique_ptr<OpalSceneManager
 
 //Street crossing test. Cubes are intended to be buildings and a plane is the floor
 std::unique_ptr<OpalSceneManager> crossingTest(std::unique_ptr<OpalSceneManager> sceneManager) {
+	std::cout << "Simulating crossing streets test" << std::endl;
 	//Cubes
 	std::vector<int> cubeind = loadTrianglesFromFile("meshes/tricube.txt");
 	std::vector<float3> cubevert = loadVerticesFromFile("meshes/vertcube.txt");
@@ -2738,71 +2810,35 @@ std::unique_ptr<OpalSceneManager> crossingTest(std::unique_ptr<OpalSceneManager>
 	std::cout << "Adding Plane. Em=" << emProp1.dielectricConstant << std::endl;
 	sceneManager->addStaticMesh(static_cast<int>(planever.size()), planever.data(), static_cast<int>(planeind.size()), planeind.data(), tm, emProp1);
 
-	sceneManager->createRaySphere2D(1, 1); //1 degree delta step
-	//sceneManager->createRaySphere2DSubstep(1, 1); //0.1 degree delta step
+	//sceneManager->createRaySphere2D(1, 1); //1 degree delta step
+	sceneManager->createRaySphere2DSubstep(1, 1); //0.1 degree delta step
 
 	//receivers
 
-	optix::float3 posrx = make_float3(0.0f, 2.0f, 100.0f);
-	sceneManager->addReceiver(1, posrx, 1.f, printPower);
+	optix::float3 posrx = make_float3(0.0f, 10.0f, 100.0f);
+	sceneManager->addReceiver(1, posrx, 1.0f, printPower);
+	
 
-
-	sceneManager->setMaxReflections(3u);
+	sceneManager->setMaxReflections(2u);
 
 	sceneManager->finishSceneContext();
 
 
-//	sceneManager->setPrintEnabled(1024 * 1024 * 1024);
-
+	//sceneManager->setPrintEnabled(1024 * 1024 * 1024);	
+	sceneManager->setUsageReport();
 
 	optix::float3 postx;
 	optix::float3 polarization = make_float3(0.0f, 1.0f, 0.0f); //Perpendicular to the floor. Assuming as in Unity that forward is z-axis and up is y-axis
-	Timer m_timer;
-	double totalTimeSequential=0.0;
+
+
 	for (int i = -50; i <= 50; ++i)
-	{
-		postx = make_float3(i, 1.43f, 50.0f);
-		m_timer.restart();
-
-		sceneManager->transmit(0, 1.0f, postx, polarization);
-		const double timeInit = m_timer.getTime();
-		std::cout<<"transmit time="<<timeInit<<std::endl;
-		totalTimeSequential +=timeInit;
-	}
-	std::cout<<"total sequential transmit time="<<totalTimeSequential<<std::endl;
-	 totalTimeSequential=0.0;
-	for (int i = -50; i <= 50; ++i)
-	{
-		postx = make_float3(i, 1.43f, 50.0f);
-		m_timer.restart();
-
-		sceneManager->transmit(0, 1.0f, postx, polarization);
-		const double timeInit = m_timer.getTime();
-		std::cout<<"transmit time="<<timeInit<<std::endl;
-		totalTimeSequential +=timeInit;
-	}
-	std::cout<<"total sequential transmit time="<<totalTimeSequential<<std::endl;
-	 totalTimeSequential=0.0;
-	for (int i = -50; i <= 50; ++i)
-	{
-		postx = make_float3(i, 1.43f, 50.0f);
-		m_timer.restart();
-
-		sceneManager->transmit(0, 1.0f, postx, polarization);
-		const double timeInit = m_timer.getTime();
-		std::cout<<"transmit time="<<timeInit<<std::endl;
-		totalTimeSequential +=timeInit;
-	}
-	std::cout<<"total sequential transmit time="<<totalTimeSequential<<std::endl;
-
-	/*for (int i = -50; i <= 50; ++i)
 	{
 		postx = make_float3(i, 10.f, 50.0f);
 
 		sceneManager->transmit(0, 1.0f, postx, polarization);
 
 
-	}*/
+	}
 
 	//postx = make_float3(-18.0f, 10.0f, 50.0f);
 	//sceneManager->transmit(0, 1.0f, postx, polarization);
@@ -2843,7 +2879,7 @@ std::unique_ptr<OpalSceneManager> planeTest(std::unique_ptr<OpalSceneManager> sc
 
 
 	sceneManager->setPrintEnabled(1024 * 1024 * 1024);
-	sceneManager->setUsageReport();
+	//sceneManager->setUsageReport();
 	
 
 	//std::cout << "Launching" << std::endl;
@@ -2868,13 +2904,13 @@ std::unique_ptr<OpalSceneManager> planeTest(std::unique_ptr<OpalSceneManager> sc
 std::unique_ptr<OpalSceneManager> quadTest(std::unique_ptr<OpalSceneManager> sceneManager) {
 	//First quad
 	int quadind[6] = { 0,1,2,1,0,3 };
-	optix::float3 quadv[4] = { make_float3(-0.5f,-0.5f,-3.06162e-17f),make_float3(0.5f,0.5f,3.06162e-17f) ,make_float3(0.5f,-0.5f,-3.06162e-17f) ,make_float3(-0.5f,0.5f,3.06162e-17f) };
+	optix::float3 quadv[4] = { make_float3(-0.5f,-0.5f,0.f),make_float3(0.5f,0.5f,0.f) ,make_float3(0.5f,-0.5f,0.f) ,make_float3(-0.5f,0.5f,0.f) };
 
 
 	Matrix4x4 tm;
-	tm.setRow(0, make_float4(1, 0, 0, 0.302f));
-	tm.setRow(1, make_float4(0, 1, 0, 0.931f));
-	tm.setRow(2, make_float4(0, 0, 1, 0.684f));
+	tm.setRow(0, make_float4(1, 0, 0, 0.f));
+	tm.setRow(1, make_float4(0, 1, 0, 0.f));
+	tm.setRow(2, make_float4(0, 0, 1, 100.0f));
 	tm.setRow(3, make_float4(0, 0, 0,  1));
 	MaterialEMProperties emProp1;
 	emProp1.dielectricConstant = make_float2(3.75f, -60.0f*sceneManager->defaultChannel.waveLength*0.038f);
@@ -2883,25 +2919,35 @@ std::unique_ptr<OpalSceneManager> quadTest(std::unique_ptr<OpalSceneManager> sce
 
 	//Second quad
 	int quadind2[6] = { 0,1,2,1,0,3 };
-	optix::float3 quadv2[4] = { make_float3(-0.5f,-0.5f,-3.06162e-17f),make_float3(0.5f,0.5f,3.06162e-17f) ,make_float3(0.5f,-0.5f,-3.06162e-17f) ,make_float3(-0.5f,0.5f,3.06162e-17f) };
+	optix::float3 quadv2[4] = { make_float3(-0.5f,-0.5f,0.f),make_float3(0.5f,0.5f,0.f) ,make_float3(0.5f,-0.5f,0.f) ,make_float3(-0.5f,0.5f,0.f) };
 
 
 	Matrix4x4 tm2;
-	tm2.setRow(0, make_float4(1, 0, 0, 0.14f));
-	tm2.setRow(1, make_float4(0, 1, 0, 0.83f));
-	tm2.setRow(2, make_float4(0, 0, 1, -12.43f));
+	tm2.setRow(0, make_float4(1, 0, 0, 0.f));
+	tm2.setRow(1, make_float4(0, 1, 0, 0.f));
+	tm2.setRow(2, make_float4(0, 0, 1, -10.0f));
 	tm2.setRow(3, make_float4(0, 0, 0, 1));
 	MaterialEMProperties emProp2;
 	emProp2.dielectricConstant = make_float2(3.75f, -60.0f*sceneManager->defaultChannel.waveLength*0.038f);
 
 
 	sceneManager->addStaticMesh(4, quadv2, 6, quadind2, tm2, emProp2);
-	optix::float3 posrx = make_float3(0.53f, -2.04f, -4.73f);
-	sceneManager->addReceiver(1, make_float3(0.53f, -2.04f, -2.45f), 5.0f, printPower);
-	optix::float3 postx = make_float3(0.0f, 1.0f, -10.68f);
+	
+	optix::float3 posrx = make_float3(0.f, 0.f, 97.0f);
+	sceneManager->addReceiver(1, posrx, 5.0f, printPower);
+	posrx=make_float3(0.0f,0.0f,99.0f);
+	sceneManager->addReceiver(2, posrx, 5.0f, printPower);
+	optix::float3 postx = make_float3(0.0f, 0.f,0.f);
 
 	optix::float3 polarization = make_float3(0.0f, 1.0f, 0.0f); //Perpendicular to the floor. Assuming as in Unity that forward is z-axis and up is y-axis
-	sceneManager->transmit(0, 0.158f,postx, polarization);
+	sceneManager->createRaySphere2D(30, 30); //1 degree delta step
+	
+	sceneManager->finishSceneContext();
+
+
+//	sceneManager->setPrintEnabled(1024 * 1024 * 1024);
+	sceneManager->setUsageReport();
+	sceneManager->transmit(0, 1.0f,postx, polarization);
 	return sceneManager;
 }
 

@@ -97,7 +97,7 @@ namespace opal {
 
 	extern "C" OPAL_API int FinishSceneContext();
 
-	extern "C" OPAL_API int Init(float frequency, bool holdReflections, bool multiTransmitter);
+	extern "C" OPAL_API int Init(float frequency, bool useInternalTracing, bool holdReflections, bool multiTransmitter);
 
 	extern "C" OPAL_API int SetMaxReflections(unsigned int  m);
 

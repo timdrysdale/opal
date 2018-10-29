@@ -168,7 +168,7 @@ namespace opal {
 		std::ofstream outputFile;
 #endif // OPALDEBUG
 		bool holdReflections;
-		
+		bool useInternalTracing;	
 
 
 		//Default programs
@@ -179,9 +179,9 @@ namespace opal {
 
 	public:
 		OpalSceneManager();
-		OpalSceneManager(float f, bool holdReflections=false);
+		OpalSceneManager(float f, bool useInternalTracing, bool holdReflections=false);
 		virtual ~OpalSceneManager();
-		void initContext(float f, bool holdReflections=false);
+		void initContext(float f,bool useInternalTracing, bool holdReflections=false);
 		virtual void initMembers();
 		void setFrequency(float f);
 		void setMaxReflections(unsigned int m);
@@ -237,6 +237,7 @@ namespace opal {
 		optix::Program createClosestHitMesh();
 
 		virtual optix::Program createClosestHitReceiver();
+		virtual optix::Program createClosestHitInternalRay();
 
 		virtual optix::Program createClosestHitReceiverHoldReflections();
 
@@ -286,11 +287,18 @@ namespace opal {
 		virtual void initMembers() override;
 		OpalSceneManagerMultiTransmitter(float f, bool holdReflections=false);
 
+		
+		//Register transmitter in Opal. Add to map
 		void addTransmitter(int txId, optix::float3 origin, optix::float3 polarization, float transmitPower) ;
+		//Find transmitter and remove from Opal. Cannot transmit anymore 
 		void removeTransmitter(int txId) ;
+		//Add transmitter to next parallel transmission
 		void addTransmitterToGroup(int txId,float transmitPower, optix::float3 origin,optix::float3 polarization); 
+		//Add transmitter to next parallel transmission
 		void addTransmitterToGroup(int txId,float transmitPower, optix::float3 origin); 
+		//Clear current transmit group
 		void clearGroup(); 
+		//Transmit simultaneously all transmitters in group
 		void groupTransmit() ;
 		
 		virtual std::string printInternalBuffersState() override;
