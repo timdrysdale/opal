@@ -1,0 +1,11 @@
+
+namespace Veneris.Communications;
+
+attribute "priority"; // Necesario al pasar el binario en "runtime"
+
+// Type 3
+table DestroyVehicle{
+	id:int;
+}
+
+root_type DestroyVehicle;

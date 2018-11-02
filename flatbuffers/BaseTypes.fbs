@@ -1,0 +1,31 @@
+
+namespace Veneris.Communications;
+
+attribute "priority"; // Necesario al pasar el binario en "runtime"
+
+enum VenerisMessageTypes : uint { Reserved=0, Create = 1, Destroy = 2,  VehicleState= 3, ExternalTime = 4, End = 5, UseOpal=6, FinishOpalContext=7, StaticMesh=8, AddDynamicMeshGroup=9, RemoveDynamicMeshGroup=10, UpdateTransformInGroup=11, FinishDynamicMeshGroup=12, DynamicMesh=13}
+
+struct Vec3 {
+	x:float;
+	y:float;
+	z:float;
+}
+struct Vec4 {
+	x:float;
+	y:float;
+	z:float;
+	w:float;
+}
+struct Matrix4x4 {
+	r0:Vec4;
+	r1:Vec4;
+	r2:Vec4;
+	r3:Vec4;
+}
+struct MaterialEMP {
+	a:float;
+	b:float;
+	c:float;
+	d:float;
+}
+

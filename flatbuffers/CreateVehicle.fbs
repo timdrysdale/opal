@@ -1,0 +1,15 @@
+include "BaseTypes.fbs";
+
+namespace Veneris.Communications;
+
+attribute "priority"; // Necesario al pasar el binario en "runtime"
+
+
+// Type 2
+table CreateVehicle{
+	id:uint;
+	position:Vec3;
+	radius:float; //Used with Opal
+}
+
+root_type CreateVehicle;

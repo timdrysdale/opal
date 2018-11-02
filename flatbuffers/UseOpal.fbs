@@ -1,0 +1,13 @@
+include "BaseTypes.fbs";
+
+namespace Veneris.Communications;
+
+attribute "priority"; 
+table UseOpal {
+	frequency:float;
+	azimuthDelta:uint;
+	elevationDelta:uint;
+	maxReflections:uint;
+	useDecimalDegrees:bool;
+}
+root_type UseOpal;

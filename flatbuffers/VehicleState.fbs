@@ -1,0 +1,14 @@
+include "BaseTypes.fbs";
+
+namespace Veneris.Communications;
+attribute "priority"; // Necesario al pasar el binario en "runtime"
+
+
+// Type 4
+table VehicleState {
+	position:Vec3; // x,y,z
+	velocity:Vec3; // v_x,v_y,v_z
+	id:uint;
+}
+
+root_type VehicleState;

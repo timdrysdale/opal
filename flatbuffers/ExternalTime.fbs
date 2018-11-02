@@ -1,0 +1,10 @@
+
+namespace Veneris.Communications ;
+
+attribute "priority"; // Necesario al pasar el binario en "runtime"
+
+table ExternalTime{
+	time:float; // Tiempo del cliente para la sincronización
+}
+
+root_type ExternalTime;

@@ -1,0 +1,14 @@
+include "BaseTypes.fbs";
+
+namespace Veneris.Communications;
+
+attribute "priority"; 
+
+table DynamicMesh {
+	id:int;
+	vertices:[Vec3];
+	indexes:[int];
+	material: MaterialEMP;
+}
+
+root_type DynamicMesh;

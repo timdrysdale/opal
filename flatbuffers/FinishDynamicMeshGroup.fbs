@@ -1,0 +1,13 @@
+include "BaseTypes.fbs";
+
+namespace Veneris.Communications;
+
+attribute "priority"; // Necesario al pasar el binario en "runtime"
+
+
+// Type 2
+table FinishDynamicMeshGroup{
+	id:int;
+}
+
+root_type FinishDynamicMeshGroup;

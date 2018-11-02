@@ -1,0 +1,14 @@
+include "BaseTypes.fbs";
+
+namespace Veneris.Communications;
+
+attribute "priority"; 
+
+table StaticMesh {
+	transform:Matrix4x4;
+	vertices:[Vec3];
+	indexes:[int];
+	material: MaterialEMP;
+}
+
+root_type StaticMesh;

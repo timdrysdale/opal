@@ -1,0 +1,12 @@
+include "BaseTypes.fbs";
+
+namespace Veneris.Communications;
+
+attribute "priority"; 
+
+table UpdateTransformInGroup {
+	id:int;
+	transform:Matrix4x4;
+}
+
+root_type UpdateTransformInGroup;
