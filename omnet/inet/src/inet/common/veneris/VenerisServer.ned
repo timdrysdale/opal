@@ -13,20 +13,16 @@
 // along with this program.  If not, see http://www.gnu.org/licenses/.
 // 
 
-package inet.opaltest;
-
+package inet.common.veneris;
+import inet.common.veneris.ExecutionServer;
 //
 // TODO auto-generated module
 //
-simple OpalTestPacketGenerator
+simple VenerisServer extends ExecutionServer
 {
     parameters:
-        double beaconFrequency =default(10);
-        int packetBytes @unit(B) =default(500B);
-        bool transmitWhenPositionChanges = default(false);
-    gates:
-        input lowerLayerIn;
-        output lowerLayerOutput;
-        
-            
+        @class(VenerisServer);
+        string opalModule=default("inet.physicallayer.common.packetlevel.OpalRadioMedium");
+        string vehicleModule=default("inet.opaltest.OpalNode");
+        string mobilityModule=default("inet.common.veneris.VenerisExternalMobility");
 }

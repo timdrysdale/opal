@@ -24,10 +24,18 @@ module OpalNode
 {
     parameters:
         @networkNode;
+        //@statistic[receptionPower](source="receptionMinSignalPower(..radioMedium.signalArrivalStarted)"; record=last,vector);
+        @statistic[x](source="xCoord(mobilityPos(mobility.mobilityStateChanged))";record=vector);
+        @statistic[y](source="yCoord(mobilityPos(mobility.mobilityStateChanged))";record=vector);
+        @statistic[z](source="zCoord(mobilityPos(mobility.mobilityStateChanged))";record=vector);
+
+        int id;
+        double receptionRadius=default(1.0);
+        string mobilityType=default("StationaryMobility");
         wlan.mgmt.typename = default("Ieee80211MgmtAdhoc");
         wlan.agent.typename = default("");
         wlan.opMode = "p";
-        mobility.typename = default("StationaryMobility");
+        mobility.typename = mobilityType;
         wlan.**.mobilityModule = default(exists(mobility) ? absPath(".mobility") : "");
         //wlan.interfaceTableModule = default("InterfaceTable");
         

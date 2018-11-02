@@ -13,20 +13,14 @@
 // along with this program.  If not, see http://www.gnu.org/licenses/.
 // 
 
-package inet.opaltest;
+package inet.common.veneris;
 
+import inet.mobility.base.MobilityBase;
 //
 // TODO auto-generated module
 //
-simple OpalTestPacketGenerator
+simple VenerisExternalMobility  extends MobilityBase
 {
     parameters:
-        double beaconFrequency =default(10);
-        int packetBytes @unit(B) =default(500B);
-        bool transmitWhenPositionChanges = default(false);
-    gates:
-        input lowerLayerIn;
-        output lowerLayerOutput;
-        
-            
+        @class(VenerisExternalMobility);
 }

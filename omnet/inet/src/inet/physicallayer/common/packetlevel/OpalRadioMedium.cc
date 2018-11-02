@@ -105,8 +105,8 @@ namespace inet::physicallayer {
             initContext((float)carrierFrequency, true);
             std::cout<<"Opal initContext called"<<endl;
             //Omnet parameters
-          //  maxGroupTransmissionTimer = new cMessage("maxGroupTransmissionTimer");
-           // useTransmitInGroup = par("useTransmitInGroup");
+            //  maxGroupTransmissionTimer = new cMessage("maxGroupTransmissionTimer");
+            // useTransmitInGroup = par("useTransmitInGroup");
             getParentModule()->subscribe(mobilityStateChangedSignal, this);
 
         }
@@ -122,10 +122,10 @@ namespace inet::physicallayer {
             //else static meshes will be loaded by Veneris server or any other framework
         }
         if (stage== INITSTAGE_LAST ) {
-          if (loadFromFiles) {
-              //if we have read the static meshes from files we can end it now, otherwise, let the server or framework call it when available.
-              finishOpalContext();
-          }
+            if (loadFromFiles) {
+                //if we have read the static meshes from files we can end it now, otherwise, let the server or framework call it when available.
+                finishOpalContext();
+            }
         }
     }
 
@@ -305,6 +305,7 @@ namespace inet::physicallayer {
             Coord c=mob->getCurrentPosition();
             cModule *radioModule = const_cast<cModule *>(check_and_cast<const cModule *>(radio));
             int id =getContainingNode(radioModule)->par("id");
+            double  rxRadius =getContainingNode(radioModule)->par("receptionRadius");
             OpalReceiverCallback* rc = new OpalReceiverCallback(this,id,radio);
 
             EV_INFO<<"Adding receiver "<<id<<" with Coord="<<c<<endl;
@@ -315,11 +316,9 @@ namespace inet::physicallayer {
             //Radios are both transmitter and receivers
 
             optix::float3 posrx=optix::make_float3((float) c.x,(float) c.y, (float) c.z);
-            addReceiver(id,posrx,receptionRadius,(rc->myCallback));
+            addReceiver(id,posrx,rxRadius,(rc->myCallback));
 
-          //  W transmitPower=radio->getTransmitter()->getMaxPower();
-            //TODO: set polarization according to antenna orientation
-            //addTransmitter(id,getOpalCoordinates(c),getOpalCoordinates(Coord(0,1,0)),transmitPower.get());
+
         } else {
             throw cRuntimeError("Radio does not have mobility coordinates");
         }
@@ -345,7 +344,7 @@ namespace inet::physicallayer {
         //removeTransmitter(rc->opalReceiverId);
     }
 
-   /*void OpalRadioMedium::handleMessage(cMessage *message)
+    /*void OpalRadioMedium::handleMessage(cMessage *message)
     {
         if (message == maxGroupTransmissionTimer) {
             transmitCachedTransmissions();
@@ -354,7 +353,7 @@ namespace inet::physicallayer {
         }
     }*/
 
-  /*  void OpalRadioMedium::transmitCachedTransmissions() {
+    /*  void OpalRadioMedium::transmitCachedTransmissions() {
         for (auto c: opalCachedTransmissions) {
             addToOpalTransmitGroup(c.radio,c.transmission);
         }
@@ -378,33 +377,18 @@ namespace inet::physicallayer {
         sendToAffectedRadios(const_cast<IRadio *>(radio), signal);
         communicationCache->setCachedSignal(transmission, signal);
 
-        /*if (useTransmitInGroup) {
-            if (maxGroupTransmissionTimer->isScheduled()) {
-                if (maxGroupTransmissionTimer->getArrivalTime()>transmission->getEndTime()) {
-                    cancelEvent(maxGroupTransmissionTimer);
-                    scheduleAt(transmission->getEndTime(), maxGroupTransmissionTimer);
-                }
-            } else {
-                scheduleAt(transmission->getEndTime(), maxGroupTransmissionTimer);
-            }
-            CachedOpalTransmissionEntry e;
-            e.radio=radio;
-            e.transmission=transmission;
-            opalCachedTransmissions.push_back(e);
-        } else {
-        */
-            //transmit in Opal
-            transmitInOpal(radio,transmission);
-//        }
+
+        transmitInOpal(radio,transmission);
+
 
 
         return signal;
     }
     void OpalRadioMedium::sendToAffectedRadios(IRadio *radio, const ISignal *transmittedSignal)
     {
-        const Signal *signal = check_and_cast<const Signal *>(transmittedSignal);
+        //const Signal *signal = check_and_cast<const Signal *>(transmittedSignal);
         //std::cout << " OpalRadioMedium::sendToAffectedRadios(): Sending " << transmittedSignal << " with " << signal->getBitLength() << " bits in " << signal->getDuration() * 1E+6 << " us transmission duration"
-                //<< " from " << radio << " on " << (IRadioMedium *)this << ". receivers.size=" <<receiversRadios.size()<< endl;
+        //<< " from " << radio << " on " << (IRadioMedium *)this << ". receivers.size=" <<receiversRadios.size()<< endl;
         //Send to all radios: opal will callback the ones receiving power
         for (auto r : receiversRadios) {
             //if (r.second->hasReceivedPower) {
@@ -416,7 +400,7 @@ namespace inet::physicallayer {
 
     }
 
-  /*  void OpalRadioMedium::addToOpalTransmitGroup(const IRadio *radio, const ITransmission *transmission) {
+    /*  void OpalRadioMedium::addToOpalTransmitGroup(const IRadio *radio, const ITransmission *transmission) {
         cModule *radioModule = const_cast<cModule *>(check_and_cast<const cModule *>(radio));
         int id =getContainingNode(radioModule)->getIndex();
         Coord txpos=transmission->getStartPosition();
@@ -426,7 +410,7 @@ namespace inet::physicallayer {
         W transmissionPower = scalarSignalAnalogModel->getPower();
         addTransmitterToGroup(id, (float) transmissionPower.get(),getOpalCoordinates(txpos));
     }
-    */
+     */
     void OpalRadioMedium::transmitInOpal(const IRadio *radio, const ITransmission *transmission) {
 
 
@@ -456,19 +440,19 @@ namespace inet::physicallayer {
         if (receiverRadio != transmitterRadio && isPotentialReceiver(receiverRadio, transmission)) {
             const IArrival *arrival = getArrival(receiverRadio, transmission);
             simtime_t propagationTime = arrival->getStartPropagationTime();
-          //  std::cout << " OpalRadioMedium::sendToRadio(): Sending " << transmittedSignal
-                    //<< " from " << (IRadio *)transmitterRadio << " at " << transmission->getStartPosition()
-                   // << " to " << (IRadio *)receiverRadio << " at " << arrival->getStartPosition()
-                    //<< " in " << propagationTime * 1E+6 << " us propagation time. arrivalTime at "<<arrival->getStartTime() << endl;
+            //  std::cout << " OpalRadioMedium::sendToRadio(): Sending " << transmittedSignal
+            //<< " from " << (IRadio *)transmitterRadio << " at " << transmission->getStartPosition()
+            // << " to " << (IRadio *)receiverRadio << " at " << arrival->getStartPosition()
+            //<< " in " << propagationTime * 1E+6 << " us propagation time. arrivalTime at "<<arrival->getStartTime() << endl;
             auto receivedSignal = static_cast<Signal *>(createReceiverSignal(transmission));
 
             //Opal transmit should have already called the callbacks. Compute reception to keep it cached for this transmission
             // getReception(receiver,transmission);
 
             //Set transmission in callback
-           // std::cout<<"OpalRadioMedium::sendToRadio(): transmission"<<transmission<<endl;
+            // std::cout<<"OpalRadioMedium::sendToRadio(): transmission"<<transmission<<endl;
             OpalReceiverCallback* callback=receiversRadios.at(receiver);
-           // std::cout<<"ccb->rxId="<<callback->opalReceiverId<<endl;
+            // std::cout<<"ccb->rxId="<<callback->opalReceiverId<<endl;
             //receiversRadios.at(receiver)->transmission=transmission;
             callback->transmission=transmission;
 
@@ -493,7 +477,7 @@ namespace inet::physicallayer {
         const Coord receptionEndPosition = arrival->getEndPosition();
         //Get power from callback
         OpalReceiverCallback* ocb=receiversRadios.at(receiver);
-       // cModule *radioModule = const_cast<cModule *>(check_and_cast<const cModule *>(transmission->getTransmitter()));
+        // cModule *radioModule = const_cast<cModule *>(check_and_cast<const cModule *>(transmission->getTransmitter()));
         //int id =getContainingNode(radioModule)->getIndex();
         int id=receiversRadios.at(transmission->getTransmitter())->opalReceiverId;
         //Only receivers with actual power received should have been called here
@@ -503,7 +487,7 @@ namespace inet::physicallayer {
         if (ocb->hasReceivedPower) {
             if (ocb->lastTransmitterId==id) {
                 p=(double)ocb->lastPower;
-                 //std::cout<<"OpalRadioMedium::computeReception(): Power received="<< p << endl;
+                //std::cout<<"OpalRadioMedium::computeReception(): Power received="<< p << endl;
                 ocb->reset();
             }else {
                 throw cRuntimeError("%f: R[%d]: Received power from unknown transmitter %d, expected transmitter %d",simTime().dbl(),ocb->opalReceiverId, ocb->lastTransmitterId,id);
@@ -517,24 +501,24 @@ namespace inet::physicallayer {
     void OpalRadioMedium::finishOpalContext()
     {
         elevationDelta=par("elevationDelta");
-                  azimuthDelta=par("azimuthDelta");
-                  if (elevationDelta<=0 || azimuthDelta <=0) {
-                      throw cRuntimeError("elevationDelta and azimuthDelta must be strictly positive");
-                  }
-                  bool useDecimalDegreeDelta=par("useDecimalDegreeDelta");
-                  if (useDecimalDegreeDelta) {
-                      if (elevationDelta>10 || azimuthDelta >10) {
-                          throw cRuntimeError("with decimal degrees elevationDelta and azimuthDelta must be between 1 and 10");
+        azimuthDelta=par("azimuthDelta");
+        if (elevationDelta<=0 || azimuthDelta <=0) {
+            throw cRuntimeError("elevationDelta and azimuthDelta must be strictly positive");
+        }
+        bool useDecimalDegreeDelta=par("useDecimalDegreeDelta");
+        if (useDecimalDegreeDelta) {
+            if (elevationDelta>10 || azimuthDelta >10) {
+                throw cRuntimeError("with decimal degrees elevationDelta and azimuthDelta must be between 1 and 10");
 
-                      }
-                      createRaySphere2DSubstep(elevationDelta, azimuthDelta);
-                  } else {
-                      createRaySphere2D(elevationDelta, azimuthDelta);
-                  }
-                  finishSceneContext();
-                  WATCH_MAP(receiversRadios);
-                  EV_INFO << "Initialized " << printSceneReport() << endl;
-                  std::cout<<"Opal Initialized"<<endl;
+            }
+            createRaySphere2DSubstep(elevationDelta, azimuthDelta);
+        } else {
+            createRaySphere2D(elevationDelta, azimuthDelta);
+        }
+        finishSceneContext();
+        WATCH_MAP(receiversRadios);
+        EV_INFO << "Initialized " << printSceneReport() << endl;
+        std::cout<<"Opal Initialized"<<endl;
     }
     void OpalRadioMedium::receiveSignal(cComponent* source, simsignal_t signal,
             cObject* value, cObject* details) {

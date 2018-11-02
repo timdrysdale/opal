@@ -13,20 +13,15 @@
 // along with this program.  If not, see http://www.gnu.org/licenses/.
 // 
 
-package inet.opaltest;
+package inet.common.veneris;
 
 //
 // TODO auto-generated module
 //
-simple OpalTestPacketGenerator
-{
-    parameters:
-        double beaconFrequency =default(10);
-        int packetBytes @unit(B) =default(500B);
-        bool transmitWhenPositionChanges = default(false);
-    gates:
-        input lowerLayerIn;
-        output lowerLayerOutput;
-        
-            
+simple ExecutionServer
+{ parameters:
+        int port = default(9993);
+        @display("i=block/routing");
+    
+    
 }

@@ -25,11 +25,15 @@ namespace inet {
 /**
  * TODO - Generated class
  */
-class OpalTestPacketGenerator : public cSimpleModule
+class OpalTestPacketGenerator : public cSimpleModule, cListener
 {
   protected:
+    //Subscribe to position changes for the receivers and transmitters
+        static simsignal_t mobilityStateChangedSignal;
+    int id;
     cMessage* generationTimer;
     double beaconFrequency;
+    bool transmitWhenPositionChanges;
     virtual void initialize();
     virtual void handleMessage(cMessage *msg);
     void processGenerationTime();
@@ -39,6 +43,7 @@ class OpalTestPacketGenerator : public cSimpleModule
   public:
     OpalTestPacketGenerator();
     virtual ~OpalTestPacketGenerator();
+    virtual void receiveSignal(cComponent *source, simsignal_t signal, cObject *value, cObject *details) override;
 };
 
 } //namespace

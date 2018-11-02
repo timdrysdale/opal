@@ -23,7 +23,9 @@
 namespace inet {
 
 Define_Module(OpalTestPacketGenerator);
-OpalTestPacketGenerator::OpalTestPacketGenerator() :    generationTimer(nullptr), beaconFrequency(0)
+
+simsignal_t OpalTestPacketGenerator::mobilityStateChangedSignal = cComponent::registerSignal("mobilityStateChanged");
+OpalTestPacketGenerator::OpalTestPacketGenerator() :    generationTimer(nullptr), beaconFrequency(0),transmitWhenPositionChanges(false)
 {
 }
 OpalTestPacketGenerator::~OpalTestPacketGenerator() {
@@ -38,10 +40,17 @@ void OpalTestPacketGenerator::initialize()
     packetBytes= par("packetBytes");
     generationTimer = new cMessage("New packet");
     lowerLayerOutId=gate("lowerLayerOutput")->getBaseId();
+    transmitWhenPositionChanges = par("transmitWhenPositionChanges");
     EV_INFO<<simTime()<<" beaconFrequency="<<beaconFrequency<<endl;
-    if (beaconFrequency>0) {
-        scheduleAt(simTime() + 1.0/beaconFrequency,generationTimer);
+    if (transmitWhenPositionChanges) {
+        getParentModule()->subscribe(mobilityStateChangedSignal,this);
+
+    } else {
+        if (beaconFrequency>0) {
+            scheduleAt(simTime() + 1.0/beaconFrequency,generationTimer);
+        }
     }
+    id=getParentModule()->par("id");
 }
 
 void OpalTestPacketGenerator::handleMessage(cMessage *msg)
@@ -49,7 +58,8 @@ void OpalTestPacketGenerator::handleMessage(cMessage *msg)
     if (msg->isSelfMessage()) {
         processGenerationTime();
     } else {
-        EV_INFO<<"Received CAM"<< endl;
+        EV_INFO<<id<<":Received CAM"<< endl;
+        std::cout<<id<<":Received CAM"<< endl;
         delete msg;
     }
 }
@@ -68,6 +78,19 @@ void OpalTestPacketGenerator::sendDown(Packet* p) {
     p->addTagIfAbsent<MacAddressReq>()->setDestAddress(MacAddress::BROADCAST_ADDRESS);
 
     send(p,lowerLayerOutId);
+}
+
+void OpalTestPacketGenerator::receiveSignal(cComponent* source,
+        simsignal_t signal, cObject* value, cObject* details) {
+    if (signal==mobilityStateChangedSignal) {
+        if (beaconFrequency>0) {
+        //MobilityBase* mob=check_and_cast<MobilityBase*>(value);
+            Enter_Method_Silent();
+            auto data = makeShared<ByteCountChunk>(B(packetBytes));
+               Packet* cam = new Packet("cam", data);
+               sendDown(cam);
+        }
+    }
 }
 
 } //namespace
