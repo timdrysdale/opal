@@ -35,6 +35,7 @@ struct EMWavePayload {
 	optix::float3 nextDirection;
 	optix::float3 hitPoint;
 	optix::float3 polarization;
+	optix::float3 lastReflectionHitPoint;
 	float electricFieldAmplitude;
 	float t;
 	int reflections;

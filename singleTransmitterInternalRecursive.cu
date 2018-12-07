@@ -26,7 +26,7 @@ rtBuffer<float3, 2> raySphere2D;
 //electric field is added.
 //rtBuffer<int, 3> internalRaysBuffer; //Filter internal rays buffer  [[elevationSteps, azimuthSteps, receiver]
 
-
+//TODO: These buffers consume a lot of memory also if we are adding new dynamic meshes with a lot of faces (e.g, vehicle models) since the faceIds are not being reused. Consider how to reuse faceIds
 
 rtBuffer<int, 3> bufferMinD; //minDistance ray to receiver [reflections, faceId,receiver];
 
@@ -63,7 +63,8 @@ rtBuffer<ReceptionInfo, 1> receptionInfoBuffer; //Results buffer [receiver]
 
 rtDeclareVariable(Transmitter, tx_origin, ,);
 
-rtDeclareVariable(uint3, launchIndex, rtLaunchIndex, );
+rtDeclareVariable(uint3, initializationLaunchIndex, rtLaunchIndex, );
+rtDeclareVariable(uint2, launchIndex, rtLaunchIndex, );
 
 rtDeclareVariable(rtObject, staticMeshes, , );
 rtDeclareVariable(rtObject, root, , );
@@ -93,22 +94,21 @@ RT_PROGRAM void initializeBuffersFaceBased() {
 
 	//Only once per receiver, does not depend on elevation or azimut	
 
-		uint receiverIndex = launchIndex.z; 
-		//rtPrintf("Initializing reception buff  receiverIndex=(%u,%u)\n", index.x, index.y);
-		//rtPrintf("Initializing reception buff  Ep0[%u,%u]=(%f,%f)  \n", receiverIndex.x, index.y, receptionInfoBuffer[index].sumRxElectricField.x, receptionInfoBuffer[index].sumRxElectricField.y);
+		uint receiverIndex = initializationLaunchIndex.z; 
 		receptionInfoBuffer[receiverIndex].sumRxElectricField = make_float2(0.0f, 0.0f);
 		receptionInfoBuffer[receiverIndex].directHits = 0;
 		receptionInfoBuffer[receiverIndex].reflections = 0;
+		//rtPrintf("Initializing reception buff  Ep0[%u]=(%f,%f)  \n", receiverIndex, receptionInfoBuffer[receiverIndex].sumRxElectricField.x, receptionInfoBuffer[receiverIndex].sumRxElectricField.y);
 		//rtPrintf("Initializing reception buff  Ep0[%u,%u]=(%f,%f)  \n", receiverIndex.x, receiverIndex.y, receptionInfoBuffer[receiverIndex].sumRxElectricField.x, receptionInfoBuffer[receiverIndex].sumRxElectricField.y);
 			//uint2 idf = make_uint2(k, i);
 			//	facesBuffer[idf] = 0u;
-				uint3 idmd = make_uint3(launchIndex.x, launchIndex.y, launchIndex.z);
-				bufferMinD[idmd] = 2147483647;
-				bufferMinE[idmd] = make_float2(0.0f, 0.0f);
+				//uint3 idmd = make_uint3(launchIndex.x, launchIndex.y, launchIndex.z);
+				bufferMinD[initializationLaunchIndex] = 2147483647;
+				bufferMinE[initializationLaunchIndex] = make_float2(0.0f, 0.0f);
 				//ife[idmd].E = make_float2(0.0f, 0.0f);
 				//ife[idmd].r = 0;
-				//rtPrintf("Initializing faces ifm buff idmd=(%u,%u,%u)=%d \n", idmd.x,idmd.y,idmd.z, ifm[idmd]);
-				//rtPrintf("Initializing faces ife buff idmd=(%u,%u,%u)=%d \n", idmd.x,idmd.y,idmd.z, ife[idmd].r);
+				//rtPrintf("Initializing faces bufferMinD buff idmd=(%u,%u,%u)=%d \n", initializationLaunchIndex.x,initializationLaunchIndex.y,initializationLaunchIndex.z, bufferMinD[initializationLaunchIndex]);
+				//rtPrintf("Initializing faces ifm bufferMinE =(%u,%u,%u)=(%f,%f) \n", initializationLaunchIndex.x,initializationLaunchIndex.y,initializationLaunchIndex.z, bufferMinE[initializationLaunchIndex].x,bufferMinE[initializationLaunchIndex].y);
 
 	
 	
@@ -138,6 +138,7 @@ RT_PROGRAM void genRayAndReflectionsFromSphereIndex()
 		rayPayload.nextDirection = optix::make_float3(0, 0, 0);
 		rayPayload.hitPoint = origin;
 		rayPayload.polarization = tx_origin.polarization;
+		rayPayload.lastReflectionHitPoint = origin;
 		rayPayload.electricFieldAmplitude = 1.0f; //Normalized Eo=1. Antenna Gain = 1. Implement antenna gain with antennaBuffer dependent on the ray direction and txId : initialEFAmplitude[txId] * antennaGain[txId]);
 		rayPayload.t = -1.0f;
 		rayPayload.reflections = 0;
@@ -156,20 +157,20 @@ RT_PROGRAM void genRayAndReflectionsFromSphereIndex()
 		// Each iteration is a segment (due to reflections) of the ray path.  The closest hit will
 		// return new segments to be traced here. Additionally, the closest hit at receiver will generate another ray to continue the propagation through the recption sphere
 		//rtPrintf("Generating ray i.x=%u i.y=%u, ray=(%f,%f,%f) inter=%d end=%d \n", launchIndex.x, launchIndex.y, ray_direction.x, ray_direction.y, ray_direction.z, rayPayload.reflections, rayPayload.end);
-		//rtPrintf("A\t%u\t%u\t%f\t%f\t%f\n", launchIndex.x, launchIndex.y, ray_direction.x, ray_direction.y, ray_direction.z);
-		
+			//rtPrintf("A\t%u\t%u\t%f\t%f\t%f\n", launchIndex.x, launchIndex.y, ray_direction.x, ray_direction.y, ray_direction.z);
 		while (true) {
 			optix::Ray myRay(origin, ray_direction, 0, min_t_epsilon, RT_DEFAULT_MAX);
 
 			rtTrace(root, myRay, rayPayload);
+			
 			//rtPrintf("A\t%u\t%u\t%f\t%f\t%f\n", launchIndex.x, launchIndex.y, ray_direction.x, ray_direction.y, ray_direction.z, rayPayload.rxBufferIndex);
-		
 			if (rayPayload.rxBufferIndex>=0) {	
 				//Hit a receiver. Trace internal ray	
 				EMWavePayload internalRayPayload;
 				internalRayPayload.geomNormal = optix::make_float3(0, 0, 0);
 				internalRayPayload.nextDirection = optix::make_float3(0, 0, 0);
 				internalRayPayload.hitPoint = rayPayload.hitPoint;
+				internalRayPayload.lastReflectionHitPoint = rayPayload.lastReflectionHitPoint;
 				internalRayPayload.polarization = rayPayload.polarization;
 				internalRayPayload.electricFieldAmplitude = 1.0f; //Normalized Eo=1. Antenna Gain = 1. Implement antenna gain with antennaBuffer dependent on the ray direction and txId : initialEFAmplitude[txId] * antennaGain[txId]);
 				internalRayPayload.t = -1.0f;
@@ -187,16 +188,16 @@ RT_PROGRAM void genRayAndReflectionsFromSphereIndex()
 				float3 internal_origin=rayPayload.hitPoint;
 				while (true) {
 					optix::Ray internalRay(internal_origin, internal_ray_direction, 1u, min_t_epsilon, RT_DEFAULT_MAX); //Internal ray type =1
-					rtPrintf("IR\t%u\t%u\t%d\tinternal_origin=(%f,%f,%f)internal_direction=(%f,%f,%f)\t%d\t%d\n", launchIndex.x, launchIndex.y, internalRayPayload.rxBufferIndex, internal_origin.x,internal_origin.y,internal_origin.z,internal_ray_direction.x,internal_ray_direction.y,internal_ray_direction.z,internalRayPayload.reflections,internalRayPayload.end);
+					//rtPrintf("IR\t%u\t%u\t%d\tinternal_origin=(%f,%f,%f)internal_direction=(%f,%f,%f)\t%d\t%d\n", launchIndex.x, launchIndex.y, internalRayPayload.rxBufferIndex, internal_origin.x,internal_origin.y,internal_origin.z,internal_ray_direction.x,internal_ray_direction.y,internal_ray_direction.z,internalRayPayload.reflections,internalRayPayload.end);
 					rtTrace(root, internalRay, internalRayPayload);
 					//Miss or too much attenuation
 					if (internalRayPayload.end) {
-						rtPrintf("IR end\t%u\t%u\t%u\t%d\t%d\t%d\n", launchIndex.x, launchIndex.y, internalRayPayload.rxBufferIndex,internalRayPayload.reflections,internalRayPayload.end );
+						//rtPrintf("IR end\t%u\t%u\t%u\t%d\t%d\t%d\n", launchIndex.x, launchIndex.y, internalRayPayload.rxBufferIndex,internalRayPayload.reflections,internalRayPayload.end );
 						break;
 					}
 					//Max number of reflections
 					if (internalRayPayload.reflections > max_interactions) {
-						rtPrintf("IR max\t%u\t%u\t%u\t%d\t%d\t%d\n", launchIndex.x, launchIndex.y, internalRayPayload.rxBufferIndex,internalRayPayload.reflections,internalRayPayload.end );
+						//rtPrintf("IR max\t%u\t%u\t%u\t%d\t%d\t%d\n", launchIndex.x, launchIndex.y, internalRayPayload.rxBufferIndex,internalRayPayload.reflections,internalRayPayload.end );
 						break;
 					}
 
@@ -226,8 +227,7 @@ RT_PROGRAM void genRayAndReflectionsFromSphereIndex()
 			//rtPrintf("Continuing or reflecting ray i.x=%u i.y=%u, reflections=%d hits=%d rd=(%f,%f,%f) origin=(%f,%f,%f) end=%d \n", launchIndex.x, launchIndex.y, rayPayload.reflections, rayPayload.hits, ray_direction.x, ray_direction.y, ray_direction.z, rayPayload.hitPoint.x, rayPayload.hitPoint.y, rayPayload.hitPoint.z, rayPayload.end);
 			
 			//Reflection info log (to be used in external programs)
-			//rtPrintf("R\t%u\t%u\t%u\t%d\t%d\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n", launchIndex.x, launchIndex.y, launchIndex.z, rayPayload.reflections, rayPayload.hits, ray_direction.x, ray_direction.y, ray_direction.z, rayPayload.hitPoint.x, rayPayload.hitPoint.y, rayPayload.hitPoint.z, rayPayload.totalDistance);
-
+			//rtPrintf("R\t%u\t%u\t%d\t%d\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n", launchIndex.x, launchIndex.y,  rayPayload.reflections, rayPayload.hits, ray_direction.x, ray_direction.y, ray_direction.z, rayPayload.hitPoint.x, rayPayload.hitPoint.y, rayPayload.hitPoint.z, rayPayload.totalDistance);
 			//Verbose log
 			//rtPrintf("Reflecting ray i.x=%u i.y=%u, inter=%d hits=%d rd=(%f,%f,%f) origin=(%f,%f,%f) end=%d \n", launchIndex.x, launchIndex.y, rayPayload.reflections, rayPayload.hits, rayPayload.reflectionDirection.x, rayPayload.reflectionDirection.y, rayPayload.reflectionDirection.z, rayPayload.hitPoint.x, rayPayload.hitPoint.y, rayPayload.hitPoint.z, rayPayload.end);
 		}
@@ -249,10 +249,11 @@ RT_PROGRAM void genRayAndReflectionsFromSphereIndex()
 rtDeclareVariable(SphereHit, hit_attr, attribute hit_attr, );
 rtDeclareVariable(EMWavePayload, hitPayload, rtPayload, );
 rtDeclareVariable(float, k, , );
-rtDeclareVariable(uint3, receiverLaunchIndex, rtLaunchIndex, );
+rtDeclareVariable(uint2, receiverLaunchIndex, rtLaunchIndex, );
 
 rtDeclareVariable(uint, receiverBufferIndex, , ); //Buffer id
-rtDeclareVariable(uint, externalId, , ); //External id  used to identify receivers 
+rtDeclareVariable(int, externalId, , ); //External id  used to identify receivers 
+rtDeclareVariable(uint, holdReflections, , ); 
 
 
 rtDeclareVariable(float4, sphere, , );
@@ -269,7 +270,7 @@ RT_PROGRAM void closestHitReceiverInternalRay()
 {
 
 //	rtPrintf("IR hit\t%u\t%u\t%u\t%d\t%d\t%d\n", receiverLaunchIndex.x, receiverLaunchIndex.y, receiverBufferIndex,hitPayload.rxId,receiverBufferIndex );
-	rtPrintf("Hit\t%u\t%u\t%u\torigin=(%f,%f,%f)\t%d\t%d\t%u\n", receiverLaunchIndex.x, receiverLaunchIndex.y, receiverBufferIndex, ray_receiver.origin.x,ray_receiver.origin.y,ray_receiver.origin.z,hitPayload.reflections,hitPayload.rxBufferIndex,ray_receiver.ray_type );
+	//rtPrintf("Hit\t%u\t%u\t%u\torigin=(%f,%f,%f)\t%d\t%d\t%u\n", receiverLaunchIndex.x, receiverLaunchIndex.y, receiverBufferIndex, ray_receiver.origin.x,ray_receiver.origin.y,ray_receiver.origin.z,hitPayload.reflections,hitPayload.rxBufferIndex,ray_receiver.ray_type );
 	//Update ray data
 
 
@@ -279,7 +280,7 @@ RT_PROGRAM void closestHitReceiverInternalRay()
 	
 	//Check if we are hitting the receiver for this internal ray
 	if (hitPayload.rxBufferIndex!=receiverBufferIndex) {
-		rtPrintf("IR not receiver\t%u\t%u\t%u\t%d\t%d\t%d\n", receiverLaunchIndex.x, receiverLaunchIndex.y, receiverBufferIndex,hitPayload.rxBufferIndex,receiverBufferIndex );
+		//rtPrintf("IR not receiver\t%u\t%u\t%u\t%d\t%d\t%d\n", receiverLaunchIndex.x, receiverLaunchIndex.y, receiverBufferIndex,hitPayload.rxBufferIndex,receiverBufferIndex );
 		return;
 	} else {
 		hitPayload.end=true; //We finish the internal ray always once hit the sphere again
@@ -299,8 +300,7 @@ RT_PROGRAM void closestHitReceiverInternalRay()
 	//	uint2 index = make_uint2(receiverId, transmitterId);
 	if (externalId == tx_origin.externalId) {
 		//Outgoing ray
-		rtPrintf("External hit for internal ray. txId=%d i.x=%u i.y=%u, ray=(%f,%f,%f) origin=(%f,%f,%f) t=%f rId[%u]=%d\n", tx_origin.externalId, receiverLaunchIndex.x, receiverLaunchIndex.y, ray_receiver.direction.x, ray_receiver.direction.y, ray_receiver.direction.z, ray_receiver.origin.x, ray_receiver.origin.y, ray_receiver.origin.z, hit_attr.t, receiverBufferIndex,externalId);
-
+		//rtPrintf("External hit for internal ray. txId=%d i.x=%u i.y=%u, ray=(%f,%f,%f) origin=(%f,%f,%f) t=%f rId[%u]=%d\n", tx_origin.externalId, receiverLaunchIndex.x, receiverLaunchIndex.y, ray_receiver.direction.x, ray_receiver.direction.y, ray_receiver.direction.z, ray_receiver.origin.x, ray_receiver.origin.y, ray_receiver.origin.z, hit_attr.t, receiverBufferIndex,externalId);
 		return;
 	}
 
@@ -308,7 +308,7 @@ RT_PROGRAM void closestHitReceiverInternalRay()
 	int reflections = hitPayload.reflections;
 	if (reflections==hitPayload.internalRayInitialReflections) {
 		//Not reflected, do not do anything else
-		rtPrintf("Not reflected\t%u\t%u\t%u\t%d\n", receiverLaunchIndex.x, receiverLaunchIndex.y, receiverBufferIndex,hitPayload.rxBufferIndex);
+		//rtPrintf("Not reflected\t%u\t%u\t%u\t%d\n", receiverLaunchIndex.x, receiverLaunchIndex.y, receiverBufferIndex,hitPayload.rxBufferIndex);
 		return;
 	}
 
@@ -318,7 +318,7 @@ RT_PROGRAM void closestHitReceiverInternalRay()
 
 	//		rtBufferId<int, 3>&  min_d_transmitter =bufferMinD [transmitterId];
 
-
+	if (reflections>0) {
 	uint3 idmd = make_uint3(reflections-1, hitPayload.faceId, receiverBufferIndex);
 
 	//Distance from ray line to receiver position
@@ -347,8 +347,9 @@ RT_PROGRAM void closestHitReceiverInternalRay()
 	atomicAdd(&receptionInfoBuffer[receiverBufferIndex].reflections, 1);
 
 
-	float3 ptx = ray_receiver.origin;
-	float d = length(prx - ptx);
+//	float3 ptx = ray_receiver.origin;
+//	float d = length(prx - ptx);
+	float d=length(prx-hitPayload.lastReflectionHitPoint);
 	//Compute electric field
 	//rtPrintf("ref totalDistance=%f d=%f reflections=%d i.x=%u i.y=%u \n", hitPayload.totalDistance, d, hitPayload.reflections, receiverLaunchIndex.x, receiverLaunchIndex.y);
 //	d += prevTd; //totalDistance
@@ -395,9 +396,12 @@ RT_PROGRAM void closestHitReceiverInternalRay()
 	float Eprevy = atomicExch(&bufferMinE[idmd].y, E.y);
 	float2 Eprev = make_float2(Eprevx, Eprevy);
 	//float2 Eprev = make_float2(0.f,0.f);
-	rtPrintf("C\t%u\t%u\t%u\t%u\t%d\t%f\t%f\t%f\t%f\t%f\n", receiverLaunchIndex.x, receiverLaunchIndex.y, reflections, hitPayload.faceId,  dmt,  E.x, E.y, hitPayload.prodReflectionCoefficient.x, hitPayload.prodReflectionCoefficient.y, d);
+	//rtPrintf("C\t%u\t%u\t%u\t%u\t%d\t%f\t%f\t%f\t%f\t%f\n", receiverLaunchIndex.x, receiverLaunchIndex.y, reflections, hitPayload.faceId,  dmt,  E.x, E.y, hitPayload.prodReflectionCoefficient.x, hitPayload.prodReflectionCoefficient.y, d);
 
-	//rtPrintf("FF\t%u\t%u\t%u\t%u\t%f\t%d\t%d\t%f\t%f\t%f\t%f\t%f\n", receiverLaunchIndex.x, receiverLaunchIndex.y, reflections, hitPayload.faceId, dm, dmt, oldd, E.x, E.y, Eprev.x, Eprev.y, d);
+	//rtPrintf("II\t%u\t%u\t%u\t%u\t%f\t%d\t%d\t%f\t%f\t%f\t%f\t%f\n", receiverLaunchIndex.x, receiverLaunchIndex.y, reflections, hitPayload.faceId, dm, dmt, oldd, E.x, E.y, Eprev.x, Eprev.y, d);
+		if (holdReflections==1) {
+			return;
+		}
 
 	//Remove Electric field from previous minimum distance hit
 	E -= Eprev; 
@@ -405,12 +409,13 @@ RT_PROGRAM void closestHitReceiverInternalRay()
 	//Update the receiver
 	float oldEx = atomicAdd(&receptionInfoBuffer[receiverBufferIndex].sumRxElectricField.x, E.x);
 	float oldEy = atomicAdd(&receptionInfoBuffer[receiverBufferIndex].sumRxElectricField.y, E.y);
-	rtPrintf("IHR. i.x=%u i.y=%u  Reflected hit  reflections=%d Ep=(%f,%f) E=(%f,%f) En=(%f,%f) rId=%d \n", receiverLaunchIndex.x, receiverLaunchIndex.y, reflections, oldEx, oldEy, E.x, E.y, receptionInfoBuffer[receiverBufferIndex].sumRxElectricField.x, receptionInfoBuffer[receiverBufferIndex].sumRxElectricField.y, receiverBufferIndex);
+	}
+	//rtPrintf("IHR. i.x=%u i.y=%u  Reflected hit  reflections=%d Ep=(%f,%f) E=(%f,%f) En=(%f,%f) rId=%d \n", receiverLaunchIndex.x, receiverLaunchIndex.y, reflections, oldEx, oldEy, E.x, E.y, receptionInfoBuffer[receiverBufferIndex].sumRxElectricField.x, receptionInfoBuffer[receiverBufferIndex].sumRxElectricField.y, receiverBufferIndex);
 
 //	rtPrintf("Old E=(%f.%f) New E=(%f,%f) i.x=%u i.y=%u \n", oldx, oldy, receptionInfoBuffer[receiverBufferIndex].sumRxElectricField.x, receptionInfoBuffer[receiverBufferIndex].sumRxElectricField.y, receiverLaunchIndex.x, receiverLaunchIndex.y);
 	//rtPrintf("%f\t%f\n", E.x, E.y);
 	//Reflected hit info log (to be used in external programs)
-		rtPrintf("IF\t%u\t%u\t%u\t%u\t%f\t%f\t%f\t%f\t%f\t%f\t%d\n", receiverLaunchIndex.x, receiverLaunchIndex.y, reflections, hitPayload.faceId, oldEx, oldEy, E.x, E.y, receptionInfoBuffer[receiverBufferIndex].sumRxElectricField.x, receptionInfoBuffer[receiverBufferIndex].sumRxElectricField.y, receiverBufferIndex);
+	//	rtPrintf("IF\t%u\t%u\t%u\t%u\t%f\t%f\t%f\t%f\t%f\t%f\t%d\n", receiverLaunchIndex.x, receiverLaunchIndex.y, reflections, hitPayload.faceId, oldEx, oldEy, E.x, E.y, receptionInfoBuffer[receiverBufferIndex].sumRxElectricField.x, receptionInfoBuffer[receiverBufferIndex].sumRxElectricField.y, receiverBufferIndex);
 
 
 
@@ -442,8 +447,8 @@ RT_PROGRAM void closestHitReceiver()
 //	uint2 index = make_uint2(receiverId, transmitterId);
 	if (externalId == tx_origin.externalId) {
 		//Outgoing ray
-		rtPrintf("External. txId=%d i.x=%u i.y=%u, ray=(%f,%f,%f) origin=(%f,%f,%f) t=%f rId[%u]=%d\n", tx_origin.externalId, receiverLaunchIndex.x, receiverLaunchIndex.y, ray_receiver.direction.x, ray_receiver.direction.y, ray_receiver.direction.z, ray_receiver.origin.x, ray_receiver.origin.y, ray_receiver.origin.z, hit_attr.t, receiverBufferIndex,externalId);
-
+		//rtPrintf("External. txId=%d i.el=%u i.az=%u, ray=(%f,%f,%f) origin=(%f,%f,%f) t=%f rId[%u]=%d\n", tx_origin.externalId, receiverLaunchIndex.x, receiverLaunchIndex.y, ray_receiver.direction.x, ray_receiver.direction.y, ray_receiver.direction.z, ray_receiver.origin.x, ray_receiver.origin.y, ray_receiver.origin.z, hit_attr.t, receiverBufferIndex,externalId);
+		//rtPrintf("External. txId=%d i.el=%u i.az=%u, ray=(%f,%f,%f) origin=(%f,%f,%f) t=%f ref=%d\n", tx_origin.externalId, receiverLaunchIndex.x, receiverLaunchIndex.y, ray_receiver.direction.x, ray_receiver.direction.y, ray_receiver.direction.z, ray_receiver.origin.x, ray_receiver.origin.y, ray_receiver.origin.z, hit_attr.t, hitPayload.reflections);
 		return;
 	}
 
@@ -451,96 +456,24 @@ RT_PROGRAM void closestHitReceiver()
 	int reflections = hitPayload.reflections;
 	float3 prx = make_float3(sphere.x, sphere.y, sphere.z);
 	float dor=length(ray_receiver.origin-prx);
-	rtPrintf("Rx\t%u\t%u\t%u\torigin=(%f,%f,%f)\t%f\t%u\n", receiverLaunchIndex.x, receiverLaunchIndex.y, receiverBufferIndex, ray_receiver.origin.x,ray_receiver.origin.y,ray_receiver.origin.z,dor,ray_receiver.ray_type );
-	if (dor<=(sphere.w+0.001)) { //Give some epsilon, otherwise numerical inaccuracies may make it fail the check
-	//This ray has hit us before, ignore it. Internal ray may compute additional contributions
-		rtPrintf("Ignored. txId=%d i.x=%u i.y=%u, ray=(%f,%f,%f) origin=(%f,%f,%f) t=%f rId[%u]=%d\n", tx_origin.externalId, receiverLaunchIndex.x, receiverLaunchIndex.y, ray_receiver.direction.x, ray_receiver.direction.y, ray_receiver.direction.z, ray_receiver.origin.x, ray_receiver.origin.y, ray_receiver.origin.z, hit_attr.t, receiverBufferIndex,externalId);
-		return;
+//	float dtxrx=length(tx_origin.origin-prx);
+	//rtPrintf("Rx\t%u\t%u\t%u\torigin=(%f,%f,%f)\t%f\t%u\n", receiverLaunchIndex.x, receiverLaunchIndex.y, receiverBufferIndex, ray_receiver.origin.x,ray_receiver.origin.y,ray_receiver.origin.z,dor,ray_receiver.ray_type );
+	if (dor<=(sphere.w+0.0001)) { //Give some epsilon, otherwise numerical inaccuracies may make it fail the check
+		//Ray originated inside the reception radius
+		
+		//if (dtxrx>=sphere.w+0.001) {
+			//Transmitter is outside the reception radius: This ray has hit us before, ignore it. Internal ray may compute additional contributions
+			//rtPrintf("Ignored. txId=%d i.x=%u i.y=%u, ray=(%f,%f,%f) origin=(%f,%f,%f) t=%f rId[%u]=%d\n", tx_origin.externalId, receiverLaunchIndex.x, receiverLaunchIndex.y, ray_receiver.direction.x, ray_receiver.direction.y, ray_receiver.direction.z, ray_receiver.origin.x, ray_receiver.origin.y, ray_receiver.origin.z, hit_attr.t, receiverBufferIndex,externalId);
+			return;
+		//} //the transmitter is inside the reception radius, so this ray has not hit us before. No internal ray is created
 
 	} else {
+		//If ray origin is outside the reception radius an internal ray is always created 
 		//Mark to  trace the internal ray to check if it collides with another thing and hits the receiver again
 
 		hitPayload.rxBufferIndex=receiverBufferIndex;	
-		//rtPrintf(" hit\t%u\t%u\t%u\torigin=(%f,%f,%f)\t%f\t%u\n", receiverLaunchIndex.x, receiverLaunchIndex.y, hitPayload.rxBufferIndex, ray_receiver.origin.x,ray_receiver.origin.y,ray_receiver.origin.z,dor,ray_receiver.ray_type );
-		/*EMWavePayload internalRayPayload;
-		internalRayPayload.geomNormal = optix::make_float3(0, 0, 0);
-		internalRayPayload.nextDirection = optix::make_float3(0, 0, 0);
-		internalRayPayload.hitPoint = hitPayload.hitPoint;
-		internalRayPayload.polarization = hitPayload.polarization;
-		internalRayPayload.electricFieldAmplitude = 1.0f; //Normalized Eo=1. Antenna Gain = 1. Implement antenna gain with antennaBuffer dependent on the ray direction and txId : initialEFAmplitude[txId] * antennaGain[txId]);
-		internalRayPayload.t = -1.0f;
-		internalRayPayload.reflections = hitPayload.reflections;
-		internalRayPayload.internalRayInitialReflections = hitPayload.reflections;
-
-		internalRayPayload.hits = hitPayload.hits;
-		internalRayPayload.totalDistance = hitPayload.totalDistance;
-		internalRayPayload.end = false;
-
-		internalRayPayload.prodReflectionCoefficient = hitPayload.prodReflectionCoefficient; 
-		internalRayPayload.faceId = hitPayload.faceId;
-		internalRayPayload.rxId=receiverBufferIndex;
-		float3 ray_direction = ray_receiver.direction;
-		float3 origin=hitPayload.hitPoint;
-		while (true) {
-			optix::Ray myRay(hitPayload.hitPoint, ray_direction, 1u, min_t_epsilon, RT_DEFAULT_MAX); //Internal ray type =1
-			rtPrintf("IR\t%u\t%u\t%u\torigin=(%f,%f,%f)\t%d\t%d\t%u\n", receiverLaunchIndex.x, receiverLaunchIndex.y, receiverBufferIndex, origin.x,origin.y,origin.z,internalRayPayload.reflections,internalRayPayload.end,ray_receiver.ray_type );
-
-			rtTrace(root, myRay, internalRayPayload);
-			//Miss or too much attenuation
-			if (internalRayPayload.end) {
-				rtPrintf("IR end\t%u\t%u\t%u\t%d\t%d\t%d\n", receiverLaunchIndex.x, receiverLaunchIndex.y, receiverBufferIndex,internalRayPayload.reflections,internalRayPayload.end );
-				break;
-			}
-			//Max number of reflections
-			if (internalRayPayload.reflections > max_interactions) {
-				rtPrintf("IR max\t%u\t%u\t%u\t%d\t%d\t%d\n", receiverLaunchIndex.x, receiverLaunchIndex.y, receiverBufferIndex,internalRayPayload.reflections,internalRayPayload.end );
-				break;
-			}
-			
-			//Reflection or going through receiver
-			// Update ray data for the next path segment
-			ray_direction = internalRayPayload.nextDirection;
-			origin = internalRayPayload.hitPoint;
-		}
-
-		*/
 	}
 	
-
-	//Check incoming or outgoing ray
-	//rtBufferId<int, 3>& ib = internalRaysBuffer[receiverId];
-//	uint3 irBufferId=make_uint3(receiverLaunchIndex.x,receiverLaunchIndex.y,receiverBufferIndex);
-//	int prevRef = internalRaysBuffer[irBufferId];
-//	if (prevRef < 0) {
-//		//Incoming ray. Store number of reflections
-//		internalRaysBuffer[irBufferId] = reflections;
-//		++hitPayload.hits;
-//		
-//		//rtPrintf("IR\t%u\t%u\t%u\t%d\t%d\t%d\n", receiverLaunchIndex.x, receiverLaunchIndex.y, receiverLaunchIndex.z, prevRef, reflections, ib[receiverLaunchIndex]);
-//		
-//	}
-//	else {
-//		//Outgoing ray. Check reflections
-//		//Reinit the buffer
-//		internalRaysBuffer[irBufferId] = -1;
-//		
-//
-//		
-//		if (prevRef == reflections) {
-//			//Ray has not been reflected within the receiver sphere, ignore it
-//			//rtPrintf("  rId=%d----> outgoing ray \n", receiverId);
-//			
-//			//rtPrintf("OR\t%u\t%u\t%u\t%d\t%d\n", receiverLaunchIndex.x, receiverLaunchIndex.y, receiverLaunchIndex.z, prevRef, reflections);
-//			
-//			return;
-//
-//		}
-//	}
-	//float r = hit_attr.t; //Distance to origin
-	//rtPrintf("HR. rx=(%f,%f,%f) radius=%f id=%u tx=%u\n", sphere.x,sphere.y,sphere.z, sphere.w, index.x, index.y);
-	//rtPrintf("HR. HitPayload inte=%d \n", hitPayload.reflections);
-
-
 
 	if (reflections == 0) {
 		
@@ -571,7 +504,7 @@ RT_PROGRAM void closestHitReceiver()
 		float oldEy = atomicAdd(&receptionInfoBuffer[receiverBufferIndex].sumRxElectricField.y, E.y);
 		//rtPrintf("DHd\t%u\t%u\t%f\t%f\t%f\t%d\n", receiverLaunchIndex.x, receiverLaunchIndex.y, oldEx, oldEy,d, receiverId);
 
-		rtPrintf("DR. Direct hit   i.x=%u i.y=%u  Ep=(%f,%f) E=(%f,%f) En=(%f,%f) rId[%u] \n", receiverLaunchIndex.x, receiverLaunchIndex.y, oldEx,oldEy, E.x, E.y, receptionInfoBuffer[receiverBufferIndex].sumRxElectricField.x, receptionInfoBuffer[receiverBufferIndex].sumRxElectricField.y, receiverBufferIndex);
+		//rtPrintf("DR. Direct hit   i.x=%u i.y=%u  Ep=(%f,%f) E=(%f,%f) En=(%f,%f) rId[%u] \n", receiverLaunchIndex.x, receiverLaunchIndex.y, oldEx,oldEy, E.x, E.y, receptionInfoBuffer[receiverBufferIndex].sumRxElectricField.x, receptionInfoBuffer[receiverBufferIndex].sumRxElectricField.y, receiverBufferIndex);
 		//Direct hit info log (to be used in external programs)
 		//rtPrintf("DH\t%u\t%u\t%f\t%f\t%f\t%f\t%f\t%f\t%d\t%d\n", receiverLaunchIndex.x, receiverLaunchIndex.y,  oldEx, oldEy, E.x, E.y, receptionInfoBuffer[receiverBufferIndex].sumRxElectricField.x, receptionInfoBuffer[receiverBufferIndex].sumRxElectricField.y, receiverBufferIndex,externalId);
 
@@ -585,7 +518,6 @@ RT_PROGRAM void closestHitReceiver()
 		
 //		rtBufferId<int, 3>&  min_d_transmitter =bufferMinD [transmitterId];
 			
-		
 		uint3 idmd = make_uint3(reflections-1, hitPayload.faceId, receiverBufferIndex);
 		
 		//Distance from ray line to receiver position
@@ -614,8 +546,9 @@ RT_PROGRAM void closestHitReceiver()
 		atomicAdd(&receptionInfoBuffer[receiverBufferIndex].reflections, 1);
 
 		
-		float3 ptx = ray_receiver.origin;
-		float d = length(prx - ptx);
+		//float3 ptx = ray_receiver.origin;
+		//float d = length(prx - ptx);
+		float d=length(prx-hitPayload.lastReflectionHitPoint);
 		//Compute electric field
 		//rtPrintf("ref totalDistance=%f d=%f reflections=%d i.x=%u i.y=%u \n", hitPayload.totalDistance, d, hitPayload.reflections, receiverLaunchIndex.x, receiverLaunchIndex.y);
 		//d += prevTd; //totalDistance
@@ -660,10 +593,12 @@ RT_PROGRAM void closestHitReceiver()
 		float Eprevx = atomicExch(&bufferMinE[idmd].x, E.x);
 		float Eprevy = atomicExch(&bufferMinE[idmd].y, E.y);
 		float2 Eprev = make_float2(Eprevx, Eprevy);
-		//float2 Eprev = make_float2(0.f,0.f);
 		//rtPrintf("C\t%u\t%u\t%u\t%u\t%d\t%f\t%f\t%f\t%f\t%f\n", receiverLaunchIndex.x, receiverLaunchIndex.y, reflections, hitPayload.faceId,  dmt,  E.x, E.y, hitPayload.prodReflectionCoefficient.x, hitPayload.prodReflectionCoefficient.y, d);
 
 		//rtPrintf("FF\t%u\t%u\t%u\t%u\t%f\t%d\t%d\t%f\t%f\t%f\t%f\t%f\n", receiverLaunchIndex.x, receiverLaunchIndex.y, reflections, hitPayload.faceId, dm, dmt, oldd, E.x, E.y, Eprev.x, Eprev.y, d);
+		if (holdReflections==1) {
+			return;
+		}
 
 		//Remove Electric field from previous minimum distance hit
 		E -= Eprev; 
@@ -676,7 +611,7 @@ RT_PROGRAM void closestHitReceiver()
 		//rtPrintf("Old E=(%f.%f) New E=(%f,%f) i.x=%u i.y=%u \n", oldx, oldy, receptionInfoBuffer[receiverBufferIndex].sumRxElectricField.x, receptionInfoBuffer[receiverBufferIndex].sumRxElectricField.y, receiverLaunchIndex.x, receiverLaunchIndex.y);
 		//rtPrintf("%f\t%f\n", E.x, E.y);
 		//Reflected hit info log (to be used in external programs)
-		rtPrintf("F\t%u\t%u\t%u\t%u\t%f\t%f\t%f\t%f\t%f\t%f\t%d\n", receiverLaunchIndex.x, receiverLaunchIndex.y, reflections, hitPayload.faceId, oldEx, oldEy, E.x, E.y, receptionInfoBuffer[receiverBufferIndex].sumRxElectricField.x, receptionInfoBuffer[receiverBufferIndex].sumRxElectricField.y, receiverBufferIndex);
+		//rtPrintf("F\t%u\t%u\t%u\t%u\t%f\t%f\t%f\t%f\t%f\t%f\t%d\n", receiverLaunchIndex.x, receiverLaunchIndex.y, reflections, hitPayload.faceId, oldEx, oldEy, E.x, E.y, receptionInfoBuffer[receiverBufferIndex].sumRxElectricField.x, receptionInfoBuffer[receiverBufferIndex].sumRxElectricField.y, receiverBufferIndex);
 
 
 	}

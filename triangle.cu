@@ -157,10 +157,10 @@ rtDeclareVariable(uint, meshId, , );
 RT_PROGRAM void closestHitTriangle()
 {
 
-	//DECIDE IF WE KILL THE RAY
 
-
-	rayPayload.hitPoint = ray.origin + ch_triangle_data.t * ray.direction;
+	float3 hp= ray.origin + ch_triangle_data.t * ray.direction ;
+	rayPayload.hitPoint =hp;
+	rayPayload.lastReflectionHitPoint = hp;
 	rayPayload.totalDistance += ch_triangle_data.t;
 	rayPayload.totalDistanceTillLastReflection = rayPayload.totalDistance;
 	rayPayload.t = ch_triangle_data.t;
@@ -183,7 +183,7 @@ RT_PROGRAM void closestHitTriangle()
 	//}
 	
 
-	rtPrintf("G\t%u\t%u\t%d\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n", launchIndexTriangle.x, launchIndexTriangle.y, rayPayload.reflections, cosA, ray.direction.x, ray.direction.y, ray.direction.z, n.x, n.y, n.z, rayPayload.totalDistanceTillLastReflection);
+	//rtPrintf("G\t%u\t%u\t%d\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%u\n", launchIndexTriangle.x, launchIndexTriangle.y, rayPayload.reflections, cosA, ray.direction.x, ray.direction.y, ray.direction.z, n.x, n.y, n.z, rayPayload.totalDistanceTillLastReflection, rayPayload.faceId);
 	//rtPrintf("Gg\t%u\t%u\t%d\t%f\t%f\t%f\t%f\t%f\t%f\n", launchIndexTriangle.x, launchIndexTriangle.y, rayPayload.reflections, rayPayload.nextDirection.x, rayPayload.nextDirection.y, rayPayload.nextDirection.z, n.x, n.y, n.z);
 
 	//Complex arithmetic: sum

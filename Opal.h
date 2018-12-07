@@ -80,6 +80,7 @@ namespace opal {
 		optix::Program closestHitProgram;
 		std::function<void(float, int)> callback;
 		int externalId;
+		bool dirty;
 	};
 
 	class BaseTransmitter {
@@ -150,7 +151,7 @@ namespace opal {
 	public:
 		bool sceneGraphCreated;
 		bool sceneFinished;
-		int transmissions;
+		int transmissionLaunches;
 		RaySphere raySphere;
 		ChannelParameters defaultChannel;
 		std::map<int, OpalDynamicMeshGroup*> dynamicMeshes; //externalId to dynamic mesh
@@ -171,6 +172,7 @@ namespace opal {
 		bool useInternalTracing;	
 
 
+		float radioReductionFraction;
 		//Default programs
 
 		std::map<std::string,optix::Program> defaultPrograms;
@@ -409,12 +411,12 @@ namespace opal {
   //Tests
 std::vector<optix::float3>  loadVerticesFromFile(const char* file);
 std::vector<int>  loadTrianglesFromFile(const char* file);
-std::unique_ptr<opal::OpalSceneManager> crossingTest(std::unique_ptr<opal::OpalSceneManager> sceneManager);
-std::unique_ptr<opal::OpalSceneManager> planeTest(std::unique_ptr<opal::OpalSceneManager> sceneManager);
-std::unique_ptr<opal::OpalSceneManager> quadTest(std::unique_ptr<opal::OpalSceneManager> sceneManager);
+std::unique_ptr<opal::OpalSceneManager> crossingTest(std::unique_ptr<opal::OpalSceneManager> sceneManager, bool print, bool subSteps);
+std::unique_ptr<opal::OpalSceneManager> planeTest(std::unique_ptr<opal::OpalSceneManager> sceneManager, bool print, bool subSteps);
+std::unique_ptr<opal::OpalSceneManager> quadTest(std::unique_ptr<opal::OpalSceneManager> sceneManager, bool print);
 std::unique_ptr<opal::OpalSceneManager> addRemoveReceivers(std::unique_ptr<opal::OpalSceneManager> sceneManager);
 std::unique_ptr<opal::OpalSceneManager> moveReceivers(std::unique_ptr<opal::OpalSceneManager> sceneManager);
-std::unique_ptr<opal::OpalSceneManager> addRemoveDynamicMeshes(std::unique_ptr<opal::OpalSceneManager> sceneManager);
+std::unique_ptr<opal::OpalSceneManager> addRemoveDynamicMeshes(std::unique_ptr<opal::OpalSceneManager> sceneManager, bool print, bool subSteps);
 std::unique_ptr<opal::OpalSceneManager> addCompoundDynamicMeshes(std::unique_ptr<opal::OpalSceneManager> sceneManager);
 std::unique_ptr<opal::OpalSceneManager> crossingTestAndVehicle(std::unique_ptr<opal::OpalSceneManager> sceneManager);
 std::unique_ptr<opal::OpalSceneManagerMultiTransmitter> seqParallelTxTest(std::unique_ptr<opal::OpalSceneManagerMultiTransmitter> sceneManager);

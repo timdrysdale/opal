@@ -218,11 +218,12 @@ rtDeclareVariable(float, k, , );
 rtDeclareVariable(uint3, receiverLaunchIndex, rtLaunchIndex, );
 
 rtDeclareVariable(uint, receiverBufferIndex, , ); //Buffer id
-rtDeclareVariable(uint, externalId, , ); //External id  used to identify receivers 
+rtDeclareVariable(int, externalId, , ); //External id  used to identify receivers 
 
 
 rtDeclareVariable(float4, sphere, , );
 rtDeclareVariable(optix::Ray, ray_receiver, rtCurrentRay, );
+rtDeclareVariable(uint, holdReflections, , ); 
 
 
 
@@ -372,8 +373,8 @@ RT_PROGRAM void closestHitReceiverFaceMin()
 		float d = length(prx - ptx);
 		//Compute electric field
 		//rtPrintf("ref totalDistance=%f d=%f reflections=%d i.x=%u i.y=%u \n", hitPayload.totalDistance, d, hitPayload.reflections, receiverLaunchIndex.x, receiverLaunchIndex.y);
-		//d += prevTd; //totalDistance
-		d+=hitPayload.totalDistanceTillLastReflection;
+		d += prevTd; //totalDistance
+		//d+=hitPayload.totalDistanceTillLastReflection;
 		float2 z = make_float2(0.0f, -k*d);
 		float2 zexp = complex_exp_only_imaginary(z);
 		float2 Rzexp = complex_prod(hitPayload.prodReflectionCoefficient, zexp);
@@ -417,8 +418,13 @@ RT_PROGRAM void closestHitReceiverFaceMin()
 		//float2 Eprev = make_float2(0.f,0.f);
 		//rtPrintf("C\t%u\t%u\t%u\t%u\t%d\t%f\t%f\t%f\t%f\t%f\n", receiverLaunchIndex.x, receiverLaunchIndex.y, reflections, hitPayload.faceId,  dmt,  E.x, E.y, hitPayload.prodReflectionCoefficient.x, hitPayload.prodReflectionCoefficient.y, d);
 
-		//rtPrintf("FF\t%u\t%u\t%u\t%u\t%f\t%d\t%d\t%f\t%f\t%f\t%f\t%f\n", receiverLaunchIndex.x, receiverLaunchIndex.y, reflections, hitPayload.faceId, dm, dmt, oldd, E.x, E.y, Eprev.x, Eprev.y, d);
+		rtPrintf("FF\t%u\t%u\t%u\t%u\t%f\t%d\t%d\t%f\t%f\t%f\t%f\t%f\n", receiverLaunchIndex.x, receiverLaunchIndex.y, reflections, hitPayload.faceId, dm, dmt, oldd, E.x, E.y, Eprev.x, Eprev.y, d);
 
+		
+		//Hold reflections for debugging
+		if (holdReflections==1) {
+			return;
+		}
 		//Remove Electric field from previous minimum distance hit
 		E -= Eprev; 
 
@@ -633,7 +639,7 @@ RT_PROGRAM void closestHitReceiverFaceMinHoldReflections()
 rtDeclareVariable(EMWavePayload, missPayload, rtPayload, );
 RT_PROGRAM void miss()
 {
-	rtPrintf("miss i.x=%u. iy=%u \n", receiverLaunchIndex.x, receiverLaunchIndex.y);
+	//rtPrintf("miss i.x=%u. iy=%u \n", receiverLaunchIndex.x, receiverLaunchIndex.y);
 	missPayload.end = true;
 }
 

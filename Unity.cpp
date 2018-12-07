@@ -113,6 +113,9 @@ namespace opal {
 			return OPAL_EXCEPTION;
 		}
 		catch (optix::Exception& e) {
+			std::cout << "Init: error occurred with error code "
+				<< e.getErrorCode() << " and message "
+				<< e.getErrorString() << std::endl;
 #ifdef OPALDEBUG
 			std::ofstream myfile;
 			myfile.open(logFile, std::ifstream::app);
