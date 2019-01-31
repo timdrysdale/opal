@@ -32,10 +32,10 @@ OpalSceneManager::OpalSceneManager() {
 	initMembers();
 
 }
-OpalSceneManager::OpalSceneManager(float f, bool useInternalTracing,  bool holdReflections)
+OpalSceneManager::OpalSceneManager(float f, bool useInternalTracing,  bool holdReflections, bool useExactSpeedOfLight)
 {
 	initMembers();
-	initContext(f,useInternalTracing, holdReflections);
+	initContext(f,useInternalTracing, holdReflections, useExactSpeedOfLight);
 
 }
 
@@ -59,8 +59,11 @@ void OpalSceneManager::initMembers() {
 
 	this->maxReflections = 10u;
 	this->minEpsilon = 1.e-3f;
-
-	this->numberOfFaces = 0u; //Increased every time a new face is added to the scene. TODO: a MAX_FACE_ID should be added to limit the buffers size
+	this->useExactSpeedOfLight=true;
+	//Increased every time a new face is added to the scene.  Sets to 1. A fake face (with index 0) is always present to create the buffers, otherwise they have to be set to 0 (Optix does not allow 
+	//a dimension of a buffer with size 0. The fake face 0 does not affect, since no geometry has this faceId;
+	//TODO: a MAX_FACE_ID should be added to limit the buffers size
+	this->numberOfFaces = 1u; 
 	this->sceneGraphCreated = false;
 	this->sceneFinished = false;
 
@@ -73,13 +76,13 @@ void OpalSceneManager::initMembers() {
 	this->useInternalTracing=true;
 	this->radioReductionFraction=1.0/sqrt(2);
 }
-void OpalSceneManager::initContext(float f, bool useInternalTracing, bool holdReflections) {
+void OpalSceneManager::initContext(float f, bool useInternalTracing, bool holdReflections, bool useExactSpeedOfLight) {
 #ifdef OPALDEBUG
 	outputFile.open("opal_log.txt");
 #endif // OPALDEBUG
 	this->holdReflections = holdReflections;
 	this->useInternalTracing=useInternalTracing;
-
+	this->useExactSpeedOfLight=useExactSpeedOfLight;
 	setFrequency(f);
 	createSceneContext();
 	setDefaultPrograms();
@@ -88,8 +91,11 @@ void OpalSceneManager::initContext(float f, bool useInternalTracing, bool holdRe
 void OpalSceneManager::setFrequency(float f)
 {
 	this->defaultChannel.frequency = f;
-	//this->defaultChannel.waveLength = 299792458.0f / f; // c/f
-	this->defaultChannel.waveLength = 3.0e8f / f;
+	if (useExactSpeedOfLight) {
+		this->defaultChannel.waveLength = 299792458.0f / f; // c/f
+	} else {
+		this->defaultChannel.waveLength = 3.0e8f / f;
+	}
 	this->defaultChannel.k = 2 * 3.14159265358979323846f / this->defaultChannel.waveLength; //wavenumber (2*pi/lambda)
 	this->defaultChannel.eA = 1.0f / ((2 * this->defaultChannel.k)*(2 * this->defaultChannel.k)); //Effective Area of the antenna (lambda/4*pi)^2
 
@@ -264,10 +270,10 @@ void OpalSceneManager::addStaticMesh(OpalMesh mesh) {
 		rootGroup->getAcceleration()->markDirty();
 	}
 
-	if (sceneFinished) {
-		//updateFacesBuffers();
-		//Done in transmit
-	}
+	//if (sceneFinished) {
+	//	updateFacesBuffers();
+	//	Done in transmit
+	//}
 }
 
 
@@ -971,8 +977,22 @@ optix::Buffer OpalSceneManager::setReceptionInfoBuffer(optix::uint rx) {
 }
 
 optix::Buffer OpalSceneManager::setFacesMinDBuffer(optix::uint rx, optix::uint reflections, optix::uint faces) {
-	//optix::Buffer rb = context->createBuffer(RT_BUFFER_OUTPUT, RT_FORMAT_INT, reflections, faces, rx);
-	optix::Buffer rb = context->createBuffer(RT_BUFFER_INPUT_OUTPUT | RT_BUFFER_GPU_LOCAL, RT_FORMAT_INT, reflections, faces, rx);
+	optix::Buffer rb;
+	if (rx == 0) {
+		//Optix doc says that if one of them is 0, all of them must be 0. No receivers, no launch should be done in transmit anyway
+		rb = context->createBuffer(RT_BUFFER_INPUT_OUTPUT | RT_BUFFER_GPU_LOCAL, RT_FORMAT_INT, 0u, 0u, 0u);
+	} else if (reflections == 0) {
+		// Cannot be set to 0. A buffer for at least one reflection is created, even though it is not used
+		rb = context->createBuffer(RT_BUFFER_INPUT_OUTPUT | RT_BUFFER_GPU_LOCAL, RT_FORMAT_INT, 1u, faces, rx);
+	}
+	else if (faces==0) {
+		throw Exception("setFacesMinDBuffer():: Cannot set internal buffers with zero faces");
+		return nullptr;
+	}
+	else {
+		//optix::Buffer rb = context->createBuffer(RT_BUFFER_OUTPUT, RT_FORMAT_INT, reflections, faces, rx);
+		 rb = context->createBuffer(RT_BUFFER_INPUT_OUTPUT | RT_BUFFER_GPU_LOCAL, RT_FORMAT_INT, reflections, faces, rx);
+	}
 
 	context["bufferMinD"]->set(rb);
 	return rb;
@@ -983,16 +1003,42 @@ optix::Buffer OpalSceneManager::setFacesMinDBuffer(optix::uint rx, optix::uint r
 optix::Buffer OpalSceneManager::setFacesMinEBuffer(optix::uint rx,optix::uint reflections, optix::uint faces) {
 	//optix::Buffer aux = context->createBuffer(RT_BUFFER_OUTPUT, RT_FORMAT_USER, reflections, faces, rx);
 	//optix::Buffer aux = context->createBuffer(RT_BUFFER_INPUT_OUTPUT | RT_BUFFER_GPU_LOCAL, RT_FORMAT_USER, reflections, faces, rx);
-	optix::Buffer rb = context->createBuffer(RT_BUFFER_INPUT_OUTPUT | RT_BUFFER_GPU_LOCAL, RT_FORMAT_FLOAT2, reflections, faces, rx);
+	optix::Buffer rb;
+	if (rx == 0) {
+		//Optix doc says that if one of them is 0, all of them must be 0. No receivers, no launch should be done in transmit anyway
+		rb = context->createBuffer(RT_BUFFER_INPUT_OUTPUT | RT_BUFFER_GPU_LOCAL, RT_FORMAT_FLOAT2, 0u, 0u, 0u);
+	}
+	else if (reflections == 0) {
+		// Cannot be set to 0. A buffer for at least one reflection is created, even though it is not used
+		rb = context->createBuffer(RT_BUFFER_INPUT_OUTPUT | RT_BUFFER_GPU_LOCAL, RT_FORMAT_FLOAT2, 1u, faces, rx);
+	}
+	else if (faces == 0) {
+		throw Exception("setFacesMinEBuffer():: Cannot set internal buffers with zero faces");
+		return nullptr;
+	}
+	
+	else {
+		 rb = context->createBuffer(RT_BUFFER_INPUT_OUTPUT | RT_BUFFER_GPU_LOCAL, RT_FORMAT_FLOAT2, reflections, faces, rx);
+	}
 	context["bufferMinE"]->set(rb);
 	return rb;
 }
 optix::Buffer OpalSceneManager::setFacesMinEBufferHoldReflections(optix::uint rx, optix::uint reflections, optix::uint faces) {
-
-	//optix::Buffer aux = context->createBuffer(RT_BUFFER_INPUT_OUTPUT, RT_FORMAT_USER, reflections, faces, rx);
-	//optix::Buffer aux = context->createBuffer(RT_BUFFER_INPUT_OUTPUT | RT_BUFFER_GPU_LOCAL, RT_FORMAT_USER, reflections, faces, rx);
-	optix::Buffer rb = context->createBuffer(RT_BUFFER_OUTPUT, RT_FORMAT_FLOAT2, reflections, faces, rx);
-	//aux->setElementSize(sizeof(DuplicateReflection));
+	optix::Buffer rb;
+	if (rx == 0) {
+		//Optix doc says that if one of them is 0, all of them must be 0. No receivers, no launch should be done in transmit anyway
+		rb = context->createBuffer(RT_BUFFER_OUTPUT, RT_FORMAT_FLOAT2, 0u, 0u, 0u);
+	}
+	else if (reflections == 0) {
+		// Cannot be set to 0. A buffer for at least one reflection is created, even though it is not used
+		rb = context->createBuffer(RT_BUFFER_OUTPUT, RT_FORMAT_FLOAT2, 1u, faces, rx);
+	}
+	else if (faces == 0) {
+		throw Exception("setFacesMinEBuffer():: Cannot set internal buffers with zero faces");
+		return nullptr;
+	} else {
+		 rb = context->createBuffer(RT_BUFFER_OUTPUT, RT_FORMAT_FLOAT2, reflections, faces, rx);
+	}
 	context["bufferMinE"]->set(rb);
 	return rb;
 
@@ -1000,13 +1046,27 @@ optix::Buffer OpalSceneManager::setFacesMinEBufferHoldReflections(optix::uint rx
 
 }
 optix::Buffer OpalSceneManager::setInternalRaysBuffer(optix::uint rx,  optix::uint elevationSteps, optix::uint azimuthSteps) {
+	optix::Buffer rb;
+	if (rx == 0) {
+		//Optix doc says that if one of them is 0, all of them must be 0. No receivers, no launch should be done in transmit anyway
+		rb = context->createBuffer(RT_BUFFER_INPUT_OUTPUT | RT_BUFFER_GPU_LOCAL, RT_FORMAT_INT, 0u, 0u, 0u);
+	}
+	else if (elevationSteps == 0 || azimuthSteps == 0) {
+		// Cannot be set to 0. A buffer for at least one reflection is created, even though it is not used
 
-	optix::Buffer rb = context->createBuffer(RT_BUFFER_INPUT_OUTPUT | RT_BUFFER_GPU_LOCAL, RT_FORMAT_INT, elevationSteps, azimuthSteps, rx);
+		throw Exception("setInternalRaysBuffer():: Cannot set internal buffers with zero azimuth or elevation steps");
+		return nullptr;
+	}
+	else {
+
+		 rb = context->createBuffer(RT_BUFFER_INPUT_OUTPUT | RT_BUFFER_GPU_LOCAL, RT_FORMAT_INT, elevationSteps, azimuthSteps, rx);
+	}
 
 
 	context["internalRaysBuffer"]->set(rb);
 
 	return rb;
+
 }
 
 void OpalSceneManager::addReceiver(int id, float3  position, float radius, std::function<void(float, int)>  callback)
@@ -1227,6 +1287,20 @@ void OpalSceneManager::updateReceiver(int id, float3 position, float radius) {
 void OpalSceneManager::transmit(int txId, float txPower,  float3 origin, float3 polarization) {
 
 	//std::cout<<printInternalBuffersState()<<std::endl;
+	uint numReceivers = static_cast<uint>(receivers.size());
+	if (numReceivers == 0) {
+		//WARNING: the internal buffers cannot create with no receivers, so we return. 
+		//For debug or testing reflections or any other thing, at least one receiver should be added
+		return;
+	
+	}
+	
+	if (numReceivers == 1) {
+		if (receivers[0]->externalId == txId) {
+			//No power will be received, since we are not assuming   dual transceiver
+			return;
+		}
+	}
 
 	checkInternalBuffers();	
 
@@ -1235,7 +1309,6 @@ void OpalSceneManager::transmit(int txId, float txPower,  float3 origin, float3 
 	host_tx.polarization = polarization;
 	host_tx.externalId = txId;
 	context["tx_origin"]->setUserData(sizeof(Transmitter),&host_tx);	
-	uint numReceivers=static_cast<uint>(receivers.size());
 
 
 	//First initialize
@@ -1297,7 +1370,7 @@ void OpalSceneManager::transmit(int txId, float txPower,  float3 origin, float3 
 
 
 			float power = defaultChannel.eA*((E.x*E.x) + (E.y*E.y))*txPower;
-	//		std::cout << "rx["<<receivers[index]->externalId<<"]=" << receivers[index]->position << ".r=" << receivers[index]->radius << "(sphere="<<receivers[index]->geomInstance["sphere"]->getFloat4()<<"); tx["<<txId<<"]=" << origin << " eA=" << defaultChannel.eA << " txPower=" << txPower << " E=(" << E.x << "," << E.y << ")" << " p=" << power << " dh=" << host_hits[index].directHits << " rf=" << host_hits[index].reflections << " d=" << length(origin - receivers[index]->position) << std::endl;
+			//std::cout << "rx["<<receivers[index]->externalId<<"]=" << receivers[index]->position << ".r=" << receivers[index]->radius << "(sphere="<<receivers[index]->geomInstance["sphere"]->getFloat4()<<"); tx["<<txId<<"]=" << origin << " eA=" << defaultChannel.eA << " txPower=" << txPower << " E=(" << E.x << "," << E.y << ")" << " p=" << power << " dh=" << host_hits[index].directHits << " rf=" << host_hits[index].reflections << " d=" << length(origin - receivers[index]->position) << std::endl;
 			//std::cout<<"PR\t"<<power<<std::endl;
 #ifdef OPALDEBUG
 			//	outputfile << "rx["<<receivers[index]->externalId<<"]=" << receivers[index]->position << ".r=" << receivers[index]->radius << "; tx["<<txId<<"]=" << origin << " eA=" << defaultChannel.eA << " txPower=" << txPower << " E=(" << E.x << "," << E.y << ")" << " p=" << power << " dh=" << host_hits[index].directHits << " rf=" << host_hits[index].reflections << " d=" << length(origin - receivers[index]->position) << std::endl;
@@ -1374,12 +1447,21 @@ void OpalSceneManager::clearInternalBuffers() {
 	//Should we do this? It is not clear in the Optix documentation whether a resizing a buffer is preferrable to recreating buffers, or whether resizing deletes the previously allocated one
 	//std::cout << "Clear internal buffers: " << std::endl;
 
-	receptionInfoBuffer->destroy();
+	if (receptionInfoBuffer) {
+		receptionInfoBuffer->destroy();
+	}
+	
+	
 	if (useInternalTracing==false) {
 		internalRaysBuffer->destroy();
 	}
-	facesMinDBuffer->destroy();
-	facesMinEBuffer->destroy();
+	if (facesMinDBuffer) {
+		facesMinDBuffer->destroy();
+	}
+	if (facesMinEBuffer) {
+		facesMinEBuffer->destroy();
+	}
+
 
 	currentInternalBuffersState.tx=0u;
 	currentInternalBuffersState.rx=0u;
@@ -1414,7 +1496,6 @@ void OpalSceneManager::setInternalBuffers() {
 
 	facesMinDBuffer=setFacesMinDBuffer(rxSize,reflectionsSize,facesSize);
 
-#ifdef OPALDEBUG
 	// Use with hold reflections for debug
 	if (holdReflections) {
 		facesMinEBuffer = setFacesMinEBufferHoldReflections(rxSize,reflectionsSize,facesSize);
@@ -1422,9 +1503,6 @@ void OpalSceneManager::setInternalBuffers() {
 	else {
 		facesMinEBuffer = setFacesMinEBuffer(rxSize,reflectionsSize,facesSize);
 	}
-#else
-	facesMinEBuffer = setFacesMinEBuffer(rxSize,reflectionsSize,facesSize);
-#endif // OPALDEBUG
 
 	if (useInternalTracing) {
 		internalRaysBuffer=nullptr;
@@ -1533,19 +1611,41 @@ std::string opal::OpalSceneManager::printInternalBuffersState()
 	RTsize w;
 	RTsize h;
 	RTsize d;
-	receptionInfoBuffer->getSize(w);
-	sb = sizeof(ReceptionInfo)*w;
-	totalBytes += sb;
-	stream << "\t receptionInfoBuffer=(" << w<<"). size="<<(sb/1024.f)<<" KiB"<< std::endl;
-
-	facesMinDBuffer->getSize(w,h,d);
-	sb = sizeof(int)*w*h*d;
-	totalBytes += sb;
-	stream << "\t facesMinDBuffers=(" << w << "," << h<< ","<<d<<"). size=" << (sb / 1024.f) << " KiB" << std::endl;
-	facesMinEBuffer->getSize(w,h,d);
-	sb = sizeof(optix::float2)*w*h*d;
-	totalBytes += sb;
-	stream << "\t facesMinEBuffers=(" << w << "," << h << "," << d << "). size=" << (sb / 1024.f) << " KiB"<< std::endl;
+	if (receptionInfoBuffer) {
+		receptionInfoBuffer->getSize(w);
+		sb = sizeof(ReceptionInfo)*w;
+		totalBytes += sb;
+		stream << "\t receptionInfoBuffer=(" << w << "). size=" << (sb / 1024.f) << " KiB" << std::endl;
+	}
+	else {
+		stream << "\t receptionInfoBuffer is null" << std::endl;
+	}
+	if (facesMinDBuffer) {
+		facesMinDBuffer->getSize(w, h, d);
+		sb = sizeof(int)*w*h*d;
+		totalBytes += sb;
+		stream << "\t facesMinDBuffers=(" << w << "," << h << "," << d << "). size=" << (sb / 1024.f) << " KiB" << std::endl;
+	}
+	else {
+		stream << "\t facesMinDBuffers is null" << std::endl;
+	}
+	if (facesMinEBuffer) {
+		facesMinEBuffer->getSize(w, h, d);
+		sb = sizeof(optix::float2)*w*h*d;
+		totalBytes += sb;
+		stream << "\t facesMinEBuffers=(" << w << "," << h << "," << d << "). size=" << (sb / 1024.f) << " KiB" << std::endl;
+	}
+	else {
+		stream << "\t facesMinEBuffers is null" << std::endl;
+	}
+	if (useInternalTracing) {
+		stream << "\t Internal tracing. No internalRaysBuffer" << std::endl;
+	} else {
+		internalRaysBuffer->getSize(w,h,d);
+		sb = sizeof(int)*w*h*d;
+		totalBytes += sb;
+		stream << "\t internalRays=(" << w << "," << h << "," << d << "). size=" << (sb / 1024.f) << "KiB" << std::endl;
+	}
 	if (useInternalTracing) {
 		stream << "\t Internal tracing. No internalRaysBuffer" << std::endl;
 	} else {
@@ -1585,7 +1685,7 @@ void OpalSceneManager::finishSceneContext() {
 	}
 	context->validate();
 	//context->setExceptionEnabled(RT_EXCEPTION_BUFFER_INDEX_OUT_OF_BOUNDS, true);
-	context->setExceptionEnabled(RT_EXCEPTION_ALL, true);
+	//context->setExceptionEnabled(RT_EXCEPTION_ALL, true);
 	sceneFinished = true;
 	std::cout<<printSceneReport();
 
@@ -1595,7 +1695,7 @@ void OpalSceneManager::finishSceneContext() {
 std::string opal::OpalSceneManager::printSceneReport()  {
 	std::ostringstream stream;
 	stream << "--- Scene Summary ---" << std::endl;
-	stream << "\t numberOfFaces=" << numberOfFaces << ". minEpsilon= " << minEpsilon << ". maxReflections=" << maxReflections << "useInternalTracing="<<useInternalTracing<<std::endl;
+	stream << "\t numberOfFaces=" << numberOfFaces << ". minEpsilon= " << minEpsilon << ". maxReflections=" << maxReflections << ". useInternalTracing="<<useInternalTracing<<". useExactSpeedOfLight="<<this->useExactSpeedOfLight<<std::endl;
 	stream << "\t Receivers=" << receivers.size() <<  std::endl;
 	stream << "\t RayCount=" << raySphere.rayCount << ". azimuthSteps=" << raySphere.azimuthSteps << ". elevationSteps=" << raySphere.elevationSteps << std::endl;
 	stream << "-- Scene Graph" << std::endl;
@@ -2378,7 +2478,10 @@ void printPower(float power, int txId) {
 
 
 //Tests. Compile as exe
+#ifdef _WIN32
+#else 
 #include <unistd.h>
+#endif
 int main(int argc, char** argv)
 {
 	try {
@@ -2392,8 +2495,11 @@ int main(int argc, char** argv)
 		bool holdReflections=false;
 		bool printEnabled=false;
 		bool subSteps=false;
+		bool useExactSpeedOfLight=true;
+#ifdef _WIN32
+#else 
 		int c;
-		while ((c = getopt (argc, argv, "nrps")) != -1) {
+		while ((c = getopt (argc, argv, "nrpsch")) != -1) {
 			switch (c) {
 				case 'n':
 					internal=false;
@@ -2407,23 +2513,30 @@ int main(int argc, char** argv)
 				case 's':
 					subSteps=true;
 					break;
+				case 'c':
+					useExactSpeedOfLight=false;
+					break;
+				case 'h':
+					std::cout<<"Usage: opal [-options] \n -n Do not use internal tracing \n -r Hold reflections to print per reflection E \n -p Enable OptiX rtPrintf on device to debug \n -s Use decimal degrees in angular spacing \n -c Use c=3e8 m/s. Default is c=299 792 458 m/s \n -h Show help"<<std::endl;
+					exit(0);
+					break;
 			}
 		}
-
-		std::unique_ptr<OpalSceneManager> sceneManager(new OpalSceneManager(freq,internal,holdReflections));
+#endif
+		std::unique_ptr<OpalSceneManager> sceneManager(new OpalSceneManager(freq,internal,holdReflections,useExactSpeedOfLight));
 
 
 
 
 
 		//sceneManager = crossingTestAndVehicle(std::move(sceneManager));
-		sceneManager = addRemoveDynamicMeshes(std::move(sceneManager), printEnabled, subSteps);
+		//sceneManager = addRemoveDynamicMeshes(std::move(sceneManager), printEnabled, subSteps);
 		//sceneManager = addCompoundDynamicMeshes(std::move(sceneManager));
 		//sceneManager = addRemoveReceivers(std::move(sceneManager));
 
 		//sceneManager = planeTest(std::move(sceneManager), printEnabled, subSteps);
 		//sceneManager = moveReceivers(std::move(sceneManager));
-		//sceneManager = crossingTest(std::move(sceneManager), printEnabled,subSteps);
+		sceneManager = crossingTest(std::move(sceneManager), printEnabled,subSteps);
 		//sceneManager = quadTest(std::move(sceneManager),printEnabled);
 
 		//For multitransmitter test
@@ -2852,7 +2965,7 @@ std::unique_ptr<OpalSceneManager> crossingTest(std::unique_ptr<OpalSceneManager>
 	//receivers
 
 	optix::float3 posrx = make_float3(0.0f, 10.0f, 100.0f);
-	sceneManager->addReceiver(1, posrx, 5.0f, printPower);
+	sceneManager->addReceiver(1, posrx, 1.0f, printPower);
 
 
 	sceneManager->setMaxReflections(2u);
@@ -2866,20 +2979,21 @@ std::unique_ptr<OpalSceneManager> crossingTest(std::unique_ptr<OpalSceneManager>
 
 	optix::float3 postx;
 	optix::float3 polarization = make_float3(0.0f, 1.0f, 0.0f); //Perpendicular to the floor. Assuming as in Unity that forward is z-axis and up is y-axis
-	timer.start();
+	//timer.start();
 
-	for (int i = -50; i <= 50; ++i)
-	{
-		postx = make_float3(i, 10.f, 50.0f);
+	/*for (int i = -50; i <= 50; ++i) {
+	
+		float x=i;
+		postx = make_float3(x, 10.f, 50.0f);
 
 		sceneManager->transmit(0, 1.0f, postx, polarization);
 
 
-	}
-	timer.stop();
-	std::cout<<"Time="<<timer.getTime()<<std::endl;
-	//postx = make_float3(-18.0f, 10.0f, 50.0f);
-	//sceneManager->transmit(0, 1.0f, postx, polarization);
+	}*/
+	//timer.stop();
+	//std::cout<<"Time="<<timer.getTime()<<std::endl;
+	postx = make_float3(-17.0f, 10.0f, 50.0f);
+	sceneManager->transmit(0, 1.0f, postx, polarization);
 
 	return sceneManager;
 

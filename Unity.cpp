@@ -65,7 +65,7 @@ namespace opal {
 
 	//When building an executable with Unity, you have either to use a specific script to create the cudaDir and copy the .cu and .h files to it, or just create and copy manually after the build is done
 	//In the end, along with the Unity executable and files you need to have this specific folder and files some way
-	OPAL_API int Init(float frequency,bool useInternalTracing,  bool holdReflections, bool multiTransmitter)
+	OPAL_API int Init(float frequency,bool useInternalTracing,  bool holdReflections, bool useExactSpeedOfLight, bool multiTransmitter)
 	{
 		try {
 			//First, set the environment to read the CUDA program files from our Plugins directory.
@@ -78,22 +78,13 @@ namespace opal {
 #endif // _WIN32
 
 
-#ifdef OPALDEBUG
-			if (multiTransmitter) {
-				MultiTransmitter=true;
-				sceneManager = new OpalSceneManagerMultiTransmitter(frequency,holdReflections);
-			} else {
-				sceneManager = new OpalSceneManager(frequency, useInternalTracing, holdReflections);
-			}
-#else
 			if (multiTransmitter) {
 				MultiTransmitter=true;
 				sceneManager = new OpalSceneManagerMultiTransmitter(frequency,holdReflections);
 			} else {
 
-				sceneManager = new OpalSceneManager(frequency, useInternalTracing);
+				sceneManager = new OpalSceneManager(frequency, useInternalTracing, holdReflections, useExactSpeedOfLight);
 			}
-#endif
 
 
 			

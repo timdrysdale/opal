@@ -164,6 +164,7 @@ namespace opal {
 
 		unsigned int maxReflections; //Default 10
 		float minEpsilon; //Default 1.e-4f
+		bool useExactSpeedOfLight; //speed of light (can be exact or approximated)
 
 #ifdef OPALDEBUG
 		std::ofstream outputFile;
@@ -181,9 +182,9 @@ namespace opal {
 
 	public:
 		OpalSceneManager();
-		OpalSceneManager(float f, bool useInternalTracing, bool holdReflections=false);
+		OpalSceneManager(float f, bool useInternalTracing, bool holdReflections=false, bool useExactSpeedOfLight=true);
 		virtual ~OpalSceneManager();
-		void initContext(float f,bool useInternalTracing, bool holdReflections=false);
+		void initContext(float f,bool useInternalTracing, bool holdReflections=false, bool useExactSpeedOfLight=true);
 		virtual void initMembers();
 		void setFrequency(float f);
 		void setMaxReflections(unsigned int m);
