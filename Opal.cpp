@@ -223,7 +223,7 @@ void opal::OpalSceneManager::finishDynamicMeshGroup(int id)
 		rootGroup->addChild(dmg->transform);
 		rootGroup->getAcceleration()->markDirty();
 	}
-//	std::cout<<printSceneReport()<<std::endl;
+	//	std::cout<<printSceneReport()<<std::endl;
 
 }
 //Create material EM properties from ITU parameters (ITU-R P.2040-1)
@@ -309,11 +309,11 @@ void OpalSceneManager::extractFaces(optix::float3* meshVertices, std::vector<std
 		}
 	}
 	std::cout  << normals.size() <<" faces added=. numberOfFaces="<< numberOfFaces<< std::endl;
-/*	for (auto v: normals)
-	  {
-	  std::cout << std::scientific<<"face normal=" << v.first << "id=" << v.second << std::endl;
+	/*	for (auto v: normals)
+		{
+		std::cout << std::scientific<<"face normal=" << v.first << "id=" << v.second << std::endl;
 
-	  }*/
+		}*/
 
 
 
@@ -391,6 +391,7 @@ OpalMesh OpalSceneManager::createStaticMesh (int meshVertexCount, optix::float3*
 		//#ifdef OPALDEBUG
 		//			outputFile << "v=(" << v.x << "," << v.y << "," << v.z << ")" << std::endl;
 		//#endif
+		//std::cout<<"v="<<v<<std::endl;
 		host_positions[i] = v;
 		mesh.bbox_min.x = std::min<float>(mesh.bbox_min.x, v.x);
 		mesh.bbox_min.y = std::min<float>(mesh.bbox_min.y, v.y);
@@ -991,7 +992,7 @@ optix::Buffer OpalSceneManager::setFacesMinDBuffer(optix::uint rx, optix::uint r
 	}
 	else {
 		//optix::Buffer rb = context->createBuffer(RT_BUFFER_OUTPUT, RT_FORMAT_INT, reflections, faces, rx);
-		 rb = context->createBuffer(RT_BUFFER_INPUT_OUTPUT | RT_BUFFER_GPU_LOCAL, RT_FORMAT_INT, reflections, faces, rx);
+		rb = context->createBuffer(RT_BUFFER_INPUT_OUTPUT | RT_BUFFER_GPU_LOCAL, RT_FORMAT_INT, reflections, faces, rx);
 	}
 
 	context["bufferMinD"]->set(rb);
@@ -1016,9 +1017,9 @@ optix::Buffer OpalSceneManager::setFacesMinEBuffer(optix::uint rx,optix::uint re
 		throw Exception("setFacesMinEBuffer():: Cannot set internal buffers with zero faces");
 		return nullptr;
 	}
-	
+
 	else {
-		 rb = context->createBuffer(RT_BUFFER_INPUT_OUTPUT | RT_BUFFER_GPU_LOCAL, RT_FORMAT_FLOAT2, reflections, faces, rx);
+		rb = context->createBuffer(RT_BUFFER_INPUT_OUTPUT | RT_BUFFER_GPU_LOCAL, RT_FORMAT_FLOAT2, reflections, faces, rx);
 	}
 	context["bufferMinE"]->set(rb);
 	return rb;
@@ -1037,7 +1038,7 @@ optix::Buffer OpalSceneManager::setFacesMinEBufferHoldReflections(optix::uint rx
 		throw Exception("setFacesMinEBuffer():: Cannot set internal buffers with zero faces");
 		return nullptr;
 	} else {
-		 rb = context->createBuffer(RT_BUFFER_OUTPUT, RT_FORMAT_FLOAT2, reflections, faces, rx);
+		rb = context->createBuffer(RT_BUFFER_OUTPUT, RT_FORMAT_FLOAT2, reflections, faces, rx);
 	}
 	context["bufferMinE"]->set(rb);
 	return rb;
@@ -1059,7 +1060,7 @@ optix::Buffer OpalSceneManager::setInternalRaysBuffer(optix::uint rx,  optix::ui
 	}
 	else {
 
-		 rb = context->createBuffer(RT_BUFFER_INPUT_OUTPUT | RT_BUFFER_GPU_LOCAL, RT_FORMAT_INT, elevationSteps, azimuthSteps, rx);
+		rb = context->createBuffer(RT_BUFFER_INPUT_OUTPUT | RT_BUFFER_GPU_LOCAL, RT_FORMAT_INT, elevationSteps, azimuthSteps, rx);
 	}
 
 
@@ -1292,9 +1293,9 @@ void OpalSceneManager::transmit(int txId, float txPower,  float3 origin, float3 
 		//WARNING: the internal buffers cannot create with no receivers, so we return. 
 		//For debug or testing reflections or any other thing, at least one receiver should be added
 		return;
-	
+
 	}
-	
+
 	if (numReceivers == 1) {
 		if (receivers[0]->externalId == txId) {
 			//No power will be received, since we are not assuming   dual transceiver
@@ -1450,8 +1451,8 @@ void OpalSceneManager::clearInternalBuffers() {
 	if (receptionInfoBuffer) {
 		receptionInfoBuffer->destroy();
 	}
-	
-	
+
+
 	if (useInternalTracing==false) {
 		internalRaysBuffer->destroy();
 	}
@@ -2486,11 +2487,14 @@ int main(int argc, char** argv)
 {
 	try {
 
-
+		//make_hash();
+		//exit(0);	
 
 		//std::cout << "Initializing " << std::endl;
 		float freq = 5.9e9f;
 
+		//Defaults	
+		uint maxReflections=10u;
 		bool internal=true;
 		bool holdReflections=false;
 		bool printEnabled=false;
@@ -2498,13 +2502,29 @@ int main(int argc, char** argv)
 		bool useExactSpeedOfLight=true;
 #ifdef _WIN32
 #else 
+
+		std::string usage="Usage: opal [-options] \n -n Do not use internal tracing \n -r Hold reflections to print per reflection E \n -p Enable OptiX rtPrintf on device to debug \n -s Use decimal degrees in angular spacing \n -c Use c=3e8 m/s. Default is c=299 792 458 m/s \n -h Show help";
+
 		int c;
-		while ((c = getopt (argc, argv, "nrpsch")) != -1) {
+		int nr;
+		while ((c = getopt (argc, argv, "nor:psch")) != -1) {
 			switch (c) {
 				case 'n':
 					internal=false;
 					break;
 				case 'r':
+					std::cout<<optarg<<std::endl;
+					nr=atoi(optarg);
+					if (nr>=0) {
+					
+						maxReflections=nr;
+					} else {
+						fprintf(stderr, usage.c_str(),
+								argv[0]);
+						exit(EXIT_FAILURE);
+					}
+					break;
+				case 'o':
 					holdReflections=true;
 					break;
 				case 'p':
@@ -2517,14 +2537,22 @@ int main(int argc, char** argv)
 					useExactSpeedOfLight=false;
 					break;
 				case 'h':
-					std::cout<<"Usage: opal [-options] \n -n Do not use internal tracing \n -r Hold reflections to print per reflection E \n -p Enable OptiX rtPrintf on device to debug \n -s Use decimal degrees in angular spacing \n -c Use c=3e8 m/s. Default is c=299 792 458 m/s \n -h Show help"<<std::endl;
+					std::cout<<usage<<std::endl;
 					exit(0);
 					break;
+
+				default: /* '?' */
+					fprintf(stderr, usage.c_str(),
+							argv[0]);
+					exit(EXIT_FAILURE);
+
+
 			}
 		}
 #endif
 		std::unique_ptr<OpalSceneManager> sceneManager(new OpalSceneManager(freq,internal,holdReflections,useExactSpeedOfLight));
 
+		sceneManager->setMaxReflections(maxReflections);
 
 
 
@@ -2536,13 +2564,13 @@ int main(int argc, char** argv)
 
 		//sceneManager = planeTest(std::move(sceneManager), printEnabled, subSteps);
 		//sceneManager = moveReceivers(std::move(sceneManager));
-		sceneManager = crossingTest(std::move(sceneManager), printEnabled,subSteps);
-		//sceneManager = quadTest(std::move(sceneManager),printEnabled);
+		//sceneManager = crossingTest(std::move(sceneManager), printEnabled,subSteps);
+		sceneManager = quadTest(std::move(sceneManager),printEnabled, subSteps);
 
 		//For multitransmitter test
 		//std::unique_ptr<OpalSceneManagerMultiTransmitter> sceneManagerMT(new OpalSceneManagerMultiTransmitter(freq));
 
-		
+
 
 
 		return 0;
@@ -2897,9 +2925,9 @@ std::unique_ptr<OpalSceneManager> moveReceivers(std::unique_ptr<OpalSceneManager
 
 //Street crossing test. Cubes are intended to be buildings and a plane is the floor
 std::unique_ptr<OpalSceneManager> crossingTest(std::unique_ptr<OpalSceneManager> sceneManager, bool print, bool subSteps) {
-	
+
 	Timer timer;
-	
+
 	std::cout << "Simulating crossing streets test" << std::endl;
 	//Cubes
 	std::vector<int> cubeind = loadTrianglesFromFile("meshes/tricube.txt");
@@ -2957,7 +2985,7 @@ std::unique_ptr<OpalSceneManager> crossingTest(std::unique_ptr<OpalSceneManager>
 	sceneManager->addStaticMesh(static_cast<int>(planever.size()), planever.data(), static_cast<int>(planeind.size()), planeind.data(), tm, emProp1);
 
 	if (subSteps) {
-	sceneManager->createRaySphere2DSubstep(1, 1); //0.1 degree delta step
+		sceneManager->createRaySphere2DSubstep(1, 1); //0.1 degree delta step
 	} else {
 		sceneManager->createRaySphere2D(1, 1); //1 degree delta step
 	}
@@ -2968,7 +2996,7 @@ std::unique_ptr<OpalSceneManager> crossingTest(std::unique_ptr<OpalSceneManager>
 	sceneManager->addReceiver(1, posrx, 1.0f, printPower);
 
 
-	sceneManager->setMaxReflections(2u);
+	//sceneManager->setMaxReflections(3u);
 
 	sceneManager->finishSceneContext();
 
@@ -2979,21 +3007,21 @@ std::unique_ptr<OpalSceneManager> crossingTest(std::unique_ptr<OpalSceneManager>
 
 	optix::float3 postx;
 	optix::float3 polarization = make_float3(0.0f, 1.0f, 0.0f); //Perpendicular to the floor. Assuming as in Unity that forward is z-axis and up is y-axis
-	//timer.start();
+	timer.start();
 
-	/*for (int i = -50; i <= 50; ++i) {
-	
+	for (int i = -50; i <= 50; ++i) {
+
 		float x=i;
 		postx = make_float3(x, 10.f, 50.0f);
 
 		sceneManager->transmit(0, 1.0f, postx, polarization);
 
 
-	}*/
-	//timer.stop();
-	//std::cout<<"Time="<<timer.getTime()<<std::endl;
-	postx = make_float3(-17.0f, 10.0f, 50.0f);
-	sceneManager->transmit(0, 1.0f, postx, polarization);
+	}
+	timer.stop();
+	std::cout<<"Time="<<timer.getTime()<<std::endl;
+	//	postx = make_float3(-17.0f, 10.0f, 50.0f);
+	//	sceneManager->transmit(0, 1.0f, postx, polarization);
 
 	return sceneManager;
 
@@ -3022,12 +3050,12 @@ std::unique_ptr<OpalSceneManager> planeTest(std::unique_ptr<OpalSceneManager> sc
 		sceneManager->createRaySphere2D(1, 1);
 	}
 	//receivers
-	optix::float3 posrx = make_float3(0.0f, 2.0f, 100.0f);
+	optix::float3 posrx = make_float3(0.0f, 10.0f, 100.0f);
 
 
 	optix::float3 postx = make_float3(0.0f, 2.0f, 50.0f);
 
-	sceneManager->addReceiver(1, posrx, 5.0f, printPower);
+	sceneManager->addReceiver(1, posrx, 1.0f, printPower);
 
 
 	sceneManager->finishSceneContext();
@@ -3035,7 +3063,7 @@ std::unique_ptr<OpalSceneManager> planeTest(std::unique_ptr<OpalSceneManager> sc
 	if (print) {
 		sceneManager->setPrintEnabled(1024 * 1024 * 1024);
 	}
-	sceneManager->setUsageReport();
+	//	sceneManager->setUsageReport();
 
 
 	//std::cout << "Launching" << std::endl;
@@ -3064,14 +3092,14 @@ std::unique_ptr<OpalSceneManager> planeTest(std::unique_ptr<OpalSceneManager> sc
 		sceneManager->transmit(0, 1.0f, postx, polarization);
 
 	}
-	
+
 
 	return sceneManager;
 }
 
 
 //Two quads as walls and two overlapping receivers
-std::unique_ptr<OpalSceneManager> quadTest(std::unique_ptr<OpalSceneManager> sceneManager, bool print) {
+std::unique_ptr<OpalSceneManager> quadTest(std::unique_ptr<OpalSceneManager> sceneManager, bool print, bool subSteps) {
 	//First quad
 	int quadind[6] = { 0,1,2,1,0,3 };
 	optix::float3 quadv[4] = { make_float3(-0.5f,-0.5f,0.f),make_float3(0.5f,0.5f,0.f) ,make_float3(0.5f,-0.5f,0.f) ,make_float3(-0.5f,0.5f,0.f) };
@@ -3102,16 +3130,22 @@ std::unique_ptr<OpalSceneManager> quadTest(std::unique_ptr<OpalSceneManager> sce
 	emProp2.dielectricConstant = make_float2(3.75f, -60.0f*sceneManager->defaultChannel.waveLength*0.038f);
 
 
-	sceneManager->addStaticMesh(4, quadv2, 6, quadind2, tm2, emProp2);
+	//sceneManager->addStaticMesh(4, quadv2, 6, quadind2, tm2, emProp2);
 
 	optix::float3 posrx = make_float3(0.f, 0.f, 97.0f);
+	//sceneManager->addReceiver(1, posrx, 1.0f, printPower);
 	sceneManager->addReceiver(1, posrx, 5.0f, printPower);
 	posrx=make_float3(0.0f,0.0f,99.0f);
 	sceneManager->addReceiver(2, posrx, 5.0f, printPower);
 	optix::float3 postx = make_float3(0.0f, 0.f,0.f);
 
 	optix::float3 polarization = make_float3(0.0f, 1.0f, 0.0f); //Perpendicular to the floor. Assuming as in Unity that forward is z-axis and up is y-axis
-	sceneManager->createRaySphere2D(30, 30); //1 degree delta step
+	if (subSteps) {
+		sceneManager->createRaySphere2DSubstep(1, 1);
+	} else {
+		sceneManager->createRaySphere2D(1, 1);
+	}
+	//sceneManager->createRaySphere2D(30, 30); //1 degree delta step
 
 	sceneManager->finishSceneContext();
 
@@ -3233,7 +3267,7 @@ std::unique_ptr<OpalSceneManager> crossingTestAndVehicle(std::unique_ptr<OpalSce
 	sceneManager->addReceiver(1, posrx, 1.f, printPower);
 
 
-	sceneManager->setMaxReflections(3u);
+	//sceneManager->setMaxReflections(3u);
 
 	sceneManager->finishSceneContext();
 
@@ -3330,7 +3364,7 @@ std::unique_ptr<OpalSceneManagerMultiTransmitter> seqParallelTxTest(std::unique_
 	sceneManager->addReceiver(100, posrx, 1.f, printPower);
 
 
-	sceneManager->setMaxReflections(3u);
+	//sceneManager->setMaxReflections(3u);
 
 	sceneManager->finishSceneContext();
 
@@ -3394,6 +3428,29 @@ std::unique_ptr<OpalSceneManagerMultiTransmitter> seqParallelTxTest(std::unique_
 
 
 }
+
+void make_hash() {
+	std::vector<uint> v1={ 23, 45, 67, 978, 1282, 76853};
+//	std::vector<uint> v2={ 28272623, 45, 67, 97};
+	std::vector<uint> v2={ 45, 2, 67, 97};
+	std::vector<uint> v3={ 2, 45, 67, 97};
+	uint seed=0;
+	for (auto v :v1 ) {
+		hash_combine_impl<uint>(seed,v);
+	}
+	std::cout<<"v1="<<seed<<std::endl;
+	seed=0;
+	for (auto v :v2 ) {
+		hash_combine_impl<uint>(seed,v);
+	}
+	std::cout<<"v2="<<seed<<std::endl;
+	seed=0;
+	for (auto v :v3 ) {
+		hash_combine_impl<uint>(seed,v);
+	}
+	std::cout<<"v3="<<seed<<std::endl;
+}
+
 
 
 

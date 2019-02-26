@@ -396,7 +396,7 @@ RT_PROGRAM void closestHitReceiverInternalRay()
 	float Eprevy = atomicExch(&bufferMinE[idmd].y, E.y);
 	float2 Eprev = make_float2(Eprevx, Eprevy);
 	//float2 Eprev = make_float2(0.f,0.f);
-	//rtPrintf("C\t%u\t%u\t%u\t%u\t%d\t%f\t%f\t%f\t%f\t%f\n", receiverLaunchIndex.x, receiverLaunchIndex.y, reflections, hitPayload.faceId,  dmt,  E.x, E.y, hitPayload.prodReflectionCoefficient.x, hitPayload.prodReflectionCoefficient.y, d);
+	rtPrintf("CI\t%u\t%u\t%u\t%u\t%d\t%f\t%f\t%f\t%f\t%f\n", receiverLaunchIndex.x, receiverLaunchIndex.y, reflections, hitPayload.faceId,  dmt,  E.x, E.y, hitPayload.prodReflectionCoefficient.x, hitPayload.prodReflectionCoefficient.y, d);
 
 	//rtPrintf("II\t%u\t%u\t%u\t%u\t%f\t%d\t%d\t%f\t%f\t%f\t%f\t%f\n", receiverLaunchIndex.x, receiverLaunchIndex.y, reflections, hitPayload.faceId, dm, dmt, oldd, E.x, E.y, Eprev.x, Eprev.y, d);
 		if (holdReflections==1) {
@@ -506,7 +506,7 @@ RT_PROGRAM void closestHitReceiver()
 
 		//rtPrintf("DR. Direct hit   i.x=%u i.y=%u  Ep=(%f,%f) E=(%f,%f) En=(%f,%f) rId[%u] \n", receiverLaunchIndex.x, receiverLaunchIndex.y, oldEx,oldEy, E.x, E.y, receptionInfoBuffer[receiverBufferIndex].sumRxElectricField.x, receptionInfoBuffer[receiverBufferIndex].sumRxElectricField.y, receiverBufferIndex);
 		//Direct hit info log (to be used in external programs)
-		//rtPrintf("DH\t%u\t%u\t%f\t%f\t%f\t%f\t%f\t%f\t%d\t%d\n", receiverLaunchIndex.x, receiverLaunchIndex.y,  oldEx, oldEy, E.x, E.y, receptionInfoBuffer[receiverBufferIndex].sumRxElectricField.x, receptionInfoBuffer[receiverBufferIndex].sumRxElectricField.y, receiverBufferIndex,externalId);
+		rtPrintf("DH\t%u\t%u\t%f\t%f\t%f\t%f\t%f\t%f\t%d\t%d\n", receiverLaunchIndex.x, receiverLaunchIndex.y,  oldEx, oldEy, E.x, E.y, receptionInfoBuffer[receiverBufferIndex].sumRxElectricField.x, receptionInfoBuffer[receiverBufferIndex].sumRxElectricField.y, receiverBufferIndex,externalId);
 
 		//receptionInfoBuffer[receiverBufferIndex].hasDirectContribution = true;
 		//rtPrintf("%f\t%f\n", E.x, E.y);
@@ -593,7 +593,7 @@ RT_PROGRAM void closestHitReceiver()
 		float Eprevx = atomicExch(&bufferMinE[idmd].x, E.x);
 		float Eprevy = atomicExch(&bufferMinE[idmd].y, E.y);
 		float2 Eprev = make_float2(Eprevx, Eprevy);
-		//rtPrintf("C\t%u\t%u\t%u\t%u\t%d\t%f\t%f\t%f\t%f\t%f\n", receiverLaunchIndex.x, receiverLaunchIndex.y, reflections, hitPayload.faceId,  dmt,  E.x, E.y, hitPayload.prodReflectionCoefficient.x, hitPayload.prodReflectionCoefficient.y, d);
+		rtPrintf("C\t%u\t%u\t%u\t%u\t%d\t%f\t%f\t%f\t%f\t%f\n", receiverLaunchIndex.x, receiverLaunchIndex.y, reflections, hitPayload.faceId,  dmt,  E.x, E.y, hitPayload.prodReflectionCoefficient.x, hitPayload.prodReflectionCoefficient.y, d);
 
 		//rtPrintf("FF\t%u\t%u\t%u\t%u\t%f\t%d\t%d\t%f\t%f\t%f\t%f\t%f\n", receiverLaunchIndex.x, receiverLaunchIndex.y, reflections, hitPayload.faceId, dm, dmt, oldd, E.x, E.y, Eprev.x, Eprev.y, d);
 		if (holdReflections==1) {

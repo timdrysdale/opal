@@ -414,10 +414,17 @@ std::vector<optix::float3>  loadVerticesFromFile(const char* file);
 std::vector<int>  loadTrianglesFromFile(const char* file);
 std::unique_ptr<opal::OpalSceneManager> crossingTest(std::unique_ptr<opal::OpalSceneManager> sceneManager, bool print, bool subSteps);
 std::unique_ptr<opal::OpalSceneManager> planeTest(std::unique_ptr<opal::OpalSceneManager> sceneManager, bool print, bool subSteps);
-std::unique_ptr<opal::OpalSceneManager> quadTest(std::unique_ptr<opal::OpalSceneManager> sceneManager, bool print);
+std::unique_ptr<opal::OpalSceneManager> quadTest(std::unique_ptr<opal::OpalSceneManager> sceneManager, bool print, bool subSteps);
 std::unique_ptr<opal::OpalSceneManager> addRemoveReceivers(std::unique_ptr<opal::OpalSceneManager> sceneManager);
 std::unique_ptr<opal::OpalSceneManager> moveReceivers(std::unique_ptr<opal::OpalSceneManager> sceneManager);
 std::unique_ptr<opal::OpalSceneManager> addRemoveDynamicMeshes(std::unique_ptr<opal::OpalSceneManager> sceneManager, bool print, bool subSteps);
 std::unique_ptr<opal::OpalSceneManager> addCompoundDynamicMeshes(std::unique_ptr<opal::OpalSceneManager> sceneManager);
 std::unique_ptr<opal::OpalSceneManager> crossingTestAndVehicle(std::unique_ptr<opal::OpalSceneManager> sceneManager);
 std::unique_ptr<opal::OpalSceneManagerMultiTransmitter> seqParallelTxTest(std::unique_ptr<opal::OpalSceneManagerMultiTransmitter> sceneManager);
+
+template <typename SizeT>
+inline void hash_combine_impl(SizeT& seed, SizeT value)
+{
+    seed ^= value + 0x9e3779b9 + (seed<<6) + (seed>>2);
+}
+void make_hash();
