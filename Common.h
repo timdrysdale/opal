@@ -14,12 +14,14 @@ struct MaterialEMProperties {
 };
 
 struct HitInfo {
-  optix::uint4 whrd; // [written,refhash,rxBufferIndex,dist]
+  optix::uint4 whrd; // [written,refhash,rxBufferIndex,dist] 
   optix::float2 E;   // Complex
 
+  //Equality operator: hits are equal if the combined has is equal, that is, the have hit the same sequence of faces
   __host__ __device__ bool operator==(const HitInfo &h) const {
     return (whrd.y == h.whrd.y);
   };
+  //Sorting. First check id (buffer index), then hash and finally distance. Hits are ordered by id, combined_hash and distance to receiver
   __host__ __device__ bool operator<(const HitInfo &h) const {
     if (whrd.z == h.whrd.z) {
       if (whrd.y == h.whrd.y) {
@@ -33,14 +35,16 @@ struct HitInfo {
   };
 };
 
+
+//Ray payload
 struct EMWavePayload {
-  optix::float2 prodReflectionCoefficient; // Complex
+  optix::float2 prodReflectionCoefficient; // Accumulated product of reflection coefficients. Complex
   optix::float3 geomNormal;
   optix::float3 nextDirection;
   optix::float3 hitPoint;
   optix::float3 polarization;
   optix::float3 lastReflectionHitPoint;
-  float electricFieldAmplitude;
+  float electricFieldAmplitude; //Can be removed if antenna gain not used
   float t;
   int reflections;
   int internalRayInitialReflections;
@@ -48,9 +52,9 @@ struct EMWavePayload {
   float totalDistance;
   float totalDistanceTillLastReflection;
   bool end;
-  unsigned int faceId;
-  int rxBufferIndex;
-  unsigned int refhash;
+  unsigned int faceId; //Can be removed
+  int rxBufferIndex; //Last receiver hit 
+  unsigned int refhash; //Combined hash to filter duplicates
 };
 
 struct Transmitter {
@@ -72,6 +76,8 @@ struct SphereHit {
   optix::float3 geom_normal;
   float t;
 };
+
+//Directly copied from boost
 template <typename SizeT>
 inline void hash_combine_impl(SizeT &seed, SizeT value) {
   seed ^= value + 0x9e3779b9 + (seed << 6) + (seed >> 2);
