@@ -1,6 +1,10 @@
-/*
- *
- */
+/***************************************************************/
+//
+//Copyright (c) 2019 Esteban Egea-Lopez http://ait.upct.es/eegea
+//
+/**************************************************************/
+
+
 #include "tutils.h"
 #include "Opal.h"
 #include "Common.h"

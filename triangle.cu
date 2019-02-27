@@ -1,3 +1,10 @@
+/***************************************************************/
+//
+//Copyright (c) 2019 Esteban Egea-Lopez http://ait.upct.es/eegea
+//
+/**************************************************************/
+
+
 /*
 * Copyright (c) 2016, NVIDIA CORPORATION. All rights reserved.
 *

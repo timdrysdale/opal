@@ -1,3 +1,10 @@
+/***************************************************************/
+//
+//Copyright (c) 2019 Esteban Egea-Lopez http://ait.upct.es/eegea
+//
+/**************************************************************/
+
+
 #include "Unity.h"
 #include <iostream>
 #include <stdlib.h>

@@ -1,3 +1,11 @@
+/***************************************************************/
+//
+//Copyright (c) 2019 Esteban Egea-Lopez http://ait.upct.es/eegea
+//
+/**************************************************************/
+
+
+
 #pragma once
 #ifdef _WIN32
 #ifdef OPAL_EXPORTS

@@ -1,3 +1,10 @@
+/***************************************************************/
+//
+//Copyright (c) 2019 Esteban Egea-Lopez http://ait.upct.es/eegea
+//
+/**************************************************************/
+
+
 #pragma once
 #define GLOBALHITBUFFEROVERFLOW RT_EXCEPTION_USER + 0
 
