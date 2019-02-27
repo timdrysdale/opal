@@ -169,7 +169,7 @@ RT_PROGRAM void closestHitTriangle()
 	
 	rayPayload.nextDirection = reflect(ray.direction, n);
 	rayPayload.faceId = ch_triangle_data.faceId;
-
+	hash_combine_impl<uint>(rayPayload.refhash,ch_triangle_data.faceId);
 	//Compute reflection coefficient
 
 	//Incidence angle (ai) is defined with respect to the surface, we use the complementary, which is 90-ai, and is the angle between ray and normal

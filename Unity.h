@@ -97,7 +97,7 @@ namespace opal {
 
 	extern "C" OPAL_API int FinishSceneContext();
 
-	extern "C" OPAL_API int Init(float frequency, bool useInternalTracing, bool holdReflections, bool useExactSpeedOfLight, bool multiTransmitter);
+	extern "C" OPAL_API int Init(float frequency,  bool useExactSpeedOfLight, bool multiTransmitter);
 
 	extern "C" OPAL_API int SetMaxReflections(unsigned int  m);
 
@@ -135,14 +135,6 @@ namespace opal {
 	extern "C" OPAL_API int  RemoveDynamicMeshGroup(int id);
 	
 
-	//Multi-transmitter functions
-
-	extern "C" OPAL_API int AddTransmitter(int txId, optix::float3 origin, optix::float3 polarization, float transmitPower) ;
-	extern "C" OPAL_API int RemoveTransmitter(int txId) ;
-	extern "C" OPAL_API int AddTransmitterToGroup(int txId,float transmitPower, optix::float3 origin,optix::float3 polarization); 
-	//extern "C" OPAL_API int AddTransmitterToGroup(int txId,float transmitPower, optix::float3 origin); 
-	extern "C" OPAL_API int ClearGroup(); 
-	extern "C" OPAL_API int GroupTransmit() ;
 
 
 
