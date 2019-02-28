@@ -8,7 +8,7 @@
 
 #pragma once
 #ifdef _WIN32
-#ifdef OPAL_EXPORTS
+#if defined(OPAL_EXPORTS) || defined(opal_s_EXPORTS)
 #define OPAL_API  __declspec(dllexport)   
 #else  
 #define OPAL_API  __declspec(dllimport)   
