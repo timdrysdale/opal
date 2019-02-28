@@ -38,6 +38,9 @@ rtDeclareVariable(float, min_t_epsilon, , );
 rtDeclareVariable(unsigned int, max_interactions, , );
 
 rtDeclareVariable(uint2, raySphereSize, , );
+
+
+//Ray generation program. Generates and traces a sphere of rays and traces reflections and internal (to a receiver sphere) reflections
 RT_PROGRAM void genRayAndReflectionsFromSphereIndex()
 {
 
@@ -68,7 +71,7 @@ RT_PROGRAM void genRayAndReflectionsFromSphereIndex()
 	rayPayload.end = false;
 
 	rayPayload.prodReflectionCoefficient = make_float2(1.0f, 0.0f);
-	rayPayload.faceId = 0u;
+	//rayPayload.faceId = 0u;
 	rayPayload.rxBufferIndex=-1;
 	rayPayload.refhash=0;
 
@@ -102,7 +105,7 @@ RT_PROGRAM void genRayAndReflectionsFromSphereIndex()
 			internalRayPayload.refhash = rayPayload.refhash;
 
 			internalRayPayload.prodReflectionCoefficient = rayPayload.prodReflectionCoefficient; 
-			internalRayPayload.faceId = rayPayload.faceId;
+			//internalRayPayload.faceId = rayPayload.faceId;
 			internalRayPayload.rxBufferIndex=rayPayload.rxBufferIndex;
 			float3 internal_ray_direction = rayPayload.nextDirection;
 			float3 internal_origin=rayPayload.hitPoint;
@@ -185,14 +188,15 @@ rtDeclareVariable(rtCallableProgramId<float2(float2)>, complex_exp_only_imaginar
 rtDeclareVariable(rtCallableProgramId<float2(float, float2)>, sca_complex_prod, , );
 rtDeclareVariable(rtCallableProgramId<float2(float2, float2)>, complex_prod, , );
 
+//Closest hit program for an internal ray (internal to the receiver sphere)
 
 RT_PROGRAM void closestHitReceiverInternalRay()
 {
 
 	//Log internal ray
 	//	rtPrintf("IR hit\t%u\t%u\t%u\t%d\t%d\t%d\n", receiverLaunchIndex.x, receiverLaunchIndex.y, receiverBufferIndex,hitPayload.rxId,receiverBufferIndex );
-	
-	
+
+
 	//Update ray data
 
 	hitPayload.totalDistance += hit_attr.t;
@@ -204,7 +208,8 @@ RT_PROGRAM void closestHitReceiverInternalRay()
 		//rtPrintf("IR not receiver\t%u\t%u\t%u\t%d\t%d\t%d\n", receiverLaunchIndex.x, receiverLaunchIndex.y, receiverBufferIndex,hitPayload.rxBufferIndex,receiverBufferIndex );
 		return;
 	} else {
-		hitPayload.end=true; //We finish the internal ray always once we hit the sphere again
+		//We finish the internal ray always once we hit the sphere again
+		hitPayload.end=true; 
 	}
 
 
@@ -244,8 +249,8 @@ RT_PROGRAM void closestHitReceiverInternalRay()
 		float dm = length(prx - p3)*1000000.0f;  //Multiply by 1000 000 to truncate later take 6 digits
 		int dmt = __float2int_rz(dm);   //Truncate
 		float d=length(prx-hitPayload.lastReflectionHitPoint);
-		
-		
+
+
 		//Compute electric field
 		d+=hitPayload.totalDistanceTillLastReflection;
 
@@ -265,7 +270,7 @@ RT_PROGRAM void closestHitReceiverInternalRay()
 		HitInfo directHit;
 		directHit.whrd=make_uint4(1u,hitPayload.refhash,receiverBufferIndex,static_cast<uint>(dmt));
 		directHit.E=E;
-		
+
 		//Store hit in global buffer
 		globalHitInfoBuffer[hitIndex]=directHit;
 
@@ -277,7 +282,7 @@ RT_PROGRAM void closestHitReceiverInternalRay()
 }
 
 
-
+//Closest hit program for a receiver. Computes electric field
 
 RT_PROGRAM void closestHitReceiver()
 {
@@ -302,112 +307,100 @@ RT_PROGRAM void closestHitReceiver()
 
 	int reflections = hitPayload.reflections;
 	float3 prx = make_float3(sphere.x, sphere.y, sphere.z);
-	float dor=length(ray_receiver.origin-prx);
-	
-	//Chek if ray originated inside the reception radius of this receiver
-	
-	if (dor<=(sphere.w+0.0001)) { //Give some epsilon, otherwise numerical inaccuracies may make it fail the check
 
-		// Origin is inside the reception radius: This ray has hit us before, ignore it. Internal ray may compute additional contributions
-		
+	//Check if ray originated inside the reception radius of this receiver
+
+	//Distance from ray origin to receiver
+ 	float3 raytorx=ray_receiver.origin-prx;
+        float dorsquare=dot(raytorx,raytorx);
+
+
+	if (dorsquare<=((sphere.w*sphere.w)+0.0001)) { //Give some epsilon, otherwise numerical inaccuracies may make it fail the check
+
+		// Origin is inside the reception radius: This ray has hit us before, ignore it. Internal ray may compute additional contributions from potential reflections inside the reception sphere
+
 		//rtPrintf("Ignored. txId=%d i.x=%u i.y=%u, ray=(%f,%f,%f) origin=(%f,%f,%f) t=%f rId[%u]=%d\n", tx_origin.externalId, receiverLaunchIndex.x, receiverLaunchIndex.y, ray_receiver.direction.x, ray_receiver.direction.y, ray_receiver.direction.z, ray_receiver.origin.x, ray_receiver.origin.y, ray_receiver.origin.z, hit_attr.t, receiverBufferIndex,externalId);
 		return;
 
 	} else {
-		//If ray origin is outside the reception radius an internal ray is always created 
+		//If ray origin is outside the reception radius an internal ray is always created to keep track of internal reflections 
 		//Mark to  trace the internal ray to check if it collides with another thing and hits the receiver again
 
 		hitPayload.rxBufferIndex=receiverBufferIndex;	
 	}
 
 
-
+	//HitInfo values
+	float d;
+	uint hash=0u;
+	uint dtrx=0u;
 	if (reflections == 0) {
-
 		//This is a direct ray
-
 		//Compute electric field. For direct rays, the distance is always between tx and rx
-		//float3 prx = make_float3(sphere.x, sphere.y, sphere.z);
 		float3 ptx = tx_origin.origin;
-		float d = length(prx - ptx);
-		float2 z = make_float2(0.0f, -k*d);
-		//rtPrintf("HR. prx=(%f,%f,%f) k=%f d=%f prevTd=%f hitPayload.totalDistance=%f Eo=%f\n", prx.x, prx.y, prx.z, k, d, prevTd, hitPayload.totalDistance, hitPayload.electricFieldAmplitude);
-
-		float2 zexp = complex_exp_only_imaginary(z);
-		float2 E = sca_complex_prod((hitPayload.electricFieldAmplitude / d), zexp);
-
-		HitInfo directHit;
-		directHit.whrd=make_uint4(1u,0u,receiverBufferIndex,0u);
-		directHit.E=E;
-		
-		//Check if global buffer is full
-		uint hitIndex=atomicAdd(&atomicIndex[0u],1u);
-		if (hitIndex>=global_info_buffer_maxsize) {
-			rtThrow(GLOBALHITBUFFEROVERFLOW);
-			//if exceptions are disabled, let it crash...?
-			hitIndex=global_info_buffer_maxsize-1;
-		}
-		//Store hit in global buffer
-		globalHitInfoBuffer[hitIndex]=directHit;
-		
-		//Log hit
-		//rtPrintf("DH\t%u\t%u\t%u\t%f\t%f\t%f\t%f\t%f\t%u\t%u\t%u\t%d\n", receiverLaunchIndex.x, receiverLaunchIndex.y,receiverBufferIndex,  directHit.E.x, directHit.E.y, E.x, E.y,d, directHit.whrd.x,directHit.whrd.y,directHit.whrd.w,externalId);
-	}
-	else {
-
+		d = length(prx - ptx);
+	} else {
 		//Reflected ray
 
 
-		//Distance from ray line to receiver position
+		//Distance from ray line to receiver position. To keep only the closest hit later
 		//Line is defined by ray
-		float3 prx = make_float3(sphere.x, sphere.y, sphere.z);
 		float3 pd = prx - hitPayload.hitPoint;
 		float u = dot(pd, ray_receiver.direction);
 		float3 p3 = hitPayload.hitPoint + u*ray_receiver.direction;
 
 
 		float drxtohit=length(prx - p3);
-		float d=length(prx-hitPayload.lastReflectionHitPoint);
-		//Compute electric field
+
+		//Unfolded path distance		
+		d=length(prx-hitPayload.lastReflectionHitPoint);
 
 		d+=hitPayload.totalDistanceTillLastReflection;
-		
-		//Take into account radius and angular separation: ignore hit if distance from hit to receiver is < unfolded path distance * angular separation
+
+		//Take into account radius and angular separation: ignore hit if distance from hit to receiver is > unfolded path distance * angular separation
 
 		float vr=d*asRadiusConstant*0.5774; //d*as/sqrt(3);
 		if (drxtohit>vr) {
 			return;
 		}
-
-		float2 z = make_float2(0.0f, -k*d);
-		float2 zexp = complex_exp_only_imaginary(z);
-		float2 Rzexp = complex_prod(hitPayload.prodReflectionCoefficient, zexp);
-
-
-		float2 E = sca_complex_prod((hitPayload.electricFieldAmplitude / d), Rzexp);
-
 		float dm = drxtohit*1000000.0f;  //Multiply by 1000 000 to truncate later take 6 digits
 		int dmt = __float2int_rz(dm);   //Truncate
-
-		HitInfo reflectedHit;	
-		reflectedHit.E=E;
-		reflectedHit.whrd=make_uint4(1u,hitPayload.refhash,receiverBufferIndex,static_cast<uint>(dmt));
-		
-		
-		//Check if global buffer is full
-		uint hitIndex=atomicAdd(&atomicIndex[0u],1u);
-		if (hitIndex>=global_info_buffer_maxsize) {
-			rtThrow(GLOBALHITBUFFEROVERFLOW);
-			//if exceptions are disabled, let it crash...?
-			hitIndex=global_info_buffer_maxsize-1;
-		}
-		//Store hit in global buffer
-		globalHitInfoBuffer[hitIndex]=reflectedHit;
-		
-		//Log hit
-		//rtPrintf("C\t%u\t%u\t%u\t%f\t%f\t%f\t%f\t%f\t%u\t%u\t%u\t%d\n", receiverLaunchIndex.x, receiverLaunchIndex.y,receiverBufferIndex,  reflectedHit.E.x, reflectedHit.E.y, E.x, E.y,d, reflectedHit.whrd.x,reflectedHit.whrd.y,reflectedHit.whrd.w,externalId);
-
+		//HitInfo values
+		dtrx=static_cast<uint>(dmt);
+		hash=hitPayload.refhash;
 	}
+
+
+
+	//Compute electric field
+	float2 z = make_float2(0.0f, -k*d);
+	float2 zexp = complex_exp_only_imaginary(z);
+	float2 Rzexp = complex_prod(hitPayload.prodReflectionCoefficient, zexp);
+	float2 E = sca_complex_prod((hitPayload.electricFieldAmplitude / d), Rzexp);
+
+
+
+
+	HitInfo aHit;
+	aHit.whrd=make_uint4(1u,hash,receiverBufferIndex,dtrx);
+	aHit.E=E;
+
+	//Check if global buffer is full
+	uint hitIndex=atomicAdd(&atomicIndex[0u],1u);
+	if (hitIndex>=global_info_buffer_maxsize) {
+		rtThrow(GLOBALHITBUFFEROVERFLOW);
+		//if exceptions are disabled, let it crash...?
+		hitIndex=global_info_buffer_maxsize-1;
+	}
+	//Store hit in global buffer
+	globalHitInfoBuffer[hitIndex]=aHit;
+
+	//Log hit
+	//if (reflections==0) {
+	//rtPrintf("DH\t%u\t%u\t%u\t%f\t%f\t%f\t%f\t%f\t%u\t%u\t%u\t%d\n", receiverLaunchIndex.x, receiverLaunchIndex.y,receiverBufferIndex,  directHit.E.x, directHit.E.y, E.x, E.y,d, directHit.whrd.x,directHit.whrd.y,directHit.whrd.w,externalId);
+	// } else {
+	//rtPrintf("C\t%u\t%u\t%u\t%f\t%f\t%f\t%f\t%f\t%u\t%u\t%u\t%d\n", receiverLaunchIndex.x, receiverLaunchIndex.y,receiverBufferIndex,  reflectedHit.E.x, reflectedHit.E.y, E.x, E.y,d, reflectedHit.whrd.x,reflectedHit.whrd.y,reflectedHit.whrd.w,externalId);
+	//}	
 
 }
 
