@@ -1,6 +1,6 @@
 # Opal
 
-Opal is a library to simulate multipath channel propagation with NVIDIA Optix for multiple moving transmitters and receivers.
+Opal is a library to simulate on GPUs multipath channel propagation with NVIDIA Optix for multiple moving transmitters and receivers.
 Opal is a 3D ray-launching based, deterministic radio-
 frequency propagation simulator. With Ray-launching methods, 
 also called shooting and bouncing (SBR), electromagnetic waves are simulated by rays launched from
