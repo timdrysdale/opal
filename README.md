@@ -17,6 +17,9 @@ as a game engine.
 
 At the moment, only reflections are computed. In future releases we will add difraction.
 
+It supports simultaneous transmissions from multiple transmitters to multiple receivers, but we have removed it 
+at the moment until we test the last changes  better.
+
 
 
 It can be used as a standalone application or as a Unity plugin. If used as
