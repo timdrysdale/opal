@@ -27,6 +27,8 @@ a Unity plugin, a Unity program will send the meshes and update the transforms
 of the elements of the scene. The Unity related code can be found in 
 our   [Veneris repository](https://gitlab.com/esteban.egea/veneris).
 
+For more information visit the [Veneris project website](http://pcacribia.upct.es/veneris).
+
 ## Installation
 
 ### Requirements
