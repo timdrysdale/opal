@@ -47,13 +47,15 @@ With Optix 5.1.
 Basically you need to install CUDA first, which for Optix 5.1 should be 9.0 
 although it has been tested with 9.1 and 9.2. Do not use CUDA 10.0, does not work with Optix 5.1.
 
-Unzip Optix. Go to the root folder of Optix and build it to test it works. Use Cmake for this:
+Unzip Optix. Go to the root folder of Optix and build it to test it works. For this, use Cmake as follows:
 
 In Linux: 
 ```bash
 cd SDK
 ccmake .
 ```
+Alternatively, as recommended in the INSTALL, you can create your build directory, go to it and run ``ccmake /path/to/SDK``. 
+
 Configure and generate, then
 ```bash
 make
@@ -76,6 +78,7 @@ If Optix works, then you can add Opal:
 5. make (or compile with VS).
 
 In Linux, that should be all, now you should find your `opal` executable and `libopal_s` shared library in the corresponding folders.
+
 
 In Windows, you will probably need to add a preprocessor definition to compile. In VS, in the Explorer Solution window, right click on the `opal` project, Properties and then go to C/C++ > Preprocessor and edit the preprocessor defintions to add `OPAL_EXPORTS`.
 
