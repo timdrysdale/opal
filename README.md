@@ -32,15 +32,20 @@ For more information visit the [Veneris project website](http://pcacribia.upct.e
 ## Installation
 
 ### Requirements
-You need a modern NVIDIA GPU and updated driver.  CUDA 9.0 or later. Optix 5.1. gcc or Visual Studio.
+You need a modern NVIDIA GPU and updated driver.  CUDA 9.0 or later. Optix 6.0 or 5.1. gcc or Visual Studio.
 CMake 3.10
 
 ### Install Optix
 Download Optix from the [NVIDIA site](https://developer.nvidia.com/optix) and 
-follow instructions to install it. It has been developed with Optix 5.1.
+follow instructions to install it.
+
+**Updated to Optix 6.0**
+It has been tested with the last Optix version, 6.0, and **the performance on the same hardware has improved remarkably**, even without using RTX cores. With Optix 6.0 
+you can use CUDA 10 and requires a NVIDIA driver at least 418.30. Follow exactly the same steps as below.
+
+With Optix 5.1.
 Basically you need to install CUDA first, which for Optix 5.1 should be 9.0 
-although it has been tested with 9.1 and 9.2. Do not use CUDA 10.0, not tested 
-with this version of Opal.
+although it has been tested with 9.1 and 9.2. Do not use CUDA 10.0, does not work with Optix 5.1.
 
 Unzip Optix. Go to the root folder of Optix and build it to test it works. Use Cmake for this:
 
