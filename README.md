@@ -74,6 +74,7 @@ If Optix works, then you can add Opal:
 1. Create a subdirectory called `opal` (or whatever you prefer) inside the Optix `SDK` directory.
 2. Copy to that subdirectory the files in this repository.
 3. Go to the Optix `SDK` and edit the `CMakeList.txt` to add your directory in the list of samples `add_subdirectory(opal)` (use the name of your directory).
+3. If you use Optix 5.1 comment out the ``#define OPAL_USE_TRI`` in ``Common.h``. Otherwise, use GeometryTriangles only supported by Optix 6.0
 4. Configure and generate again with cmake as above.
 5. make (or compile with VS).
 
