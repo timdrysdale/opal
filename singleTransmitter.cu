@@ -38,9 +38,6 @@ rtDeclareVariable(float, min_t_epsilon, , );
 rtDeclareVariable(unsigned int, max_interactions, , );
 
 rtDeclareVariable(uint2, raySphereSize, , );
-
-
-//Ray generation program. Generates and traces a sphere of rays and traces reflections and internal (to a receiver sphere) reflections
 RT_PROGRAM void genRayAndReflectionsFromSphereIndex()
 {
 
@@ -188,7 +185,6 @@ rtDeclareVariable(rtCallableProgramId<float2(float2)>, complex_exp_only_imaginar
 rtDeclareVariable(rtCallableProgramId<float2(float, float2)>, sca_complex_prod, , );
 rtDeclareVariable(rtCallableProgramId<float2(float2, float2)>, complex_prod, , );
 
-//Closest hit program for an internal ray (internal to the receiver sphere)
 
 RT_PROGRAM void closestHitReceiverInternalRay()
 {
@@ -199,8 +195,9 @@ RT_PROGRAM void closestHitReceiverInternalRay()
 
 	//Update ray data
 
-	hitPayload.totalDistance += hit_attr.t;
-	hitPayload.hitPoint = ray_receiver.origin + hit_attr.t*ray_receiver.direction;
+	const float rayLength = hit_attr.geom_normal_t.w;
+	hitPayload.totalDistance += rayLength;
+	hitPayload.hitPoint = ray_receiver.origin + rayLength*ray_receiver.direction;
 	hitPayload.nextDirection = ray_receiver.direction;
 
 	//Check if we are hitting the receiver for this internal ray
@@ -282,7 +279,7 @@ RT_PROGRAM void closestHitReceiverInternalRay()
 }
 
 
-//Closest hit program for a receiver. Computes electric field
+
 
 RT_PROGRAM void closestHitReceiver()
 {
@@ -292,8 +289,9 @@ RT_PROGRAM void closestHitReceiver()
 	//Do not end the ray, it can pass through the reception sphere and reflect on a wall, inside or outside the receiver sphere
 
 	//Update ray data
-	hitPayload.totalDistance += hit_attr.t;
-	hitPayload.hitPoint = ray_receiver.origin + hit_attr.t*ray_receiver.direction;
+	const float rayLength = hit_attr.geom_normal_t.w;
+	hitPayload.totalDistance += rayLength; 
+	hitPayload.hitPoint = ray_receiver.origin + rayLength*ray_receiver.direction;
 	hitPayload.nextDirection = ray_receiver.direction;
 
 
@@ -311,8 +309,9 @@ RT_PROGRAM void closestHitReceiver()
 	//Check if ray originated inside the reception radius of this receiver
 
 	//Distance from ray origin to receiver
- 	float3 raytorx=ray_receiver.origin-prx;
-        float dorsquare=dot(raytorx,raytorx);
+	//float dor=length(ray_receiver.origin-prx);
+	float3 raytorx=ray_receiver.origin-prx;	
+	float dorsquare=dot(raytorx,raytorx);
 
 
 	if (dorsquare<=((sphere.w*sphere.w)+0.0001)) { //Give some epsilon, otherwise numerical inaccuracies may make it fail the check
@@ -350,7 +349,9 @@ RT_PROGRAM void closestHitReceiver()
 		float3 p3 = hitPayload.hitPoint + u*ray_receiver.direction;
 
 
-		float drxtohit=length(prx - p3);
+		float3 rxtoh=prx-p3;
+		float drxtohitsq=dot(rxtoh,rxtoh);
+		//float drxtohit=length(prx - p3);
 
 		//Unfolded path distance		
 		d=length(prx-hitPayload.lastReflectionHitPoint);
@@ -359,11 +360,11 @@ RT_PROGRAM void closestHitReceiver()
 
 		//Take into account radius and angular separation: ignore hit if distance from hit to receiver is > unfolded path distance * angular separation
 
-		float vr=d*asRadiusConstant*0.5774; //d*as/sqrt(3);
-		if (drxtohit>vr) {
+		float vrsq=d*d*asRadiusConstant*asRadiusConstant/3; //sqr(d*as/sqrt(3));
+		if (drxtohitsq>vrsq) {
 			return;
 		}
-		float dm = drxtohit*1000000.0f;  //Multiply by 1000 000 to truncate later take 6 digits
+		float dm = drxtohitsq*1000000.0f;  //Multiply by 1000 000 to truncate later take 6 digits
 		int dmt = __float2int_rz(dm);   //Truncate
 		//HitInfo values
 		dtrx=static_cast<uint>(dmt);
@@ -372,14 +373,13 @@ RT_PROGRAM void closestHitReceiver()
 
 
 
-	//Compute electric field
+	//Compute electric field	
 	float2 z = make_float2(0.0f, -k*d);
 	float2 zexp = complex_exp_only_imaginary(z);
 	float2 Rzexp = complex_prod(hitPayload.prodReflectionCoefficient, zexp);
+
+
 	float2 E = sca_complex_prod((hitPayload.electricFieldAmplitude / d), Rzexp);
-
-
-
 
 	HitInfo aHit;
 	aHit.whrd=make_uint4(1u,hash,receiverBufferIndex,dtrx);

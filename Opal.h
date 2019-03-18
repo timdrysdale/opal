@@ -192,7 +192,6 @@ namespace opal {
 			
 		//Static meshes	
 			void setMeshEMProperties(optix::GeometryInstance geom_instance, MaterialEMProperties emProp);
-			OpalMesh createStaticMesh(int meshVertexCount, optix::float3* meshVertices, int meshTriangleCount, int* meshTriangles, optix::Matrix4x4 transformationMatrix, optix::Program intersectionProgram, optix::Program boundingBoxProgram, optix::Material material);
 			OpalMesh createMesh(int meshVertexCount, optix::float3* meshVertices, int meshTriangleCount, int* meshTriangles, optix::Program intersectionProgram, optix::Program boundingBoxProgram, optix::Material material);
 			OpalMesh addStaticMesh(int meshVertexCount, optix::float3* meshVertices, int meshTriangleCount, int* meshTriangles, optix::Matrix4x4 transformationMatrix, MaterialEMProperties emProp);
 			void addStaticMesh(OpalMesh mesh);
@@ -244,6 +243,9 @@ namespace opal {
 
 
 			optix::Program createBoundingBoxTriangle();
+			#ifdef OPAL_USE_TRI
+			optix::Program createTriangleAttributesProgram();
+			#endif
 
 			optix::Program createIntersectionTriangle();
 

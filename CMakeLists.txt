@@ -118,6 +118,7 @@ OPTIX_add_sample_executable( opal
   Unity.h
   Unity.cpp
   singleTransmitter.cu
+  optixGeometryTriangles.cu
   triangle.cu
   sphere.cu
   tutils.cu
@@ -136,6 +137,7 @@ set(sources
   Common.h
   Unity.h
   Unity.cpp
+  optixGeometryTriangles.cu
   singleTransmitter.cu
   triangle.cu
   sphere.cu
@@ -149,6 +151,7 @@ OPTIX_add_sample_library( opal_s
   Unity.h
   Unity.cpp
   singleTransmitter.cu
+  optixGeometryTriangles.cu
   triangle.cu
   sphere.cu
   tutils.cu
@@ -168,6 +171,7 @@ set(sources
   Unity.h
   Unity.cpp
   singleTransmitter.cu
+  optixGeometryTriangles.cu
   triangle.cu
   sphere.cu
   tutils.cu

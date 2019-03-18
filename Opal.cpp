@@ -17,6 +17,7 @@
 #include <functional>
 #include <iostream>
 #include <fstream>
+#include <cstring>
 #ifdef _WIN32
 #include <sstream>
 #endif
@@ -129,9 +130,12 @@ void opal::OpalSceneManager::setDefaultPrograms()
 
 	//TODO: we could add an intersection program for planes (ideal infinite planes), typically used to represent flat grounds, should be more efficient than a mesh
 	defaultPrograms.insert(std::pair<std::string, optix::Program>("meshClosestHit", createClosestHitMesh()));
+#ifdef OPAL_USE_TRI
+	defaultPrograms.insert(std::pair<std::string, optix::Program>("triangleAttributes", createTriangleAttributesProgram()));
+#else
 	defaultPrograms.insert(std::pair<std::string, optix::Program>("meshIntersection", createIntersectionTriangle()));
 	defaultPrograms.insert(std::pair<std::string, optix::Program>("meshBounds", createBoundingBoxTriangle()));
-
+#endif
 
 	defaultPrograms.insert(std::pair<std::string, optix::Program>("receiverClosestHit", createClosestHitReceiver()));
 	defaultPrograms.insert(std::pair<std::string, optix::Program>("receiverClosestHitInternalRay", createClosestHitInternalRay()));
@@ -234,7 +238,26 @@ MaterialEMProperties OpalSceneManager::ITUparametersToMaterial(float a, float b,
 //Creates and add a static mesh with default programs and material
 OpalMesh OpalSceneManager::addStaticMesh(int meshVertexCount, optix::float3* meshVertices, int meshTriangleCount, int* meshTriangles, optix::Matrix4x4 transformationMatrix, MaterialEMProperties emProp) {
 
-	OpalMesh mesh=createStaticMesh(meshVertexCount, meshVertices, meshTriangleCount, meshTriangles, transformationMatrix, defaultPrograms.at("meshIntersection"), defaultPrograms.at("meshBounds"), defaultMeshMaterial);
+	//A new copy in case the mesh is being reused with different transforms
+	std::vector<optix::float3> transformedVertices(meshVertexCount);
+	//Apply first transformation matrix
+	for (size_t i = 0; i < meshVertexCount; i++)
+	{
+
+		//std::cout <<"vertex=("<< meshVertices[i].x <<","<< meshVertices[i].y <<","<< meshVertices[i].z <<")"<< std::endl;
+		const float3 v = optix::make_float3(transformationMatrix*optix::make_float4(meshVertices[i], 1.0f));
+		//#ifdef OPALDEBUG
+		//			outputFile << "v=(" << v.x << "," << v.y << "," << v.z << ")" << std::endl;
+		//#endif
+		//std::cout<<"v="<<v<<std::endl;
+		transformedVertices[i]=v;
+	}
+#ifdef OPAL_USE_TRI
+	OpalMesh mesh=createMesh(meshVertexCount, transformedVertices.data(), meshTriangleCount, meshTriangles,  defaultPrograms.at("triangleAttributes"), defaultPrograms.at("triangleAttributes"), defaultMeshMaterial);
+#else
+	OpalMesh mesh=createMesh(meshVertexCount, transformedVertices.data(), meshTriangleCount, meshTriangles, defaultPrograms.at("meshIntersection"), defaultPrograms.at("meshBounds"), defaultMeshMaterial);
+
+#endif
 	setMeshEMProperties(mesh.geom_instance, emProp);
 	addStaticMesh(mesh);
 	return mesh;
@@ -300,109 +323,6 @@ void OpalSceneManager::extractFaces(optix::float3* meshVertices, std::vector<std
 
 }
 
-//Creates a static mesh. Points are directly translated with the transformation matrix and no rtTransform is assigned. Material includes closest hit program. Instance-specific material properties are not set
-OpalMesh OpalSceneManager::createStaticMesh (int meshVertexCount, optix::float3* meshVertices, int meshTriangleCount, int* meshTriangles, optix::Matrix4x4 transformationMatrix, optix::Program intersectionProgram, optix::Program boundingBoxProgram, optix::Material material) {
-
-	// Create a float3 formatted buffer (each triplet of floats in the array is now a vector3 in the order x,y,z)
-
-
-	//Make int3s
-	if (meshTriangleCount % 3 != 0) {
-		std::cout<<"Error: Number of triangle indices is not a multiple of 3"<<std::endl;
-		throw  opal::Exception("Error: Number of triangle indices is not a multiple of 3");
-
-	}
-	std::vector<std::pair<optix::int3,unsigned int>> triangleIndexBuffer;
-
-
-	for (size_t i = 0; i < meshTriangleCount; i += 3)
-	{
-
-		triangleIndexBuffer.push_back(std::pair<optix::int3, unsigned int>(make_int3(meshTriangles[i], meshTriangles[i + 1], meshTriangles[i + 2]),0u));
-
-	}
-
-
-	extractFaces(meshVertices, triangleIndexBuffer);
-	/*for (size_t i = 0; i < triangleIndexBuffer.size(); i++)
-	  {
-	  std::cout<<triangleIndexBuffer[i].second << std::endl;
-
-	  }*/
-
-	OpalMesh mesh;
-
-	//Device buffers
-	optix::Buffer tri_indices;
-	optix::Buffer positions;
-	optix::Buffer faces;
-
-	int numTriangles = static_cast<int>(triangleIndexBuffer.size());
-	tri_indices = context->createBuffer(RT_BUFFER_INPUT, RT_FORMAT_INT3, numTriangles);
-	positions = context->createBuffer(RT_BUFFER_INPUT, RT_FORMAT_FLOAT3, meshVertexCount);
-	faces = context->createBuffer(RT_BUFFER_INPUT, RT_FORMAT_UNSIGNED_INT, numTriangles);
-
-
-	//Map to host buffers to write
-	int3* host_tri_indices = reinterpret_cast<int3*>(tri_indices->map());
-	float3* host_positions = reinterpret_cast<float3*>  (positions->map());
-	uint* host_faces= reinterpret_cast<uint*>  (faces->map());
-
-	for (size_t i = 0; i < numTriangles; i++)
-	{
-		host_tri_indices[i] = triangleIndexBuffer[i].first;
-		host_faces[i] = triangleIndexBuffer[i].second;
-	}
-
-
-	mesh.bbox_min = make_float3(1.0e26f, 1.0e26f, 1.0e26f);
-	mesh.bbox_max = make_float3(-1.0e26f, -1.0e26f, -1.0e26f);
-
-	//Apply transformation matrix
-	for (size_t i = 0; i < meshVertexCount; i++)
-	{
-
-		//Should we use Transform?
-		//std::cout <<"vertex=("<< meshVertices[i].x <<","<< meshVertices[i].y <<","<< meshVertices[i].z <<")"<< std::endl;
-		const float3 v = optix::make_float3(transformationMatrix*optix::make_float4(meshVertices[i], 1.0f));
-		//#ifdef OPALDEBUG
-		//			outputFile << "v=(" << v.x << "," << v.y << "," << v.z << ")" << std::endl;
-		//#endif
-		//std::cout<<"v="<<v<<std::endl;
-		host_positions[i] = v;
-		mesh.bbox_min.x = std::min<float>(mesh.bbox_min.x, v.x);
-		mesh.bbox_min.y = std::min<float>(mesh.bbox_min.y, v.y);
-		mesh.bbox_max.x = std::max<float>(mesh.bbox_max.x, v.x);
-		mesh.bbox_max.y = std::max<float>(mesh.bbox_max.y, v.y);
-		mesh.bbox_max.z = std::max<float>(mesh.bbox_max.z, v.z);
-
-	}
-	//Release buffers
-	positions->unmap();
-	tri_indices->unmap();
-	faces->unmap();
-
-	optix::Geometry geometry = context->createGeometry();
-	geometry["vertex_buffer"]->setBuffer(positions); //Vertices buffer
-	geometry["index_buffer"]->setBuffer(tri_indices); //Indices buffer
-	geometry["faceId_buffer"]->setBuffer(faces); //Ids for the faces
-
-	geometry->setPrimitiveCount(numTriangles);
-	geometry->setBoundingBoxProgram(boundingBoxProgram);
-	geometry->setIntersectionProgram(intersectionProgram);
-	mesh.num_triangles = numTriangles;
-
-
-
-	std::vector<optix::Material> optix_materials;
-	optix_materials.push_back(material);
-
-	mesh.geom_instance = context->createGeometryInstance(geometry, optix_materials.begin(), optix_materials.end());
-
-
-	return mesh;
-
-}
 
 OpalDynamicMeshGroup* OpalSceneManager::addDynamicMeshGroup(int id) {
 	std::cout<<"Dynamic mesh group called with "<<id<<std::endl;
@@ -504,33 +424,29 @@ OpalMesh OpalSceneManager::createMesh(int meshVertexCount, optix::float3* meshVe
 	}
 
 
-	mesh.bbox_min = make_float3(1.0e26f, 1.0e26f, 1.0e26f);
-	mesh.bbox_max = make_float3(-1.0e26f, -1.0e26f, -1.0e26f);
 
-	//Do not apply transformation to mesh vertices
+	//Copy to mapped buffer
+	memmove(host_positions, meshVertices,sizeof(optix::float3)*meshVertexCount);
 
-	for (size_t i = 0; i < meshVertexCount; i++)
-	{
-
-		//Should we use Transform?
-		//std::cout <<"vertex=("<< meshVertices[i].x <<","<< meshVertices[i].y <<","<< meshVertices[i].z <<")"<< std::endl;
-
-		const float3 v = meshVertices[i];
-		//#ifdef OPALDEBUG
-		//			outputFile << "v=(" << v.x << "," << v.y << "," << v.z << ")" << std::endl;
-		//#endif
-		host_positions[i] = v;
-		mesh.bbox_min.x = std::min<float>(mesh.bbox_min.x, v.x);
-		mesh.bbox_min.y = std::min<float>(mesh.bbox_min.y, v.y);
-		mesh.bbox_max.x = std::max<float>(mesh.bbox_max.x, v.x);
-		mesh.bbox_max.y = std::max<float>(mesh.bbox_max.y, v.y);
-		mesh.bbox_max.z = std::max<float>(mesh.bbox_max.z, v.z);
-
-	}
 	//Release buffers
 	positions->unmap();
 	tri_indices->unmap();
 	faces->unmap();
+#ifdef OPAL_USE_TRI 
+	// Create a Optix 6.0 GeometryTriangles object.
+	optix::GeometryTriangles geom_tri = context->createGeometryTriangles();
+
+	geom_tri["vertex_buffer"]->setBuffer(positions); //Vertices buffer
+	geom_tri["index_buffer"]->setBuffer(tri_indices); //Indices buffer
+	geom_tri["faceId_buffer"]->setBuffer(faces); //Ids for the faces
+	geom_tri->setPrimitiveCount( numTriangles );
+	geom_tri->setTriangleIndices( tri_indices, RT_FORMAT_UNSIGNED_INT3 );
+	geom_tri->setVertices( meshVertexCount, positions, RT_FORMAT_FLOAT3 );
+	geom_tri->setBuildFlags( RTgeometrybuildflags( 0 ) );
+	// Set an attribute program for the GeometryTriangles, which will compute
+	std::cout<<"Adding triangle attributes"<<std::endl;
+	geom_tri->setAttributeProgram(intersectionProgram );
+#else
 
 	optix::Geometry geometry = context->createGeometry();
 	geometry["vertex_buffer"]->setBuffer(positions);
@@ -540,15 +456,19 @@ OpalMesh OpalSceneManager::createMesh(int meshVertexCount, optix::float3* meshVe
 	geometry->setPrimitiveCount(numTriangles);
 	geometry->setBoundingBoxProgram(boundingBoxProgram);
 	geometry->setIntersectionProgram(intersectionProgram);
+#endif
 	mesh.num_triangles = numTriangles;
 
 
 
 	std::vector<optix::Material> optix_materials;
 	optix_materials.push_back(material);
+#ifdef OPAL_USE_TRI 
+	mesh.geom_instance = context->createGeometryInstance(geom_tri,material); //If called with iterator does not compile, but it appears in the documentation 
+#else
 
 	mesh.geom_instance = context->createGeometryInstance(geometry, optix_materials.begin(), optix_materials.end());
-
+#endif
 
 	return mesh;
 
@@ -623,6 +543,13 @@ optix::Program OpalSceneManager::createBoundingBoxTriangle()
 	return context->createProgramFromPTXString(sutil::getPtxString(cudaProgramsDir.c_str(), "triangle.cu"), "boundsTriangle");
 }
 
+#ifdef OPAL_USE_TRI
+optix::Program OpalSceneManager::createTriangleAttributesProgram()
+{
+	return  context->createProgramFromPTXString(sutil::getPtxString(cudaProgramsDir.c_str(),"optixGeometryTriangles.cu"), "triangle_attributes" ) ;
+
+}
+#endif
 
 optix::Program OpalSceneManager::createIntersectionTriangle()
 {
@@ -1084,7 +1011,6 @@ void OpalSceneManager::transmit(int txId, float txPower,  float3 origin, float3 
 	context["tx_origin"]->setUserData(sizeof(Transmitter),&host_tx);	
 
 
-
 	//Adaptive radio just to avoid a transmitter being inside a receiver sphere
 	bool applyDirty=false;
 	for (int i=0; i<numReceivers; i++) {
@@ -1113,6 +1039,7 @@ void OpalSceneManager::transmit(int txId, float txPower,  float3 origin, float3 
 
 
 	//Transmission launch
+	//std::cout<<"Transmitting["<<txId<<"]["<<txPower<<"]"<<origin<<std::endl;	
 	Timer timer;
 	timer.start();
 	context->launch(0, raySphere.elevationSteps, raySphere.azimuthSteps); //Launch 2D (elevation, azimuth);
@@ -1142,7 +1069,7 @@ void OpalSceneManager::transmit(int txId, float txPower,  float3 origin, float3 
 	RTsize gsize;
 	globalHitInfoBuffer->getSize(gsize);
 	//Log times for performance tests
-	std::cout<<"**"<<numReceivers<<"\t"<<gsize<<"\t"<<lastHitIndex<<"\t"<<hits<<"\t"<<launchTime<<"\t"<<filterTime<<"\t"<<transferTime<<std::endl;
+	std::cout<<"#"<<numReceivers<<"\t"<<gsize<<"\t"<<lastHitIndex<<"\t"<<hits<<"\t"<<launchTime<<"\t"<<filterTime<<"\t"<<transferTime<<std::endl;
 
 	//Compute received power by adding EM waves of all hits. Global computation. Not done with thrust because reduce does not seem to allow a different type as output of the sum
 
@@ -1160,8 +1087,8 @@ void OpalSceneManager::transmit(int txId, float txPower,  float3 origin, float3 
 				if (raysHit!=0u) {
 					//At least one hit, callback
 					float power = defaultChannel.eA*((E.x*E.x) + (E.y*E.y))*txPower;
-					//std::cout << "rx["<<receivers[index]->externalId<<"]=" << receivers[index]->position << ".r=" << receivers[index]->radius << "(sphere="<<receivers[index]->geomInstance["sphere"]->getFloat4()<<"); tx["<<txId<<"]=" << origin << " eA=" << defaultChannel.eA << " txPower=" << txPower << " E=(" << E.x << "," << E.y << ")" << " p=" << power <<  " d=" << length(origin - receivers[index]->position) << std::endl;
-					//std::cout<<"PR\t"<<power<<std::endl;
+					std::cout << "rx["<<receivers[index]->externalId<<"]=" << receivers[index]->position << ".r=" << receivers[index]->radius << "(sphere="<<receivers[index]->geomInstance["sphere"]->getFloat4()<<"); tx["<<txId<<"]=" << origin << " eA=" << defaultChannel.eA << " txPower=" << txPower << " E=(" << E.x << "," << E.y << ")" << " p=" << power <<  " d=" << length(origin - receivers[index]->position) << std::endl;
+					std::cout<<"PR\t"<<power<<std::endl;
 					receivers[index]->callback(power, txId);
 				}
 				//New receiver, start new accumulation
@@ -1188,8 +1115,8 @@ void OpalSceneManager::transmit(int txId, float txPower,  float3 origin, float3 
 	if (raysHit!=0u) {
 
 		float power = defaultChannel.eA*((E.x*E.x) + (E.y*E.y))*txPower;
-		//std::cout << "rx["<<receivers[index]->externalId<<"]=" << receivers[index]->position << ".r=" << receivers[index]->radius << "(sphere="<<receivers[index]->geomInstance["sphere"]->getFloat4()<<"); tx["<<txId<<"]=" << origin << " eA=" << defaultChannel.eA << " txPower=" << txPower << " E=(" << E.x << "," << E.y << ")" << " p=" << power <<  " d=" << length(origin - receivers[index]->position) << std::endl;
-		//std::cout<<"PR\t"<<power<<std::endl;
+		std::cout << "rx["<<receivers[index]->externalId<<"]=" << receivers[index]->position << ".r=" << receivers[index]->radius << "(sphere="<<receivers[index]->geomInstance["sphere"]->getFloat4()<<"); tx["<<txId<<"]=" << origin << " eA=" << defaultChannel.eA << " txPower=" << txPower << " E=(" << E.x << "," << E.y << ")" << " p=" << power <<  " d=" << length(origin - receivers[index]->position) << std::endl;
+		std::cout<<"PR\t"<<power<<std::endl;
 		receivers[index]->callback(power, txId);
 	}	
 	//timer.stop();

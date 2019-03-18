@@ -90,8 +90,12 @@ void intersect_sphere(void)
 		if (rtPotentialIntersection(t)) {
 			//shading_normal = geometric_normal = (O + (root1 + root11)*D) / radius;
 			SphereHit h;
-			h.t = t;
-			h.geom_normal = (O + (root1 + root11)*D) / radius;
+//			h.t = t;
+//			h.geom_normal = (O + (root1 + root11)*D) / radius;
+		float3 gn = (O + (root1 + root11)*D) / radius;		
+	//packed version
+			h.geom_normal_t=make_float4(gn.x,gn.y,gn.z,t);
+
 			hit_attr = h;
 			//Only one material. Change here if more materials used
 			if (rtReportIntersection(0)) {
@@ -102,8 +106,11 @@ void intersect_sphere(void)
 			float root2 = (-b + sdisc) + (do_refine ? root1 : 0);
 			if (rtPotentialIntersection(root2)) {
 				SphereHit h;
-				h.t = root2;
-				h.geom_normal = (O + root2*D) / radius;
+				//h.t = root2;
+				//h.geom_normal = (O + root2*D) / radius;
+				float3 gn2 = (O + root2*D) / radius;
+				//Packed version
+				h.geom_normal_t=make_float4(gn2.x,gn2.y,gn2.z,root2);
 				hit_attr = h;
 				//shading_normal = geometric_normal = (O + root2*D) / radius;
 			
