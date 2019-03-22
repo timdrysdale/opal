@@ -270,13 +270,14 @@ namespace opal {
 			virtual void checkInternalBuffers();
 			virtual void clearInternalBuffers();
 
-			optix::Buffer setGlobalHitInfoBuffer(optix::uint ele, optix::uint azi, optix::uint rx, optix::uint reflections);
+			virtual optix::Buffer setGlobalHitInfoBuffer(optix::uint ele, optix::uint azi, optix::uint rx, optix::uint reflections);
 			void resizeGlobalHitInfoBuffer(optix::uint ele, optix::uint azi, optix::uint rx, optix::uint reflections);
-			optix::Buffer setResultHitInfoBuffer(optix::uint rx, optix::uint reflections);
+			virtual optix::Buffer setResultHitInfoBuffer(optix::uint rx, optix::uint reflections);
 			optix::Buffer setAtomicIndexBuffer();
 
-
+		//Utils
 			static void callbackUsageReport(int level, const char* tag, const char* msg, void* cbdata);
+			void computeReceivedPower(optix::float2 E, unsigned int index, int txId, float txPower, optix::float3 origin);
 	};
 
 
@@ -347,7 +348,7 @@ namespace opal {
 } //namespace opal
 
 //Load meshes
-std::vector<optix::float3>  loadVerticesFromFile(const char* file);
+/*std::vector<optix::float3>  loadVerticesFromFile(const char* file);
 std::vector<int>  loadTrianglesFromFile(const char* file);
 
 //Tests
@@ -360,4 +361,4 @@ std::unique_ptr<opal::OpalSceneManager> moveReceivers(std::unique_ptr<opal::Opal
 std::unique_ptr<opal::OpalSceneManager> addRemoveDynamicMeshes(std::unique_ptr<opal::OpalSceneManager> sceneManager, bool print, bool subSteps);
 std::unique_ptr<opal::OpalSceneManager> addCompoundDynamicMeshes(std::unique_ptr<opal::OpalSceneManager> sceneManager);
 std::unique_ptr<opal::OpalSceneManager> crossingTestAndVehicle(std::unique_ptr<opal::OpalSceneManager> sceneManager);
-
+*/

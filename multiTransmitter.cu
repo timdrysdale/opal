@@ -12,29 +12,25 @@
 using namespace optix;
 
 
+//Propagation kernels for single transmitter/ multiple receivers
+
+
 
 //Receivers buffers
-
-
-
-
 rtBuffer<HitInfo, 1> resultHitInfoBuffer; //Results buffer to be used  by thrust to store filtering resutls 
 rtBuffer<HitInfo, 1> globalHitInfoBuffer; //Buffer to store all the hits
 rtBuffer<uint, 1> atomicIndex; //Buffer to store the current global buffer index 
 rtDeclareVariable(uint, global_info_buffer_maxsize, ,);
 
-rtDeclareVariable(Transmitter, tx_origin, ,);
-
-
-
-
+//Transmitter buffer
+rtBuffer<Transmitter, 1> tx_origin;
 
 
 
 rtDeclareVariable(SphereHit, hit_attr, attribute hit_attr, );
 rtDeclareVariable(EMWavePayload, hitPayload, rtPayload, );
 rtDeclareVariable(float, k, , );
-rtDeclareVariable(uint2, receiverLaunchIndex, rtLaunchIndex, );
+rtDeclareVariable(uint3, receiverLaunchIndex, rtLaunchIndex, );
 
 rtDeclareVariable(uint, receiverBufferIndex, , ); //Buffer id
 rtDeclareVariable(int, externalId, , ); //External id  used to identify receivers 
@@ -65,7 +61,9 @@ RT_PROGRAM void closestHitReceiverInternalRay()
 	hitPayload.totalDistance += rayLength;
 	hitPayload.hitPoint = ray_receiver.origin + rayLength*ray_receiver.direction;
 	hitPayload.nextDirection = ray_receiver.direction;
-
+	uint c_tx_index=receiverLaunchIndex.z;
+	const Transmitter current_tx=tx_origin[c_tx_index];
+	//const Transmitter current_tx = {make_float3(0.0f,0.0f,0.0f), make_float3(0.0f,0.0f,0.0f),0};
 	//Check if we are hitting the receiver for this internal ray
 	if (hitPayload.rxBufferIndex!=receiverBufferIndex) {
 		//rtPrintf("IR not receiver\t%u\t%u\t%u\t%d\t%d\t%d\n", receiverLaunchIndex.x, receiverLaunchIndex.y, receiverBufferIndex,hitPayload.rxBufferIndex,receiverBufferIndex );
@@ -83,9 +81,8 @@ RT_PROGRAM void closestHitReceiverInternalRay()
 
 
 	//Check if ray is hitting his own tx (transmitter are also receivers usually) A transmitter cannot receive while it is transmitting, unless other channel is used.
-	if (externalId == tx_origin.externalId) {
+	if (externalId == current_tx.externalId) {
 		//My own outgoing ray
-		//rtPrintf("External hit for internal ray. txId=%d i.x=%u i.y=%u, ray=(%f,%f,%f) origin=(%f,%f,%f) t=%f rId[%u]=%d\n", tx_origin.externalId, receiverLaunchIndex.x, receiverLaunchIndex.y, ray_receiver.direction.x, ray_receiver.direction.y, ray_receiver.direction.z, ray_receiver.origin.x, ray_receiver.origin.y, ray_receiver.origin.z, hit_attr.t, receiverBufferIndex,externalId);
 		return;
 	}
 
@@ -131,7 +128,7 @@ RT_PROGRAM void closestHitReceiverInternalRay()
 
 		float2 E = sca_complex_prod((hitPayload.electricFieldAmplitude / d), Rzexp);
 		HitInfo internalHit;
-		internalHit.thrd=make_uint4(0u,hitPayload.refhash,receiverBufferIndex,static_cast<uint>(dmt));
+		internalHit.thrd=make_uint4(c_tx_index,hitPayload.refhash,receiverBufferIndex,static_cast<uint>(dmt));
 		internalHit.E=E;
 
 		//Store hit in global buffer
@@ -160,9 +157,12 @@ RT_PROGRAM void closestHitReceiver()
 	hitPayload.hitPoint = ray_receiver.origin + rayLength*ray_receiver.direction;
 	hitPayload.nextDirection = ray_receiver.direction;
 
+	uint c_tx_index=receiverLaunchIndex.z;
+	const Transmitter current_tx=tx_origin[c_tx_index];
+	//const Transmitter current_tx = {make_float3(0.0f,0.0f,0.0f), make_float3(0.0f,0.0f,0.0f),0};
 
 	//Check if ray is hitting his own tx (transmitter are also receivers usually) A transmitter cannot receive while it is transmitting, unless other channel is used.
-	if (externalId == tx_origin.externalId) {
+	if (externalId == current_tx.externalId) {
 		//My own outgoing ray
 		//rtPrintf("External. txId=%d i.el=%u i.az=%u, ray=(%f,%f,%f) origin=(%f,%f,%f) t=%f rId[%u]=%d\n", tx_origin.externalId, receiverLaunchIndex.x, receiverLaunchIndex.y, ray_receiver.direction.x, ray_receiver.direction.y, ray_receiver.direction.z, ray_receiver.origin.x, ray_receiver.origin.y, ray_receiver.origin.z, hit_attr.t, receiverBufferIndex,externalId);
 		return;
@@ -202,7 +202,7 @@ RT_PROGRAM void closestHitReceiver()
 	if (reflections == 0) {
 		//This is a direct ray
 		//Compute electric field. For direct rays, the distance is always between tx and rx
-		float3 ptx = tx_origin.origin;
+		float3 ptx = current_tx.origin;
 		d = length(prx - ptx);
 	} else {
 		//Reflected ray
@@ -248,9 +248,8 @@ RT_PROGRAM void closestHitReceiver()
 	float2 E = sca_complex_prod((hitPayload.electricFieldAmplitude / d), Rzexp);
 
 	HitInfo aHit;
-	aHit.thrd=make_uint4(0u,hash,receiverBufferIndex,dtrx);
+	aHit.thrd=make_uint4(c_tx_index,hash,receiverBufferIndex,dtrx);
 	aHit.E=E;
-
 	//Check if global buffer is full
 	uint hitIndex=atomicAdd(&atomicIndex[0u],1u);
 	if (hitIndex>=global_info_buffer_maxsize) {
