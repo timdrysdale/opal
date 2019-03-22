@@ -111,7 +111,7 @@ set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/tutils.cu
   )
 
 # See top level CMakeLists.txt file for documentation of OPTIX_add_sample_executable.
-OPTIX_add_sample_executable( multit 
+OPTIX_add_sample_executable( opal 
   Opal.cpp
   Opal.h
   Common.h
@@ -120,7 +120,10 @@ OPTIX_add_sample_executable( multit
   tests.cpp
   multitransmitter.h
   multitransmitter.cpp
+  generation.cu
+  generationMultiTransmitter.cu
   singleTransmitter.cu
+  multiTransmitter.cu
   optixGeometryTriangles.cu
   triangle.cu
   sphere.cu
@@ -128,7 +131,7 @@ OPTIX_add_sample_executable( multit
   tutils.h
   )
 
-target_link_libraries( multit 
+target_link_libraries( opal 
      ${CUDA_LIBRARIES}
   optix
   optixu
@@ -143,6 +146,10 @@ set(sources
   tests.cpp
   multitransmitter.h
   multitransmitter.cpp
+  generation.cu
+  generationMultiTransmitter.cu
+  singleTransmitter.cu
+  multiTransmitter.cu
   optixGeometryTriangles.cu
   singleTransmitter.cu
   triangle.cu
@@ -150,7 +157,7 @@ set(sources
   tutils.cu
   tutils.h
 )
-OPTIX_add_sample_library( multit_s 
+OPTIX_add_sample_library( opal_s 
   Opal.cpp
   Opal.h
   Common.h
@@ -159,7 +166,10 @@ OPTIX_add_sample_library( multit_s
   tests.cpp
   multitransmitter.h
   multitransmitter.cpp
+  generation.cu
+  generationMultiTransmitter.cu
   singleTransmitter.cu
+  multiTransmitter.cu
   optixGeometryTriangles.cu
   triangle.cu
   sphere.cu
@@ -167,7 +177,7 @@ OPTIX_add_sample_library( multit_s
   tutils.h
   )
 
-target_link_libraries( multit_s 
+target_link_libraries( opal_s 
      ${CUDA_LIBRARIES}
   optix
   optixu
@@ -182,7 +192,10 @@ set(sources
   tests.cpp
   multitransmitter.h
   multitransmitter.cpp
+  generation.cu
+  generationMultiTransmitter.cu
   singleTransmitter.cu
+  multiTransmitter.cu
   optixGeometryTriangles.cu
   triangle.cu
   sphere.cu
