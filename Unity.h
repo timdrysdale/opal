@@ -18,6 +18,7 @@
 #endif
 
 #include "Opal.h"
+#include "multitransmitter.h"
 //#include <optixpp_namespace.h>
 #include <fstream>
 
@@ -41,38 +42,38 @@ namespace opal {
 	// Matrix Data Variables to be marshalled from Unity
 	// -------------------------------------------------------------------------------------
 	struct UnityMatrix4x4 {
-	public:
-		float m00;
+		public:
+			float m00;
 
-		float m01;
+			float m01;
 
-		float m02;
+			float m02;
 
-		float m03;
+			float m03;
 
-		float m10;
+			float m10;
 
-		float m11;
+			float m11;
 
-		float m12;
+			float m12;
 
-		float m13;
+			float m13;
 
-		float m20;
+			float m20;
 
-		float m21;
+			float m21;
 
-		float m22;
+			float m22;
 
-		float m23;
+			float m23;
 
-		float m30;
+			float m30;
 
-		float m31;
+			float m31;
 
-		float m32;
+			float m32;
 
-		float m33;
+			float m33;
 
 
 
@@ -81,12 +82,12 @@ namespace opal {
 	struct UnityMaterialEMProperties {
 		//ITU parameters: depend on frequency
 		//RelativePermitivity
-		 float a;
-		 float b;
+		float a;
+		float b;
 		//Conductivity
-		 float c;
-		 float d;
-		
+		float c;
+		float d;
+
 	};
 
 	static  OpalSceneManager* sceneManager = nullptr;
@@ -94,13 +95,13 @@ namespace opal {
 	void printMatrix(UnityMatrix4x4& u, std::ofstream& s);
 	void UnityToOptixMatrix4x4(optix::Matrix4x4& m, UnityMatrix4x4& u);
 #ifdef _WIN32
-	
+
 	typedef void(__stdcall *receiverCallback)(float, int);
 #else
 	typedef  std::function<void(float,int)> receiverCallback;
 #endif //_WIN32
 
-	
+
 	extern "C" OPAL_API int Transmit(int txId, float txPower, optix::float3 origin, optix::float3 polarization);
 
 	extern "C" OPAL_API int FinishSceneContext();
@@ -130,7 +131,7 @@ namespace opal {
 	extern "C" OPAL_API int RemoveReceiverFromUnity(int id);
 
 	extern "C" OPAL_API int AddStaticMeshFromUnity(int meshVertexCount, optix::float3* meshVertices, int meshTriangleCount, int* meshTriangles, UnityMatrix4x4 transformationMatrix, UnityMaterialEMProperties emProp);
-	
+
 
 	extern "C" OPAL_API int  AddDynamicMeshGroup(int id);
 
@@ -141,9 +142,19 @@ namespace opal {
 	extern "C" OPAL_API int  FinishDynamicMeshGroup(int id);
 
 	extern "C" OPAL_API int  RemoveDynamicMeshGroup(int id);
-	
 
+	//Multi-transmitter functions
 
+	//Register transmitter in Opal. Add to transmitters map
+	extern "C" OPAL_API int	 RegisterTransmitter(int txId, optix::float3 origin, optix::float3 polarization, float transmitPower) ;
+	//Find transmitter and remove from Opal. Cannot transmit anymore 
+	extern "C" OPAL_API int	 RemoveTransmitter(int txId) ;
+	//Add transmitter to next parallel transmission
+	extern "C" OPAL_API int AddTransmitterToGroup(int txId,float transmitPower, optix::float3 origin,optix::float3 polarization);
+	//Clear current transmit group
+	extern "C" OPAL_API int	 ClearGroup();
+	//Transmit simultaneously all transmitters in group
+	extern "C" OPAL_API int	 GroupTransmit() ;
 
 
 

@@ -11,8 +11,8 @@
 
 #define CHM() if (sceneManager==nullptr) return OPAL_NO_SCENE_MANAGER; //Check manager
 #define CHMT() if (sceneManager==nullptr) { return OPAL_NO_SCENE_MANAGER;} else {if (MultiTransmitter==false) return OPAL_NO_MULTI_TRANSMITTER_MANAGER;}  //Check manager
- 
- 
+
+
 using namespace optix;
 namespace opal {
 
@@ -79,7 +79,7 @@ namespace opal {
 
 #ifdef _WIN32
 			_putenv_s("OPTIX_SAMPLES_SDK_DIR", cudaDir);
-			
+
 #else
 			setenv("OPTIX_SAMPLES_SDK_DIR", cudaDir, 1);
 #endif // _WIN32
@@ -87,18 +87,18 @@ namespace opal {
 
 			if (multiTransmitter) {
 				//Return exception until corrected
-				throw optix::Exception("Not implemented yet");
-				//MultiTransmitter=true;
-				//sceneManager = new OpalSceneManagerMultiTransmitter(frequency,holdReflections);
+				//throw optix::Exception("Not implemented yet");
+				MultiTransmitter=true;
+				sceneManager = new OpalSceneManagerMultiTransmitter(frequency,useExactSpeedOfLight);
 			} else {
 
 				sceneManager = new OpalSceneManager(frequency,  useExactSpeedOfLight);
 			}
 
 
-			
-			
-			
+
+
+
 			return 0;
 
 		}
@@ -148,7 +148,7 @@ namespace opal {
 		CHM();
 		sceneManager->setMaxReflections(m);
 
-		
+
 		return 0;
 	}
 	OPAL_API int AddStaticMeshFromUnity(int meshVertexCount, optix::float3* meshVertices, int meshTriangleCount, int* meshTriangles, UnityMatrix4x4 transformationMatrix, UnityMaterialEMProperties emProp) {
@@ -159,21 +159,21 @@ namespace opal {
 			//When transforming to MaterialEMProperties conductivity is multiplied by -60*wavelenght
 			MaterialEMProperties prop = sceneManager->ITUparametersToMaterial(emProp.a,emProp.b,emProp.c,emProp.d);
 			/*float relativePermitivity;
-			if (emProp.b==0) {
-				relativePermitivity = emProp.a;
-			}
-			else {
-				relativePermitivity=emProp.a*powf((sceneManager->defaultChannel.frequency / 1.0e9f), emProp.b); //Frequency in GHz
-			}
-			float conductivity;
-			if (emProp.d == 0) {
-				conductivity = emProp.c;
-			}
-			else {
-				conductivity = emProp.c*powf((sceneManager->defaultChannel.frequency / 1.0e9f), emProp.d); //Frequency in GHz
-			}
-			prop.dielectricConstant = make_float2(relativePermitivity,-60.0f*sceneManager->defaultChannel.waveLength*conductivity);
-		*/
+			  if (emProp.b==0) {
+			  relativePermitivity = emProp.a;
+			  }
+			  else {
+			  relativePermitivity=emProp.a*powf((sceneManager->defaultChannel.frequency / 1.0e9f), emProp.b); //Frequency in GHz
+			  }
+			  float conductivity;
+			  if (emProp.d == 0) {
+			  conductivity = emProp.c;
+			  }
+			  else {
+			  conductivity = emProp.c*powf((sceneManager->defaultChannel.frequency / 1.0e9f), emProp.d); //Frequency in GHz
+			  }
+			  prop.dielectricConstant = make_float2(relativePermitivity,-60.0f*sceneManager->defaultChannel.waveLength*conductivity);
+			  */
 			sceneManager->addStaticMesh(meshVertexCount, meshVertices, meshTriangleCount, meshTriangles, translationMatrix, prop);
 
 			return 0;
@@ -236,7 +236,7 @@ namespace opal {
 	{
 		CHM();
 		try {
-			
+
 			//When transforming to MaterialEMProperties conductivity is multiplied by -60*wavelenght
 			MaterialEMProperties prop = sceneManager->ITUparametersToMaterial(emProp.a,emProp.b,emProp.c,emProp.d);
 
@@ -273,7 +273,7 @@ namespace opal {
 		try {
 			optix::Matrix4x4 translationMatrix;
 			UnityToOptixMatrix4x4(translationMatrix, transformationMatrix);
-			
+
 
 			sceneManager->updateTransformInGroup(id, translationMatrix);  
 
@@ -302,38 +302,6 @@ namespace opal {
 		}
 	}
 
-	/*OPAL_API int SetDuplicateBlockSize(optix::uint elevationBlockSize, optix::uint azimuthBlockSize)
-	{
-		CHM();
-		try {
-
-			sceneManager->setDuplicateBlockSize(elevationBlockSize, azimuthBlockSize);
-			return 0;
-		}
-		catch (opal::Exception& e) {
-#ifdef OPALDEBUG
-			std::ofstream myfile;
-			myfile.open(logFile, std::ifstream::app);
-			myfile << "SetDuplicateBlockSize: error occurred with message " << e.getErrorString() << std::endl;
-			myfile.close();
-#endif // OPALDEBUG
-
-			return OPAL_EXCEPTION;
-		}
-		catch (optix::Exception& e) {
-#ifdef OPALDEBUG
-			std::ofstream myfile;
-			myfile.open(logFile, std::ifstream::app);
-			myfile << "SetDuplicateBlockSize: error occurred with error code "
-				<< e.getErrorCode() << " and message "
-				<< e.getErrorString() << std::endl;
-			myfile.close();
-#endif // OPALDEBUG
-			return OPTIX_EXCEPTION;
-		}
-	}
-
-	*/
 	OPAL_API int SetPrintEnabled(int bufferSize)
 	{
 		CHM();
@@ -699,6 +667,67 @@ namespace opal {
 			myfile.close();
 #endif // OPALDEBUG
 			return OPTIX_EXCEPTION;
+		}
+	}
+	OPAL_API int RegisterTransmitter(int txId, optix::float3 origin, optix::float3 polarization, float transmitPower) 
+	{
+		CHMT();
+		try {
+
+			static_cast<OpalSceneManagerMultiTransmitter*>(sceneManager)->registerTransmitter(txId,origin,polarization,transmitPower);
+			return 0;
+		}
+		catch (...) {
+			handle();
+		}
+	}
+	OPAL_API int RemoveTransmitter(int txId) 
+	{
+		CHMT();
+		try {
+
+			static_cast<OpalSceneManagerMultiTransmitter*>(sceneManager)->removeTransmitter(txId);
+			return 0;
+		}
+		catch (...) {
+			handle();
+		}
+	}
+	OPAL_API int AddTransmitterToGroup(int txId,float transmitPower, optix::float3 origin,optix::float3 polarization)
+	{
+		CHMT();
+		try {
+
+			static_cast<OpalSceneManagerMultiTransmitter*>(sceneManager)->addTransmitterToGroup(txId,transmitPower,origin,polarization);
+			return 0;
+		}
+		catch (...) {
+			handle();
+		}
+	}
+
+	OPAL_API int ClearGroup()
+	{
+		CHMT();
+		try {
+
+			static_cast<OpalSceneManagerMultiTransmitter*>(sceneManager)->clearGroup();
+			return 0;
+		}
+		catch (...) {
+			handle();
+		}
+	}
+	OPAL_API int GroupTransmit()
+	{
+		CHMT();
+		try {
+
+			static_cast<OpalSceneManagerMultiTransmitter*>(sceneManager)->groupTransmit();
+			return 0;
+		}
+		catch (...) {
+			handle();
 		}
 	}
 

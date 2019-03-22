@@ -24,26 +24,31 @@ struct MaterialEMProperties {
 
 struct HitInfo {
 	//Packed to fullfill alignment rules, see for instance https://devtalk.nvidia.com/default/topic/1037798/optix/optix-time-for-launch/
-	optix::uint4 whrd; // [written,refhash,rxBufferIndex,dist] 
+	optix::uint4 thrd; // [txBufferIndex,refhash,rxBufferIndex,distance] 
 	optix::float2 E;   // Complex
 
-	//Equality operator: hits are equal if the combined has is equal, that is, the have hit the same sequence of faces
-	__host__ __device__ bool operator==(const HitInfo &h) const {
-		return (whrd.y == h.whrd.y);
+	//Equality operator: hits are equal if the combined has is equal and the transmitter is the same, that is, the have hit the same sequence of faces
+	__forceinline__  __device__ bool operator==(const HitInfo &h) const {
+		return ((thrd.x==h.thrd.x) && (thrd.y == h.thrd.y)  );
 	};
-	//Sorting. First check id (buffer index), then hash and finally distance. Hits are ordered by id, combined_hash and distance to receiver
-	__host__ __device__ bool operator<(const HitInfo &h) const {
-		if (whrd.z == h.whrd.z) {
-			if (whrd.y == h.whrd.y) {
-				return (whrd.w < h.whrd.w);
+	//Sorting. Here we first order by txId (tx buffer index), then check receiver id (receiver buffer index), then hash and finally distance. Hits are ordered by txId, rxid, combined_hash and distance to receiver
+	__forceinline__  __device__ bool operator<(const HitInfo &h) const {
+		if (thrd.x==h.thrd.x) {
+			if (thrd.z == h.thrd.z) {
+				if (thrd.y == h.thrd.y) {
+					return (thrd.w < h.thrd.w);
+				} else {
+					return (thrd.y < h.thrd.y);
+				}
 			} else {
-				return (whrd.y < h.whrd.y);
+				return (thrd.z < h.thrd.z);
 			}
 		} else {
-			return (whrd.z < h.whrd.z);
+			return (thrd.x<h.thrd.x);
 		}
 	};
 };
+
 
 
 //TODO:Pack these structures as suggested in documentation
