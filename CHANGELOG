@@ -1,0 +1,3 @@
+# Opal-0.2
+1. Multi-transmitter: you can now launch with multiple transmitters in parallel. They are supposed to transmit simultaneously. To use it, a new class has been derived from the Opal class, since 
+this feature is not compatible with OMNET++  at the moment. 
