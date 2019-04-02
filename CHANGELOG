@@ -1,3 +1,5 @@
-# Opal-0.2
-1. Multi-transmitter: you can now launch with multiple transmitters in parallel. They are supposed to transmit simultaneously. To use it, a new class has been derived from the Opal class, since 
+Opal-0.2 (March 2019)
+-----------
+1. Multi-transmitter: you can now launch with multiple transmitters in parallel. They are supposed to transmit simultaneously. No interference is computed, the receivers get the power received by each transmitter separately.  
+To use it, a new class has been derived from the Opal class, since 
 this feature is not compatible with OMNET++  at the moment. 
