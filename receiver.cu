@@ -126,14 +126,16 @@ RT_PROGRAM void closestHitReceiverInternalRay()
 		float attE=0.0f;
 		if (usePenetration==1u) {
 			//Switch to linear
-			//Check to avoid overflows
 			attE=hitPayload.accumulatedAttenuation*0.05f;
-			if (attE>-10.f) {
-				rtPrintf("attE=%f, E=(%.10e,%.10e) d=%.10e Rzexp(%.10e,%.10e)\n",attE,E.x,E.y,d,Rzexp.x,Rzexp.y);
+			//Check to avoid float overflows
+			if (attE>-15.f) {
 				attE=exp10f(attE);
-				E=sca_complex_prod(attE,E);
+				//rtPrintf("Eatt=(%.10e,%.10e) attExp=%f hits=%u\n",E.x,E.y,attE,hitPayload.hits );
+			} else {
+				attE=1.e-15f; //Set this value directly to avoid overflows, it is neglectable anyway
 
 			}
+			E=sca_complex_prod(attE,E);
 
 		}
 		HitInfo internalHit;
