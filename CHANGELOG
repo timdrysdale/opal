@@ -1,3 +1,20 @@
+
+Opal-0.3 (April 2019)
+-----------
+1. Penetration added. Now rays can penetrate environment elements. Penenetration uses recursive tracing and incurs in a performance penalty, so it 
+can be enabled or disabled. A transmission coefficient plus an independent material attenuation are aplied to the rays. 
+  - MaterialEMProperties has been updated to support attenuation.
+
+2. Merged single and multitransmitter launches. Now all launches are 3D, with the z dimension used for the number of transmitters. A single 
+transmitter sets z=1 (as used in OMNET). Code is cleaner and it should also improve performance (see https://devtalk.nvidia.com/default/topic/1048952/optix/recompile-question/ about setting variables vs buffer).
+ - Removed all single/multi* .cu files, since we do not distinguish any more.
+ - HitInfo now includes the transmitter buffer index and is sorted according to the transmitter
+
+ 3. Changed callable programs to device functions. According to https://devtalk.nvidia.com/default/topic/1048990/optix/question-about-function-vs-callable-programs/ 
+ callable programs are necessary if we need virtual function like functionality, which we don't at the moment. Complex arithmetic has been put in its own Complex.h
+
+ 4. Tests have been moved along with main() to a tests.cpp file.
+
 Opal-0.2 (March 2019)
 -----------
 1. Multi-transmitter: you can now launch with multiple transmitters in parallel. They are supposed to transmit simultaneously. No interference is computed, the receivers get the power received by each transmitter separately.  
