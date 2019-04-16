@@ -1,7 +1,6 @@
-
 Opal-0.3 (April 2019)
 -----------
-1. Penetration added. Now rays can penetrate environment elements. Penenetration uses recursive tracing and incurs in a performance penalty, so it 
+1. Penetration added. Now rays can penetrate environment elements. Penetration uses recursive tracing and incurs in a performance penalty, so it 
 can be enabled or disabled. A transmission coefficient plus an independent material attenuation are aplied to the rays. 
   - MaterialEMProperties has been updated to support attenuation.
 
