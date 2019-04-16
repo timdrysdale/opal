@@ -151,6 +151,21 @@ namespace opal {
 
 		return 0;
 	}
+	OPAL_API int EnablePenetration() {
+		CHM();
+		sceneManager->enablePenetration();
+		return 0;
+	}
+	OPAL_API int DisablePenetration() {
+		CHM();
+		sceneManager->disablePenetration();
+		return 0;
+	}
+	OPAL_API int SetAttenuationLimit(float l) {
+		CHM();
+		sceneManager->setAttenuationLimit(l);
+		return 0;
+	}
 	OPAL_API int AddStaticMeshFromUnity(int meshVertexCount, optix::float3* meshVertices, int meshTriangleCount, int* meshTriangles, UnityMatrix4x4 transformationMatrix, UnityMaterialEMProperties emProp) {
 		CHM();
 		try {

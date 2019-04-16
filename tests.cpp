@@ -93,7 +93,9 @@ std::unique_ptr<OpalSceneManager> addCompoundDynamicMeshes(std::unique_ptr<OpalS
 		tm.setRow(2, make_float4(0, 0, 1, 75.f));
 		tm.setRow(3, make_float4(0, 0, 0.f, 1));
 		MaterialEMProperties emProp1;
-		emProp1.dielectricConstant = make_float2(3.75f, -60.0f*sceneManager->defaultChannel.waveLength*0.038f);
+		emProp1.dielectricConstant = make_float2(3.75f, -60.0f*sceneManager->getChannelParameters().waveLength*0.038f);
+		//There is a dependency on the frequency again, we use -15 dB per 203 mm at 5 GHz => -75 dB/m
+		emProp1.tattenuation = make_float2(0.1f,-75.f );
 
 		//Creation of dynamic meshes  requires calling these 4 functions
 		sceneManager->addDynamicMeshGroup(0);
@@ -180,7 +182,9 @@ std::unique_ptr<OpalSceneManager> addRemoveDynamicMeshes(std::unique_ptr<OpalSce
 		tm.setRow(2, make_float4(0, 0, 1, 75.f));
 		tm.setRow(3, make_float4(0, 0, 0.f, 1));
 		MaterialEMProperties emProp1;
-		emProp1.dielectricConstant = make_float2(3.75f, -60.0f*sceneManager->defaultChannel.waveLength*0.038f);
+		emProp1.dielectricConstant = make_float2(3.75f, -60.0f*sceneManager->getChannelParameters().waveLength*0.038f);
+		//There is a dependency on the frequency again, we use -15 dB per 203 mm at 5 GHz => -75 dB/m
+		emProp1.tattenuation = make_float2(0.1f,-75.f );
 
 		//Creation of dynamic meshes  requires calling these 4 functions
 		sceneManager->addDynamicMeshGroup(0);
@@ -229,7 +233,7 @@ std::unique_ptr<OpalSceneManager> addRemoveDynamicMeshes(std::unique_ptr<OpalSce
 		sceneManager->updateTransformInGroup(1, tm);
 		sceneManager->finishDynamicMeshGroup(1);
 
-		std::cout << "Transmit with new quad. Num quads= "<< sceneManager->dynamicMeshes.size() << std::endl;
+		std::cout << "Transmit with new quad. Num quads= "<< sceneManager->getDynamicMeshes().size() << std::endl;
 		sceneManager->transmit(1, 1.0f, postx, polarization);
 
 		//Remove first quad
@@ -237,10 +241,10 @@ std::unique_ptr<OpalSceneManager> addRemoveDynamicMeshes(std::unique_ptr<OpalSce
 
 		posrx = make_float3(0.0f, 2.0f, 50.0f);
 		sceneManager->updateReceiver(0, posrx);
-		std::cout << "Removing first quad. Expect again the first power. Transmit again.  Num quads= " << sceneManager->dynamicMeshes.size() << std::endl;
+		std::cout << "Removing first quad. Expect again the first power. Transmit again.  Num quads= " << sceneManager->getDynamicMeshes().size() << std::endl;
 		Matrix4x4 mym;
 		Matrix4x4 mymi;
-		sceneManager->dynamicMeshes.at(1)->transform->getMatrix(0, mym.getData(), mymi.getData());
+		sceneManager->getDynamicMeshes().at(1)->transform->getMatrix(0, mym.getData(), mymi.getData());
 		std::cout << "Tm of quad 1: " <<  mym<< std::endl;
 		sceneManager->transmit(1, 1.0f, postx, polarization);
 
@@ -281,7 +285,9 @@ std::unique_ptr<OpalSceneManager> addRemoveReceivers(std::unique_ptr<OpalSceneMa
 		tm.setRow(2, make_float4(0, 0, 10.0f, 50.0f));
 		tm.setRow(3, make_float4(0, 0, 0, 1));
 		MaterialEMProperties emProp1;
-		emProp1.dielectricConstant = make_float2(3.75f, -60.0f*sceneManager->defaultChannel.waveLength*0.038f);
+		emProp1.dielectricConstant = make_float2(3.75f, -60.0f*sceneManager->getChannelParameters().waveLength*0.038f);
+		//There is a dependency on the frequency again, we use -15 dB per 203 mm at 5 GHz => -75 dB/m
+		emProp1.tattenuation = make_float2(0.1f,-75.f );
 		sceneManager->addStaticMesh(static_cast<int>(planever.size()), planever.data(), static_cast<int>(planeind.size()), planeind.data(), tm, emProp1);
 
 
@@ -350,7 +356,9 @@ std::unique_ptr<OpalSceneManager> moveReceivers(std::unique_ptr<OpalSceneManager
 		tm.setRow(2, make_float4(0, 0, 10.0f, 50.0f));
 		tm.setRow(3, make_float4(0, 0, 0, 1));
 		MaterialEMProperties emProp1;
-		emProp1.dielectricConstant = make_float2(3.75f, -60.0f*sceneManager->defaultChannel.waveLength*0.038f);
+		emProp1.dielectricConstant = make_float2(3.75f, -60.0f*sceneManager->getChannelParameters().waveLength*0.038f);
+		//There is a dependency on the frequency again, we use -15 dB per 203 mm at 5 GHz => -75 dB/m
+		emProp1.tattenuation = make_float2(0.1f,-75.f );
 		sceneManager->addStaticMesh(static_cast<int>(planever.size()), planever.data(), static_cast<int>(planeind.size()), planeind.data(), tm, emProp1);
 
 
@@ -419,7 +427,9 @@ std::unique_ptr<OpalSceneManagerMultiTransmitter> crossingTestMulti(std::unique_
 	tm.setRow(2, make_float4(0, 0, 40.0f, 80.0f));
 	tm.setRow(3, make_float4(0, 0, 0, 1));
 	MaterialEMProperties emProp1;
-	emProp1.dielectricConstant = make_float2(3.75f, -60.0f*sceneManager->defaultChannel.waveLength*0.038f);
+	emProp1.dielectricConstant = make_float2(3.75f, -60.0f*sceneManager->getChannelParameters().waveLength*0.038f);
+		//There is a dependency on the frequency again, we use -15 dB per 203 mm at 5 GHz => -75 dB/m
+		emProp1.tattenuation = make_float2(0.1f,-75.f );
 	//emProp1.dielectricConstant = make_float2(3.75f, -0.4576f);
 	std::cout << "Adding NW. Em="<< emProp1.dielectricConstant << std::endl;
 	sceneManager->addStaticMesh(static_cast<int>(cubevert.size()), cubevert.data(), static_cast<int>(cubeind.size()), cubeind.data(), tm, emProp1);
@@ -530,7 +540,9 @@ std::unique_ptr<OpalSceneManager> crossingTest(std::unique_ptr<OpalSceneManager>
 	tm.setRow(2, make_float4(0, 0, 40.0f, 80.0f));
 	tm.setRow(3, make_float4(0, 0, 0, 1));
 	MaterialEMProperties emProp1;
-	emProp1.dielectricConstant = make_float2(3.75f, -60.0f*sceneManager->defaultChannel.waveLength*0.038f);
+	emProp1.dielectricConstant = make_float2(3.75f, -60.0f*sceneManager->getChannelParameters().waveLength*0.038f);
+		//There is a dependency on the frequency again, we use -15 dB per 203 mm at 5 GHz => -75 dB/m
+	emProp1.tattenuation = make_float2(0.1f,-15.f );
 	//emProp1.dielectricConstant = make_float2(3.75f, -0.4576f);
 	std::cout << "Adding NW. Em="<< emProp1.dielectricConstant << std::endl;
 	sceneManager->addStaticMesh(static_cast<int>(cubevert.size()), cubevert.data(), static_cast<int>(cubeind.size()), cubeind.data(), tm, emProp1);
@@ -610,8 +622,8 @@ std::unique_ptr<OpalSceneManager> crossingTest(std::unique_ptr<OpalSceneManager>
 	}
 	timer.stop();
 	std::cout<<"Time="<<timer.getTime()<<std::endl;
-	//		postx = make_float3(-18.0f, 10.0f, 50.0f);
-	//		sceneManager->transmit(0, 1.0f, postx, polarization);
+//			postx = make_float3(-39.0f, 10.0f, 50.0f);
+//			sceneManager->transmit(0, 1.0f, postx, polarization);
 
 	return sceneManager;
 
@@ -630,7 +642,9 @@ std::unique_ptr<OpalSceneManager> planeTest(std::unique_ptr<OpalSceneManager> sc
 	tm.setRow(2, make_float4(0, 0, 10.0f, 50.0f));
 	tm.setRow(3, make_float4(0, 0, 0, 1));
 	MaterialEMProperties emProp1;
-	emProp1.dielectricConstant = make_float2(3.75f, -60.0f*sceneManager->defaultChannel.waveLength*0.038f);
+	emProp1.dielectricConstant = make_float2(3.75f, -60.0f*sceneManager->getChannelParameters().waveLength*0.038f);
+		//There is a dependency on the frequency again, we use -15 dB per 203 mm at 5 GHz => -75 dB/m
+		emProp1.tattenuation = make_float2(0.1f,-75.f );
 	sceneManager->addStaticMesh(static_cast<int>(planever.size()), planever.data(), static_cast<int>(planeind.size()), planeind.data(), tm, emProp1);
 
 
@@ -704,7 +718,9 @@ std::unique_ptr<OpalSceneManager> quadTest(std::unique_ptr<OpalSceneManager> sce
 	tm.setRow(2, make_float4(0, 0, 1, 100.0f));
 	tm.setRow(3, make_float4(0, 0, 0,  1));
 	MaterialEMProperties emProp1;
-	emProp1.dielectricConstant = make_float2(3.75f, -60.0f*sceneManager->defaultChannel.waveLength*0.038f);
+		//There is a dependency on the frequency again, we use -15 dB per 203 mm at 5 GHz => -75 dB/m
+		emProp1.tattenuation = make_float2(0.1f,-75.f );
+	emProp1.dielectricConstant = make_float2(3.75f, -60.0f*sceneManager->getChannelParameters().waveLength*0.038f);
 
 	sceneManager->addStaticMesh(4, quadv, 6, quadind, tm, emProp1 );
 
@@ -719,7 +735,7 @@ std::unique_ptr<OpalSceneManager> quadTest(std::unique_ptr<OpalSceneManager> sce
 	tm2.setRow(2, make_float4(0, 0, 1, -10.0f));
 	tm2.setRow(3, make_float4(0, 0, 0, 1));
 	MaterialEMProperties emProp2;
-	emProp2.dielectricConstant = make_float2(3.75f, -60.0f*sceneManager->defaultChannel.waveLength*0.038f);
+	emProp2.dielectricConstant = make_float2(3.75f, -60.0f*sceneManager->getChannelParameters().waveLength*0.038f);
 
 
 	//sceneManager->addStaticMesh(4, quadv2, 6, quadind2, tm2, emProp2);
@@ -764,7 +780,9 @@ std::unique_ptr<OpalSceneManager> crossingTestAndVehicle(std::unique_ptr<OpalSce
 	tm.setRow(2, make_float4(0, 0, 40.0f, 80.0f));
 	tm.setRow(3, make_float4(0, 0, 0, 1));
 	MaterialEMProperties emProp1;
-	emProp1.dielectricConstant = make_float2(3.75f, -60.0f*sceneManager->defaultChannel.waveLength*0.038f);
+	emProp1.dielectricConstant = make_float2(3.75f, -60.0f*sceneManager->getChannelParameters().waveLength*0.038f);
+		//There is a dependency on the frequency again, we use -15 dB per 203 mm at 5 GHz => -75 dB/m
+		emProp1.tattenuation = make_float2(0.1f,-75.f );
 	//emProp1.dielectricConstant = make_float2(3.75f, -0.4576f);
 	std::cout << "Adding NW. Em=" << emProp1.dielectricConstant << std::endl;
 	sceneManager->addStaticMesh(static_cast<int>(cubevert.size()), cubevert.data(), static_cast<int>(cubeind.size()), cubeind.data(), tm, emProp1);
@@ -890,6 +908,183 @@ std::unique_ptr<OpalSceneManager> crossingTestAndVehicle(std::unique_ptr<OpalSce
 }
 
 
+//Penetration test. One cube, transmitter and receiver
+std::unique_ptr<OpalSceneManager> penetrationTest(std::unique_ptr<OpalSceneManager> sceneManager, bool print, bool subSteps) {
+
+	Timer timer;
+
+	std::cout << "Simulating crossing streets test" << std::endl;
+	//Cubes
+	std::vector<int> cubeind = loadTrianglesFromFile("meshes/tricube.txt");
+	std::vector<float3> cubevert = loadVerticesFromFile("meshes/vertcube.txt");
+	//std::cout << "indices=" << cubeind.size() << "vertices=" << cubevert.size() << std::endl;
+	//Cube(4) NW
+	Matrix4x4 tm;
+	tm.setRow(0, make_float4(40.0f, 0, 0, -30.0f));
+	tm.setRow(1, make_float4(0, 40.0f, 0, 20.0f));
+	tm.setRow(2, make_float4(0, 0, 40.0f, 80.0f));
+	tm.setRow(3, make_float4(0, 0, 0, 1));
+	MaterialEMProperties emProp1;
+	emProp1.dielectricConstant = make_float2(3.75f, -60.0f*sceneManager->getChannelParameters().waveLength*0.038f);
+		//There is a dependency on the frequency again, we use -15 dB per 203 mm at 5 GHz => -75 dB/m
+		emProp1.tattenuation = make_float2(0.1f,-75.f );
+	//emProp1.dielectricConstant = make_float2(3.75f, -0.4576f);
+	std::cout << "Adding NW. Em="<< emProp1.dielectricConstant << std::endl;
+	sceneManager->addStaticMesh(static_cast<int>(cubevert.size()), cubevert.data(), static_cast<int>(cubeind.size()), cubeind.data(), tm, emProp1);
+
+
+	sceneManager->createRaySphere2D(90,60);	
+//	if (subSteps) {
+//		sceneManager->createRaySphere2DSubstep(1, 1); //0.1 degree delta step
+//	} else {
+//		sceneManager->createRaySphere2D(1, 1); //1 degree delta step
+//	}
+
+	//receivers
+
+	optix::float3 posrx = make_float3(-8.48f,10.0f, 78.0856f); //Hit with 60 degrees ray reflected on cube
+	sceneManager->addReceiver(1, posrx, 5.0f, printPower);
+
+
+	sceneManager->enablePenetration();
+	sceneManager->finishSceneContext();
+
+	if (print) {
+		sceneManager->setPrintEnabled(1024 * 1024 * 1024);	
+	}
+	//sceneManager->setUsageReport();
+
+	optix::float3 postx;
+	optix::float3 polarization = make_float3(0.0f, 1.0f, 0.0f); //Perpendicular to the floor. Assuming as in Unity that forward is z-axis and up is y-axis
+	timer.start();
+			postx = make_float3(-50.0f, 10.0f, 50.0f);
+			sceneManager->transmit(0, 1.0f, postx, polarization);
+
+	timer.stop();
+	std::cout<<"Time="<<timer.getTime()<<std::endl;
+
+	return sceneManager;
+
+}
+
+
+
+std::unique_ptr<OpalSceneManager> penetrationPlane(std::unique_ptr<OpalSceneManager> sceneManager, bool print, bool subSteps) {
+
+	Timer timer;
+
+	std::cout << "Simulating penetration through plane" << std::endl;
+	//Cubes
+	std::vector<int> cubeind = loadTrianglesFromFile("meshes/tricube.txt");
+	std::vector<float3> cubevert = loadVerticesFromFile("meshes/vertcube.txt");
+//	//std::cout << "indices=" << cubeind.size() << "vertices=" << cubevert.size() << std::endl;
+//	//Cube(4) NW
+	Matrix4x4 tm;
+	tm.setRow(0, make_float4(40.0f, 0, 0, -30.0f));
+	tm.setRow(1, make_float4(0, 40.0f, 0, 20.0f));
+	tm.setRow(2, make_float4(0, 0, 40.0f, 80.0f));
+	tm.setRow(3, make_float4(0, 0, 0, 1));
+	MaterialEMProperties emProp1;
+	emProp1.dielectricConstant = make_float2(3.75f, -60.0f*sceneManager->getChannelParameters().waveLength*0.038f);
+		//There is a dependency on the frequency again, we use -15 dB per 203 mm at 5 GHz => -75 dB/m
+	emProp1.tattenuation = make_float2(0.1f,-15.f );
+	//emProp1.dielectricConstant = make_float2(3.75f, -0.4576f);
+	std::cout << "Adding NW. Em="<< emProp1.dielectricConstant << std::endl;
+	sceneManager->addStaticMesh(static_cast<int>(cubevert.size()), cubevert.data(), static_cast<int>(cubeind.size()), cubeind.data(), tm, emProp1);
+//
+//	//Cube SW
+//	tm.setRow(0, make_float4(40.0f, 0, 0, -30.0f));
+//	tm.setRow(1, make_float4(0, 40.0f, 0, 20.0f));
+//	tm.setRow(2, make_float4(0, 0, 40.0f, 20.0f));
+//	tm.setRow(3, make_float4(0, 0, 0, 1));
+//	std::cout << "Adding SW. Em = "<< emProp1.dielectricConstant << std::endl;
+//	sceneManager->addStaticMesh(static_cast<int>(cubevert.size()), cubevert.data(), static_cast<int>(cubeind.size()), cubeind.data(), tm, emProp1);
+//	//Cube(2) NE
+//
+//	tm.setRow(0, make_float4(40.0f, 0, 0, 30.0f));
+//	tm.setRow(1, make_float4(0, 40.0f, 0, 20.0f));
+//	tm.setRow(2, make_float4(0, 0, 40.0f, 80.0f));
+//	tm.setRow(3, make_float4(0, 0, 0, 1));
+//	std::cout << "Adding NE. Em = "<< emProp1.dielectricConstant << std::endl;
+//	sceneManager->addStaticMesh(static_cast<int>(cubevert.size()), cubevert.data(), static_cast<int>(cubeind.size()), cubeind.data(), tm, emProp1);
+//
+//	//Cube(1) SE
+//
+//	tm.setRow(0, make_float4(40.0f, 0, 0, 30.0f));
+//	tm.setRow(1, make_float4(0, 40.0f, 0, 20.0f));
+//	tm.setRow(2, make_float4(0, 0, 40.0f, 20.0f));
+//	tm.setRow(3, make_float4(0, 0, 0, 1));
+//	std::cout << "Adding SE. Em = "<< emProp1.dielectricConstant << std::endl;
+//	sceneManager->addStaticMesh(static_cast<int>(cubevert.size()), cubevert.data(), static_cast<int>(cubeind.size()), cubeind.data(), tm, emProp1);
+//
+	//Horizontal plane as quad at origin 
+	//int quadind[6] = { 0,1,2,1,0,3 };
+	//optix::float3 quadh[4] = { make_float3(-0.5f,0.0f,-0.5f),make_float3(0.5f,0.f,0.5f) ,make_float3(0.5f,0.f,-0.5f) ,make_float3(-0.5f,0.0f,0.5f) };
+
+//	//Scale 100x100
+//	Matrix4x4 tm;
+//	tm.setRow(0, make_float4(100, 0, 0, 0.f));
+//	tm.setRow(1, make_float4(0, 1, 0, 0.f));
+//	tm.setRow(2, make_float4(0, 0, 100, 0.f));
+//	tm.setRow(3, make_float4(0, 0, 0,  1));
+
+/**********/	
+//	std::vector<int> planeind = loadTrianglesFromFile("meshes/tri.txt");
+//	std::vector<float3> planever = loadVerticesFromFile("meshes/vert.txt");
+//	std::cout << "indices=" << planeind.size() << "vertices=" << planever.size() << std::endl;
+//
+//	tm.setRow(0, make_float4(10.0f, 0, 0, 0.0f));
+//	tm.setRow(1, make_float4(0, 1, 0, 0.0f));
+//	tm.setRow(2, make_float4(0, 0, 10.0f, 50.0f));
+//	tm.setRow(3, make_float4(0, 0, 0, 1));
+//
+//	std::cout << "Adding Plane. Em.dielectric=" << emProp1.dielectricConstant << std::endl;
+//	std::cout << "Adding Plane. Em.attenuation=" << emProp1.tattenuation << std::endl;
+//	sceneManager->addStaticMesh(static_cast<int>(planever.size()), planever.data(), static_cast<int>(planeind.size()), planeind.data(), tm, emProp1);
+//	sceneManager->addStaticMesh(4, quadh, 6, quadind, tm, emProp1 );
+
+	if (subSteps) {
+		sceneManager->createRaySphere2DSubstep(1, 1); //0.1 degree delta step
+	} else {
+		sceneManager->createRaySphere2D(1, 1); //1 degree delta step
+	}
+
+	//receivers
+
+	optix::float3 posrx = make_float3(0.0f, 10.0f, 100.0f);
+	sceneManager->addReceiver(1, posrx, 5.0f, printPower);
+
+
+	//sceneManager->setMaxReflections(3u);
+
+	sceneManager->finishSceneContext();
+
+	if (print) {
+		sceneManager->setPrintEnabled(1024 * 1024 * 1024);	
+	}
+	//sceneManager->setUsageReport();
+
+	optix::float3 postx;
+	optix::float3 polarization = make_float3(0.0f, 1.0f, 0.0f); //Parallel to the floor. Assuming as in Unity that forward is z-axis and up is y-axis
+	timer.start();
+
+//	for (int i = -50; i <= 50; ++i) {
+//
+//		float x=i;
+//		postx = make_float3(x, 10.f, 50.0f);
+//
+//		sceneManager->transmit(0, 1.0f, postx, polarization);
+//
+//
+//	}
+	timer.stop();
+	std::cout<<"Time="<<timer.getTime()<<std::endl;
+			postx = make_float3(-40.0f, 10.0f, 50.0f);
+			sceneManager->transmit(0, 1.0f, postx, polarization);
+
+	return sceneManager;
+
+}
 
 
 
@@ -951,8 +1146,10 @@ int main(int argc, char** argv)
 			}
 		}
 #endif
-		//std::unique_ptr<OpalSceneManager> sceneManager(new OpalSceneManager(freq,useExactSpeedOfLight));
-		std::unique_ptr<OpalSceneManagerMultiTransmitter> sceneManager(new OpalSceneManagerMultiTransmitter(freq,useExactSpeedOfLight));
+		std::unique_ptr<OpalSceneManager> sceneManager(new OpalSceneManager(freq,useExactSpeedOfLight));
+		sceneManager->enablePenetration();
+		sceneManager->setAttenuationLimit(-200);
+		//std::unique_ptr<OpalSceneManagerMultiTransmitter> sceneManager(new OpalSceneManagerMultiTransmitter(freq,useExactSpeedOfLight));
 
 		sceneManager->setMaxReflections(maxReflections);
 		//sceneManager->setUsageReport();
@@ -966,10 +1163,11 @@ int main(int argc, char** argv)
 
 		//sceneManager = planeTest(std::move(sceneManager), printEnabled, subSteps);
 		//sceneManager = moveReceivers(std::move(sceneManager));
-		//sceneManager = crossingTest(std::move(sceneManager), printEnabled,subSteps);
+		sceneManager = crossingTest(std::move(sceneManager), printEnabled,subSteps);
 		//sceneManager = quadTest(std::move(sceneManager),printEnabled,subSteps);
-		sceneManager = crossingTestMulti(std::move(sceneManager), printEnabled,subSteps);
-
+		//sceneManager = crossingTestMulti(std::move(sceneManager), printEnabled,subSteps);
+		//sceneManager = penetrationTest(std::move(sceneManager), printEnabled,subSteps);
+		//sceneManager = penetrationPlane(std::move(sceneManager), printEnabled,subSteps);
 
 
 

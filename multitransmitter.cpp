@@ -19,9 +19,8 @@ OpalSceneManagerMultiTransmitter::OpalSceneManagerMultiTransmitter(float f, bool
 
 void OpalSceneManagerMultiTransmitter::initMembers() {
 	OpalSceneManager::initMembers();        
-	this->txOriginBuffer = nullptr;
 	this->activeTransmitters.clear();
-	this->cudaProgramsDir="multitransmitter";
+	this->cudaProgramsDir="penetration";
 
 }
 void OpalSceneManagerMultiTransmitter::registerTransmitter(int txId, optix::float3 origin, optix::float3 polarization, float transmitPower) {
@@ -269,58 +268,6 @@ void OpalSceneManagerMultiTransmitter::groupTransmit() {
 
 }
 
-optix::Buffer OpalSceneManagerMultiTransmitter::setTransmitterBuffer(optix::uint tx) {
-	uint tra=1u;
-	if (tx>0) {
-		tra=tx;
-	}
-	optix::Buffer b = context->createBuffer(RT_BUFFER_INPUT, RT_FORMAT_USER, tra);
-	b->setElementSize(sizeof(Transmitter));
-	context["tx_origin"]->set(b);
-	return b;
-}
-std::string opal::OpalSceneManagerMultiTransmitter::printInternalBuffersState()
-{
-
-	std::ostringstream stream;
-	unsigned long long totalBytes = 0;
-	unsigned long long sb;
-	stream << "--Internal buffers--" << std::endl;
-	RTsize w;
-	RTsize h;
-	RTsize d;
-	//std::cout<<"Available device memory: "<<context->getAvailableDeviceMemory(0)<<std::endl;
-	std::cout<<"Receivers="<<currentInternalBuffersState.rx<<std::endl;
-	if (globalHitInfoBuffer) {
-		globalHitInfoBuffer->getSize(w);
-		sb = sizeof(HitInfo)*w;
-		totalBytes += sb;
-		stream << "\t globalHitInfoBuffers=(" << w <<"). size=" << (sb / 1024.f) << " KiB" << std::endl;
-	}
-	if (resultHitInfoBuffer) {
-		resultHitInfoBuffer->getSize(w);
-		sb = sizeof(HitInfo)*w;
-		totalBytes += sb;
-		stream << "\t resulHitInfoBuffers=(" << w <<"). size=" << (sb / 1024.f) << " KiB" << std::endl;
-	}
-	if (txOriginBuffer) {
-		txOriginBuffer->getSize(w);
-		sb = sizeof(Transmitter)*w;
-		totalBytes += sb;
-		stream << "\t txOriginBuffer=(" << w <<"). size=" << (sb / 1024.f) << " KiB" << std::endl;
-	}
-	//Check memory usage
-	stream << "Total memory in internal buffers:  " << (totalBytes / (1024.f*1024.f)) << " MiB" << std::endl;
-	return stream.str();
-
-}
-void OpalSceneManagerMultiTransmitter::setInternalBuffers() {
-	OpalSceneManager::setInternalBuffers();
-	optix::uint txSize=static_cast<uint>(activeTransmitters.size());
-	//Store current state
-	currentInternalBuffersState.tx=txSize;
-	txOriginBuffer = setTransmitterBuffer(txSize);
-}
 void OpalSceneManagerMultiTransmitter::checkInternalBuffers() {
 	OpalSceneManager::checkInternalBuffers();
 	uint numTransmitters=static_cast<uint>(activeTransmitters.size());
@@ -342,50 +289,3 @@ void OpalSceneManagerMultiTransmitter::resizeTransmitterBuffer(uint tx) {
 	}
 	txOriginBuffer->setSize(tra);
 }
-optix::Program OpalSceneManagerMultiTransmitter::createClosestHitReceiver()
-{
-
-	optix::Program chrx;
-	std::string ptx=sutil::getPtxString(cudaProgramsDir.c_str(), "multiTransmitter.cu");
-	chrx = context->createProgramFromPTXString(ptx, "closestHitReceiver");
-
-	//Add programs for complex arithmetic
-	chrx["complex_exp_only_imaginary"]->setProgramId(defaultPrograms.at("complex_exp_only_imaginary"));
-	chrx["sca_complex_prod"]->setProgramId(defaultPrograms.at("sca_complex_prod"));
-	chrx["complex_prod"]->setProgramId(defaultPrograms.at("complex_prod"));
-
-	//Program variables: common value for all receiver instances, since they all share the program. 
-	chrx["k"]->setFloat(defaultChannel.k); //If multichannel is used, this should be set per transmission
-
-	return chrx;
-}
-optix::Program OpalSceneManagerMultiTransmitter::createClosestHitInternalRay()
-{
-
-
-
-	std::cout<<"Creating closestHitReceiveInternal" <<std::endl;
-	optix::Program chrx = context->createProgramFromPTXString(sutil::getPtxString(cudaProgramsDir.c_str(), "multiTransmitter.cu"), "closestHitReceiverInternalRay");
-
-	//Add programs for complex arithmetic
-	chrx["complex_exp_only_imaginary"]->setProgramId(defaultPrograms.at("complex_exp_only_imaginary"));
-	chrx["sca_complex_prod"]->setProgramId(defaultPrograms.at("sca_complex_prod"));
-	chrx["complex_prod"]->setProgramId(defaultPrograms.at("complex_prod"));
-
-	//Program variable: common value for all receiver instances, since they all share the program. If multichannel is used, this should be set per transmission
-	chrx["k"]->setFloat(defaultChannel.k);
-	return chrx;
-}
-optix::Program  OpalSceneManagerMultiTransmitter::createRayGenerationProgram()
-{
-
-
-	return context->createProgramFromPTXString(sutil::getPtxString(cudaProgramsDir.c_str(), "generationMultiTransmitter.cu"), "genRayAndReflectionsFromSphereIndex");
-
-}
-optix::Program OpalSceneManagerMultiTransmitter::createMissProgram() 
-{
-	return context->createProgramFromPTXString(sutil::getPtxString(cudaProgramsDir.c_str(), "multiTransmitter.cu"), "miss");
-
-}
-

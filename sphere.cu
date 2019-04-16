@@ -5,7 +5,8 @@
 /**************************************************************/
 
 
-//Modified from NVIDIA sources
+//Modified from NVIDIA OptiX samples
+
 /*
 * Copyright (c) 2016, NVIDIA CORPORATION. All rights reserved.
 *

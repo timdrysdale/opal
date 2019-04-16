@@ -111,19 +111,19 @@ set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/tutils.cu
   )
 
 # See top level CMakeLists.txt file for documentation of OPTIX_add_sample_executable.
-OPTIX_add_sample_executable( opal 
+OPTIX_add_sample_executable( pen 
   Opal.cpp
   Opal.h
   Common.h
+  Complex.h
   Unity.h
   Unity.cpp
   tests.cpp
+  traceFunctions.h
   multitransmitter.h
   multitransmitter.cpp
   generation.cu
-  generationMultiTransmitter.cu
-  singleTransmitter.cu
-  multiTransmitter.cu
+  receiver.cu
   optixGeometryTriangles.cu
   triangle.cu
   sphere.cu
@@ -131,7 +131,7 @@ OPTIX_add_sample_executable( opal
   tutils.h
   )
 
-target_link_libraries( opal 
+target_link_libraries( pen 
      ${CUDA_LIBRARIES}
   optix
   optixu
@@ -141,35 +141,34 @@ set(sources
   Opal.cpp
   Opal.h
   Common.h
+  Complex.h
   Unity.h
   Unity.cpp
   tests.cpp
   multitransmitter.h
   multitransmitter.cpp
+  traceFunctions.h
   generation.cu
-  generationMultiTransmitter.cu
-  singleTransmitter.cu
-  multiTransmitter.cu
+  receiver.cu
   optixGeometryTriangles.cu
-  singleTransmitter.cu
   triangle.cu
   sphere.cu
   tutils.cu
   tutils.h
 )
-OPTIX_add_sample_library( opal_s 
+OPTIX_add_sample_library( pen_s 
   Opal.cpp
   Opal.h
   Common.h
+  Complex.h
   Unity.h
   Unity.cpp
   tests.cpp
   multitransmitter.h
   multitransmitter.cpp
+  traceFunctions.h
   generation.cu
-  generationMultiTransmitter.cu
-  singleTransmitter.cu
-  multiTransmitter.cu
+  receiver.cu
   optixGeometryTriangles.cu
   triangle.cu
   sphere.cu
@@ -177,7 +176,7 @@ OPTIX_add_sample_library( opal_s
   tutils.h
   )
 
-target_link_libraries( opal_s 
+target_link_libraries( pen_s 
      ${CUDA_LIBRARIES}
   optix
   optixu
@@ -187,15 +186,15 @@ set(sources
   Opal.cpp
   Opal.h
   Common.h
+  Complex.h
   Unity.h
   Unity.cpp
   tests.cpp
   multitransmitter.h
   multitransmitter.cpp
+  traceFunctions.h
   generation.cu
-  generationMultiTransmitter.cu
-  singleTransmitter.cu
-  multiTransmitter.cu
+  receiver.cu
   optixGeometryTriangles.cu
   triangle.cu
   sphere.cu

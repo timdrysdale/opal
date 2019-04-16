@@ -34,165 +34,56 @@
  */
 
 #include "Common.h"
+#include "Complex.h"
+#include "traceFunctions.h"
 #include <optix.h>
 #include <optixu/optixu_math_namespace.h>
 #include <optixu/optixu_aabb_namespace.h>
-//#include <cmath>
 using namespace optix;
 
-
-//Complex sqrt. Adapted from thrust: https://github.com/thrust/thrust/blob/master/thrust/detail/complex/csqrtf.h 
-
-RT_CALLABLE_PROGRAM float2 complex_sqrt(float2 z) {
-	float a = z.x, b = z.y;
-	float t;
-	int scale;
-	float2 result;
-
-	/* We risk spurious overflow for components >= FLT_MAX / (1 + sqrt(2)). */
-	const float THRESH = 1.40949553037932e+38f;
-
-	/* Handle special cases. */
-	if (b == 0.0f && a==0.0f)
-		return (make_float2(0.0f, 0.0f));
-	if (isinf(b))
-		return (make_float2(__int_as_float(0x7f800000), b));//This should be infinity
-	if (isnan(a)) {
-		t = (b - b) / (b - b);	/* raise invalid if b is not a NaN */
-		return (make_float2(a, t));	/* return NaN + NaN i */
-	}
-	if (isinf(a)) {
-		/*
-		 * csqrtf(inf + NaN i)  = inf +  NaN i
-		 * csqrtf(inf + y i)    = inf +  0 i
-		 * csqrtf(-inf + NaN i) = NaN +- inf i
-		 * csqrtf(-inf + y i)   = 0   +  inf i
-		 */
-		if (signbit(a))
-			return (make_float2(fabsf(b - b), copysignf(a, b)));
-		else
-			return (make_float2(a, copysignf(b - b, b)));
-	}
-	/*
-	 * The remaining special case (b is NaN) is handled just fine by
-	 * the normal code path below.
-	 */
-
-	/*
-	 * Unlike in the FreeBSD code we'll avoid using double precision as
-	 * not all hardware supports it.
-	 */
-
-	// FLT_MIN*2
-	const float low_thresh = 2.35098870164458e-38f;
-	scale = 0;
-
-	if (fabsf(a) >= THRESH || fabsf(b) >= THRESH) {
-		/* Scale to avoid overflow. */
-		a *= 0.25f;
-		b *= 0.25f;
-		scale = 1;
-	}
-	else if (fabsf(a) <= low_thresh && fabsf(b) <= low_thresh) {
-		/* Scale to avoid underflow. */
-		a *= 4.f;
-		b *= 4.f;
-		scale = 2;
-	}
-
-	/* Algorithm 312, CACM vol 10, Oct 1967. */
-	if (a >= 0.0f) {
-		t = sqrtf((a + hypotf(a, b)) * 0.5f);
-		result = make_float2(t, b / (2.0f * t));
-	}
-	else {
-		t = sqrtf((-a + hypotf(a, b)) * 0.5f);
-		result = make_float2(fabsf(b) / (2.0f * t), copysignf(t, b));
-	}
-
-	/* Rescale. */
-	if (scale == 1)
-		return make_float2(result.x* 2.0f, result.y*2.0f);
-	else if (scale == 2)
-		return make_float2(result.x * 0.5f, result.y*0.5f);
-	else
-		return result;
-}
-//Complex division. Adapted from thrust :https://github.com/thrust/thrust/blob/master/thrust/detail/complex/arithmetic.h
-RT_CALLABLE_PROGRAM float2 complex_div(float2 lhs, float2 rhs ) {
-	float s = abs(rhs.x) + abs(rhs.y);
-	float oos = 1.0f / s;
-	float ars = lhs.x * oos;
-	float ais = lhs.y * oos;
-	float brs = rhs.x * oos;
-	float bis = rhs.y * oos;
-	s = (brs * brs) + (bis * bis);
-	oos = 1.0f / s;
-	float2 quot=make_float2(((ars * brs) + (ais * bis)) * oos,
-			((ais * brs) - (ars * bis)) * oos);
-	return quot;
-}
-//Complex product. Adapted from thrust :https://github.com/thrust/thrust/blob/master/thrust/detail/complex/arithmetic.h
-
-RT_CALLABLE_PROGRAM float2 complex_prod(float2 lhs, float2 rhs) {
-	return make_float2(lhs.x*rhs.x - lhs.y*rhs.y,
-			lhs.x*rhs.y + lhs.y*rhs.x);
-}
-
-//Complex scalar product. Adapted from thrust :https://github.com/thrust/thrust/blob/master/thrust/detail/complex/arithmetic.h
-
-RT_CALLABLE_PROGRAM float2 sca_complex_prod(float f, float2 z) {
-	return make_float2(f*z.x,f*z.y);
-}
-
-//Complex exponential JUST FOR  IMAGINARY EXPONENTS . Adapted from thrust :https://github.com/thrust/thrust/blob/master/thrust/detail/complex/arithmetic.h
-
-RT_CALLABLE_PROGRAM float2 complex_exp_only_imaginary(float2 z) {
-	return make_float2(cos(z.y), sin(z.y));
-}
-
-
-
+//Launch variables
+rtDeclareVariable(uint3, launchIndexTriangle, rtLaunchIndex, );
 rtDeclareVariable(EMWavePayload, rayPayload, rtPayload, );
 rtDeclareVariable(optix::Ray, ray, rtCurrentRay, );
 rtDeclareVariable(TriangleHit, ch_triangle_data, attribute triangle_hit_data, );
-rtDeclareVariable(MaterialEMProperties, EMProperties, , );
-rtDeclareVariable(uint3, launchIndexTriangle, rtLaunchIndex, );
 
+//Per-mesh local variables 
+rtDeclareVariable(MaterialEMProperties, EMProperties, , );
 rtDeclareVariable(uint, meshId, , );
+
+//Penetration configuration
+rtDeclareVariable(uint, usePenetration, , );
+rtDeclareVariable(float, attenuationLimit, , );
 
 RT_PROGRAM void closestHitTriangle()
 {
 
-
+	//Update payload
 	const float rayLength = ch_triangle_data.geom_normal_t.w;
 	float3 hp= ray.origin + rayLength * ray.direction ;
 	rayPayload.hitPoint =hp;
 	rayPayload.lastReflectionHitPoint = hp;
 	rayPayload.totalDistance += rayLength;
 	rayPayload.totalDistanceTillLastReflection = rayPayload.totalDistance;
-	rayPayload.t = rayLength;
 	const float3 gn=make_float3(ch_triangle_data.geom_normal_t.x,ch_triangle_data.geom_normal_t.y,ch_triangle_data.geom_normal_t.z);	
 	float3 n = normalize(rtTransformNormal(RT_OBJECT_TO_WORLD,gn ));
 	rayPayload.nextDirection = reflect(ray.direction, n);
-	rayPayload.faceId = ch_triangle_data.faceId;
-	hash_combine_impl<uint>(rayPayload.refhash,ch_triangle_data.faceId);
+	//hash_combine_impl<uint>(rayPayload.refhash,ch_triangle_data.faceId);
+	//rtPrintf("HASH \t%u\t%u\t%u\t%u\n",ch_triangle_date.faceId,rayPayload.reflections,rayPayload.hits,rayPayload.refhash);
+	//Use reflections and hits to create hash
+	hash_combine_impl<uint>(rayPayload.refhash,ch_triangle_data.faceId+rayPayload.reflections+rayPayload.hits);
+	
+	
 	//Compute reflection coefficient
 
 	//Incidence angle (ai) is defined with respect to the surface, we use the complementary, which is 90-ai, and is the angle between ray and normal
 	//WARNING: Assuming ray direction is normalized: dot(r,n)=cos(angle(r,n))
 	//We use the fabs() because if a ray hits an internal face, the normal is reversed. The cos would be negative. For "closed" meshes this should not happen. However, in the borders, due to precision
 	//it happens: a ray is not detected as hitting a face and gets inside the mesh, hitting an internal face later.
+	//With penetration we can hit internal faces in closed meshes. This way, we also get the correct incidence angle again.
 	float cosA = fabs(dot(-ray.direction, n));
 
-	//if (cosA < 0) {
-	//	rtPrintf("COS\t%u\t%u\t%d\t%f\t%d\t%f\t%f\t%f\n", launchIndexTriangle.x, launchIndexTriangle.y, rayPayload.reflections, cosA, rayPayload.faceId, n.x, n.y, n.z);
-	//}
-
-
-	//rtPrintf("G\t%u\t%u\t%d\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%u\n", launchIndexTriangle.x, launchIndexTriangle.y, rayPayload.reflections, cosA, ray.direction.x, ray.direction.y, ray.direction.z, n.x, n.y, n.z, rayPayload.totalDistanceTillLastReflection, rayPayload.faceId);
-	//rtPrintf("Gg\t%u\t%u\t%d\t%f\t%f\t%f\t%f\t%f\t%f\n", launchIndexTriangle.x, launchIndexTriangle.y, rayPayload.reflections, rayPayload.nextDirection.x, rayPayload.nextDirection.y, rayPayload.nextDirection.z, n.x, n.y, n.z);
-
+	//rtPrintf("G\t%u\t%u\t%d\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n", launchIndexTriangle.x, launchIndexTriangle.y, rayPayload.reflections, cosA, ray.direction.x, ray.direction.y, ray.direction.z, n.x, n.y, n.z, rayPayload.totalDistanceTillLastReflection);
 	//Complex arithmetic: sum
 	float2 argument = make_float2(EMProperties.dielectricConstant.x + (cosA*cosA) - 1.0f, EMProperties.dielectricConstant.y);
 	float2 root = complex_sqrt(argument);
@@ -207,13 +98,8 @@ RT_PROGRAM void closestHitTriangle()
 
 
 		//Reflection info log (to be used in external programs)
-
-		/*if (launchIndexTriangle.x == 987 && launchIndexTriangle.y == 3218) {
-		  float2 tR = complex_prod(rayPayload.prodReflectionCoefficient, R);
-		//if (rayPayload.faceId >= 25) {
-		rtPrintf("S\t%u\t%u\t%d\t%d\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n", launchIndexTriangle.x, launchIndexTriangle.y, rayPayload.reflections, rayPayload.faceId, argument.x, argument.y, root.x, root.y, R.x, R.y, tR.x, tR.y);
-		}
-		 */
+		//rtPrintf("S\t%u\t%u\t%d\t%d\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n", launchIndexTriangle.x, launchIndexTriangle.y, rayPayload.reflections, rayPayload.faceId, argument.x, argument.y, root.x, root.y, R.x, R.y, tR.x, tR.y);
+		
 
 	}
 	else {
@@ -225,95 +111,112 @@ RT_PROGRAM void closestHitTriangle()
 
 		float2 div = sca_complex_prod(cosA, EMProperties.dielectricConstant);
 
-		/*if (launchIndexTriangle.x == 1118 && launchIndexTriangle.y == 900) {
-		  rtPrintf("N num=(%f,%f), div=(%f,%f) \n", num.x, num.y,  div.x, div.y);
-
-		  }
-		 */
 		num.x += root.x;
 		num.y += root.y;
 		div.x += root.x;
 		div.y += root.y;
-		/*if (launchIndexTriangle.x == 1118 && launchIndexTriangle.y == 900) {
-		  rtPrintf("N  num+=(%f,%f) div+=(%f,%f)\n", num.x, num.y, div.x, div.y);
-
-		  }*/
 		R = complex_div(num, div);
-
-
-
 		//Reflection info log (to be used in external programs)
-
-
-
-		/*if (launchIndexTriangle.x == 987 && launchIndexTriangle.y == 3218) {
-		  float2 tR = complex_prod(rayPayload.prodReflectionCoefficient, R);
-		//if (rayPayload.faceId>=25) {
-		float mycos = dot(-ray.direction, n);
-		rtPrintf("N\t%u\t%u\t%d\t%d\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n", launchIndexTriangle.x, launchIndexTriangle.y, rayPayload.reflections, rayPayload.faceId, argument.x, argument.y, root.x, root.y, R.x, R.y, tR.x, tR.y);
-		rtPrintf("NN dot=%f angle=%f hp=(%f,%f,%f)per=(%f,%f)rayR=(%f,%f)\n",mycos,  acosf(mycos), rayPayload.hitPoint.x, rayPayload.hitPoint.y, rayPayload.hitPoint.z, EMProperties.dielectricConstant.x, EMProperties.dielectricConstant.y, rayPayload.prodReflectionCoefficient.x, rayPayload.prodReflectionCoefficient.y);
-		}
-		 */
-
+		//rtPrintf("N\t%u\t%u\t%d\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n", launchIndexTriangle.x, launchIndexTriangle.y, rayPayload.reflections,  argument.x, argument.y, root.x, root.y, R.x,R.y,cosA);
+	//	float mycos = dot(-ray.direction, n);
+	//	rtPrintf("N\t%u\t%u\t%d\t%d\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n", launchIndexTriangle.x, launchIndexTriangle.y, rayPayload.reflections, rayPayload.faceId, argument.x, argument.y, root.x, root.y, R.x, R.y, tR.x, tR.y);
+	//	rtPrintf("NN dot=%f angle=%f hp=(%f,%f,%f)per=(%f,%f)rayR=(%f,%f)\n",mycos,  acosf(mycos), rayPayload.hitPoint.x, rayPayload.hitPoint.y, rayPayload.hitPoint.z, EMProperties.dielectricConstant.x, EMProperties.dielectricConstant.y, rayPayload.prodReflectionCoefficient.x, rayPayload.prodReflectionCoefficient.y);
 
 	}
 
 
+
+
+	if ((usePenetration==1u) && (rayPayload.hits<max_interactions)) {
+		//Trace a penetration ray as a new ray. Recursive tracing, check stack depth>max_interactions
+		//Quickly check for attenuation in dB, if att has a very low value we do not trace. Also, we do not want to overflow the float in the operations and get a nan.
+		//Apply material attenuation. Again, we assume the material is not bending the ray in any direction
+		
+		//Typical values are -15 dB for 203 mm at 5 GHz => -75 dB/m
+		//TODO: add this option as a parameter
+		//Considering real distance travelled through material
+		float dbAtt=(EMProperties.tattenuation.x/cosA)*(EMProperties.tattenuation.y); //Attenuation in dB (power) distance*att/m = thickness/cosA*att/m
+		
+		//Considering that material has been travelled in perpendicular
+		//float dbAtt=(EMProperties.tattenuation.x)*(EMProperties.tattenuation.y);
+		float tAtt=rayPayload.accumulatedAttenuation + dbAtt; //Accumulate in log scale to avoid overflows
+		if (tAtt>attenuationLimit) {
+			EMWavePayload penPayload = rayPayload;
+			penPayload.geomNormal = optix::make_float3(0, 0, 0);
+			penPayload.nextDirection = optix::make_float3(0, 0, 0);
+			penPayload.internalRayInitialReflections=rayPayload.reflections ;
+			penPayload.hits = rayPayload.hits+1;
+			penPayload.end = false;
+			//Assuming the media on both sides of the plane are the same (air, most likely), then the incidence angle is equal to the transmission angle, so the ray does not change trajectory
+			//Otherwise, we have to rotate the ray by the transmission angle, where a_t (angle_transmission) and theta= 90-a_t, with respect to the vector ortoghonal to the normal and ray,
+			//that is the normal vector of the plane defined by ray and mesh face normal.
+			//We can use Rodrigues formula to rotate the vector given angle and unit vector e,  to avoid using rotating matrix
+			//So, e = cross(normal,-ray), remember right hand rule and check this... already should be a unit vector since ray and normal are normalized
+			//ray_rot=cos(theta)*ray + sin(theta)*(cross(e,ray)+(1-cos(theta)(dot(e,ray))e. 
+			//Have to compute the cos and sin of theta=90-a_
+			//Check the above
+			//Assume equal media
+			//Transmission coefficient
+			penPayload.prodReflectionCoefficient = complex_prod(rayPayload.prodReflectionCoefficient,make_float2(1.0f+R.x, R.y)); 
+			//Attenuation
+			penPayload.accumulatedAttenuation = tAtt;
+			//rtPrintf("AT cosA=%f\tatt=%f\ttAtt=%f\nr=(%f,%f,%f)\tn=(%f,%f,%f)\n",cosA,dbAtt,tAtt,ray.direction.x,ray.direction.y,ray.direction.z,n.x,n.y,n.z);
+			traceReflection(penPayload, rayPayload.hitPoint, ray.direction);
+		}
+	}
+	//Update here reflection coefficient, otherwise we multiply reflection and transmission in the transmission above
 	rayPayload.prodReflectionCoefficient = complex_prod(rayPayload.prodReflectionCoefficient,R);
-
-
 	++rayPayload.reflections;
 
-	}
+}
 
 
 
 
-	//Mesh buffers
-	rtBuffer<float3> vertex_buffer;
-	rtBuffer<int3>   index_buffer;
-	rtBuffer<uint> faceId_buffer;
+//Mesh buffers
+rtBuffer<float3> vertex_buffer;
+rtBuffer<int3>   index_buffer;
+rtBuffer<uint> faceId_buffer;
 
-	rtDeclareVariable(TriangleHit, int_triangle_data, attribute triangle_hit_data, );
+rtDeclareVariable(TriangleHit, int_triangle_data, attribute triangle_hit_data, );
 
-	RT_PROGRAM void intersectTriangle(int primIdx)
+RT_PROGRAM void intersectTriangle(int primIdx)
+{
+	const int3 v_idx = index_buffer[primIdx];
+
+	const float3 p0 = vertex_buffer[v_idx.x];
+	const float3 p1 = vertex_buffer[v_idx.y];
+	const float3 p2 = vertex_buffer[v_idx.z];
+
+	// Intersect ray with triangle
+	float3 normal;
+	float  t, beta, gamma;
+	//rtPrintf("PreIntersection idx=%d ray=(%.8e,%.8e,%.8e) p0=(%.8e,%.8e,%.8e)p1=(%.8e,%.8e,%.8e)p2=(%.8e,%.8e,%.8e)\n", primIdx, ray.direction.x, ray.direction.y, ray.direction.z,p0.x,p0.y,p0.z,p1.x,p1.y,p1.z,p2.x,p2.y,p2.z);
+	if (intersect_triangle(ray, p0, p1, p2, normal, t, beta, gamma))
 	{
-		const int3 v_idx = index_buffer[primIdx];
-
-		const float3 p0 = vertex_buffer[v_idx.x];
-		const float3 p1 = vertex_buffer[v_idx.y];
-		const float3 p2 = vertex_buffer[v_idx.z];
-
-		// Intersect ray with triangle
-		float3 normal;
-		float  t, beta, gamma;
-
-		//rtPrintf("PreIntersection idx=%d ray=(%f,%f,%f)", primIdx, ray.direction.x, ray.direction.y, ray.direction.z);
-		if (intersect_triangle(ray, p0, p1, p2, normal, t, beta, gamma))
+		if (rtPotentialIntersection(t))
 		{
-			if (rtPotentialIntersection(t))
-			{
-				TriangleHit h;
-				h.triId = primIdx;
-				h.geom_normal_t = make_float4(normal.x,normal.y,normal.z,t);
-				h.faceId = faceId_buffer[primIdx];
+			TriangleHit h;
+			h.triId = primIdx;
+			h.geom_normal_t = make_float4(normal.x,normal.y,normal.z,t);
+			h.faceId = faceId_buffer[primIdx];
 
 
-				int_triangle_data = h;
-				//rtPrintf("Intersection idx=%d ray=(%f,%f,%f)", primIdx, ray.direction.x, ray.direction.y, ray.direction.z);
-				rtReportIntersection( /*material index*/ 0);
-			}
+			int_triangle_data = h;
+			//rtPrintf("Intersection idx=%d ray=(%f,%f,%f)\n", primIdx, ray.direction.x, ray.direction.y, ray.direction.z);
+			rtReportIntersection( /*material index*/ 0);
 		}
 	}
-	RT_PROGRAM void boundsTriangle(int primIdx, float result[6])
-	{
-		const int3 v_idx = index_buffer[primIdx];
+}
+RT_PROGRAM void boundsTriangle(int primIdx, float result[6])
+{
+	const int3 v_idx = index_buffer[primIdx];
 
-		const float3 p0 = vertex_buffer[v_idx.x];
-		const float3 p1 = vertex_buffer[v_idx.y];
-		const float3 p2 = vertex_buffer[v_idx.z];
+	const float3 p0 = vertex_buffer[v_idx.x];
+	const float3 p1 = vertex_buffer[v_idx.y];
+	const float3 p2 = vertex_buffer[v_idx.z];
 
-		optix::Aabb* aabb = (optix::Aabb*)result;
-		aabb->m_min = fminf(fminf(p0, p1), p2);
-		aabb->m_max = fmaxf(fmaxf(p0, p1), p2);
-	}
+	optix::Aabb* aabb = (optix::Aabb*)result;
+	aabb->m_min = fminf(fminf(p0, p1), p2);
+	aabb->m_max = fmaxf(fmaxf(p0, p1), p2);
+}

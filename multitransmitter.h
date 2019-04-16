@@ -30,25 +30,16 @@ namespace opal {
 			//Transmit simultaneously all transmitters in group
 			void groupTransmit() ;
 
-			virtual std::string printInternalBuffersState() override;
 
 
 		protected:
 
-			virtual optix::Program createClosestHitReceiver() override;
-			virtual optix::Program createClosestHitInternalRay() override;
-			virtual optix::Program createRayGenerationProgram() override;
-			virtual optix::Program createMissProgram() override;
-
-			optix::Buffer setTransmitterBuffer(optix::uint tx);
-			virtual void setInternalBuffers() override;
 			virtual void checkInternalBuffers() override;
 			void resizeTransmitterBuffer(optix::uint tx);
 
 
 
 			std::vector<BaseTransmitter*> activeTransmitters; //Map from internal buffer index to external Id. Used for grouping transmissions (batches)
-			optix::Buffer txOriginBuffer;
 
 
 

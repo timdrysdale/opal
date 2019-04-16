@@ -99,6 +99,12 @@ In the chosen directory you should put all the .cu files and the `Common.h` file
 Any other change made in the .cu files is ignored unless copied to that location.
 When building an executable with Unity, you have either to use a specific script to create the cudaDir and copy the .cu and .h files to it, or just create and copy manually after the build is done. In the end, along with the Unity executable and files you need to have this specific folder and files 
 
+### Usage remarks
+* Avoid placing receivers so that the radius of the receiver sphere overlaps walls or other interacting elements. Depending on the particular case, the result may be incorrect. In general, if the radius do not overlap, the 
+result will be correct. 
+* The results are correct for horizontal and vertical elements (or just slightly leaning) in the scene, because we are assuming it for the polarization and reflections. Otherwise, the effects on the electric field have 
+to be correctly accounted for (left for future releases) and you only have an approximations right now. 
+
 
 
 ## Contributing

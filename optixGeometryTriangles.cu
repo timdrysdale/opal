@@ -1,3 +1,12 @@
+/***************************************************************/
+//
+//Copyright (c) 2019 Esteban Egea-Lopez http://ait.upct.es/eegea
+//
+/**************************************************************/
+
+
+//Adapted from OptiX samples
+
 /*
  * Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
  *

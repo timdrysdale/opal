@@ -109,6 +109,13 @@ namespace opal {
 	extern "C" OPAL_API int Init(float frequency,  bool useExactSpeedOfLight, bool multiTransmitter);
 
 	extern "C" OPAL_API int SetMaxReflections(unsigned int  m);
+	
+	extern "C" OPAL_API int EnablePenetration();
+	
+	extern "C" OPAL_API int DisablePenetration();
+	
+	extern "C" OPAL_API int SetAttenuationLimit(float l);
+
 
 	extern "C" OPAL_API int Exit();
 
