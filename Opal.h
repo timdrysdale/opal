@@ -115,7 +115,6 @@ namespace opal {
 
 	typedef std::map<optix::float3, unsigned int, face_compare> FaceMap; //Used to extract the faces of the meshes
 
-	const float deg2rad = 0.017453292f;  //Degrees to radians
 
 	class OpalSceneManager {
 		protected:
@@ -139,6 +138,7 @@ namespace opal {
 			optix::Buffer globalHitInfoBuffer;
 			optix::Buffer resultHitInfoBuffer;
 			optix::Buffer atomicIndexBuffer;
+			optix::Buffer txOriginBuffer;
 
 
 			//Scene graph variables
@@ -151,7 +151,7 @@ namespace opal {
 			std::map<int, unsigned int> receiverExtToBufferId; //External id to receptionInfo buffer Id
 			std::vector<SphereReceiver*> receivers; //receivers info (mapped to receptionInfo buffer)
 			std::map<int, BaseTransmitter*> transmitterExtToBase; //Map from externalId to transmitterBase
-		public:
+		
 			bool sceneGraphCreated;
 			bool sceneFinished;
 			int transmissionLaunches;
@@ -161,8 +161,8 @@ namespace opal {
 
 			//Control parameters
 			unsigned int numberOfFaces;
-
-
+			bool usePenetration;
+			float attenuationLimit;	
 
 			unsigned int maxReflections; //Default 10
 			float minEpsilon; //Default 1.e-4f
@@ -176,6 +176,7 @@ namespace opal {
 			float radioReductionFraction;
 			//Default programs
 
+			float deg2rad;   //Degrees to radians
 			std::map<std::string,optix::Program> defaultPrograms;
 			optix::Material defaultMeshMaterial;
 
@@ -187,9 +188,8 @@ namespace opal {
 			virtual ~OpalSceneManager();
 			void initContext(float f, bool useExactSpeedOfLight=true);
 			virtual void initMembers();
-			void setFrequency(float f);
-			void setMaxReflections(unsigned int m);
-			
+			ChannelParameters getChannelParameters() const;
+				
 		//Static meshes	
 			void setMeshEMProperties(optix::GeometryInstance geom_instance, MaterialEMProperties emProp);
 			OpalMesh createMesh(int meshVertexCount, optix::float3* meshVertices, int meshTriangleCount, int* meshTriangles, optix::Program intersectionProgram, optix::Program boundingBoxProgram, optix::Material material);
@@ -202,10 +202,13 @@ namespace opal {
 			void  addMeshToGroup(int id, int meshVertexCount, optix::float3* meshVertices, int meshTriangleCount, int* meshTriangles,  MaterialEMProperties emProp);
 			void updateTransformInGroup(int id, optix::Matrix4x4 transformationMatrix);
 			void finishDynamicMeshGroup(int id);
-		//Ray sphere
+			const std::map<int, OpalDynamicMeshGroup*> &  getDynamicMeshes() const;
+			//Create and arbitrary 2D ray sphere, with ray directions provided by the user
 			void createRaySphere2D(int elevationSteps, int azimutSteps, optix::float3 * rayDirections);
+			//Create a 2D ray sphere in discrete steps of elevation and azimuth
 			void createRaySphere2D(int elevationDelta, int azimuthDelta);
-
+			//Create a ray sphere with fractions of degree
+			//Now elevation delta and azimuthDelta are a decimal fraction of degree, that is, every unit is 0.1 degree, so elevationDelta=1 means 0.1 degree, elevationDelta=2 means 0.2 degree
 			void createRaySphere2DSubstep(int elevationDelta, int azimuthDelta);
 		//Receivers
 			void addReceiver(int id, optix::float3  position, float radius, std::function<void(float, int)>  callback);
@@ -218,6 +221,14 @@ namespace opal {
 	
 		//Finish building scene
 			void finishSceneContext();
+
+		//Configure launch
+			void enablePenetration();
+			void disablePenetration();
+			void setFrequency(float f);
+			//Set max attenuation for penetration in dB. Rays with a higher attenuation are not traced for penetration 
+			void setAttenuationLimit(float f);
+			void setMaxReflections(unsigned int m);
 		//Log
 			void setPrintEnabled(int bufferSize);
 			void setUsageReport();
@@ -274,6 +285,7 @@ namespace opal {
 			void resizeGlobalHitInfoBuffer(optix::uint ele, optix::uint azi, optix::uint rx, optix::uint reflections);
 			virtual optix::Buffer setResultHitInfoBuffer(optix::uint rx, optix::uint reflections);
 			optix::Buffer setAtomicIndexBuffer();
+			optix::Buffer setTransmitterBuffer(optix::uint tx);
 
 		//Utils
 			static void callbackUsageReport(int level, const char* tag, const char* msg, void* cbdata);

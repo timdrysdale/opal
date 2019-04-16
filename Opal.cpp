@@ -60,8 +60,9 @@ opal::OpalSceneManager::~OpalSceneManager()
 }
 void OpalSceneManager::initMembers() {
 
+	this->deg2rad=M_PI/180.f;
 	//Change to your own directory
-	this->cudaProgramsDir="multitransmitter";
+	this->cudaProgramsDir="penetration";
 	this->maxReflections = 10u;
 	this->minEpsilon = 1.e-3f;
 	this->useExactSpeedOfLight=true;
@@ -73,8 +74,12 @@ void OpalSceneManager::initMembers() {
 
 	this->globalHitInfoBuffer = nullptr;
 	this->resultHitInfoBuffer = nullptr;
+	this->txOriginBuffer = nullptr;
+	this->atomicIndexBuffer=nullptr;
 
 	this->radioReductionFraction=1.0/sqrt(2); //To avoid transmitters inside reception sphere
+	this->usePenetration=false;
+	this->attenuationLimit = -80.0f;
 }
 void OpalSceneManager::initContext(float f,  bool useExactSpeedOfLight) {
 #ifdef OPALDEBUG
@@ -121,12 +126,6 @@ void OpalSceneManager::createSceneContext()
 void opal::OpalSceneManager::setDefaultPrograms()
 {
 
-	//Complex functions and arithmetic. CREATE THEM FIRST, since closest hit programs use them
-	defaultPrograms.insert(std::pair<std::string, optix::Program>("complex_sqrt", createComplexSqrt()));
-	defaultPrograms.insert(std::pair<std::string, optix::Program>("sca_complex_prod", createComplexScaProd()));
-	defaultPrograms.insert(std::pair<std::string, optix::Program>("complex_prod", createComplexProd()));
-	defaultPrograms.insert(std::pair<std::string, optix::Program>("complex_div", createComplexDiv()));
-	defaultPrograms.insert(std::pair<std::string, optix::Program>("complex_exp_only_imaginary", createComplexExpImaginary()));
 
 	//TODO: we could add an intersection program for planes (ideal infinite planes), typically used to represent flat grounds, should be more efficient than a mesh
 	defaultPrograms.insert(std::pair<std::string, optix::Program>("meshClosestHit", createClosestHitMesh()));
@@ -496,10 +495,10 @@ optix::Material OpalSceneManager::createMeshMaterial(unsigned int ray_type_index
 optix::Program OpalSceneManager::createClosestHitMesh() {
 	optix::Program chmesh = context->createProgramFromPTXString(sutil::getPtxString(cudaProgramsDir.c_str(), "triangle.cu"), "closestHitTriangle");
 	//Add programs for complex arithmetic
-	chmesh["complex_sqrt"]->setProgramId(defaultPrograms.at("complex_sqrt"));
-	chmesh["sca_complex_prod"]->setProgramId(defaultPrograms.at("sca_complex_prod"));
-	chmesh["complex_prod"]->setProgramId(defaultPrograms.at("complex_prod"));
-	chmesh["complex_div"]->setProgramId(defaultPrograms.at("complex_div"));
+//	chmesh["complex_sqrt"]->setProgramId(defaultPrograms.at("complex_sqrt"));
+//	chmesh["sca_complex_prod"]->setProgramId(defaultPrograms.at("sca_complex_prod"));
+//	chmesh["complex_prod"]->setProgramId(defaultPrograms.at("complex_prod"));
+//	chmesh["complex_div"]->setProgramId(defaultPrograms.at("complex_div"));
 	return chmesh;
 
 }
@@ -508,12 +507,8 @@ optix::Program OpalSceneManager::createClosestHitReceiver()
 {
 
 	optix::Program chrx;
-	chrx = context->createProgramFromPTXString(sutil::getPtxString(cudaProgramsDir.c_str(), "singleTransmitter.cu"), "closestHitReceiver");
+	chrx = context->createProgramFromPTXString(sutil::getPtxString(cudaProgramsDir.c_str(), "receiver.cu"), "closestHitReceiver");
 
-	//Add programs for complex arithmetic
-	chrx["complex_exp_only_imaginary"]->setProgramId(defaultPrograms.at("complex_exp_only_imaginary"));
-	chrx["sca_complex_prod"]->setProgramId(defaultPrograms.at("sca_complex_prod"));
-	chrx["complex_prod"]->setProgramId(defaultPrograms.at("complex_prod"));
 
 	//Program variables: common value for all receiver instances, since they all share the program. 
 	chrx["k"]->setFloat(defaultChannel.k); //If multichannel is used, this should be set per transmission
@@ -524,14 +519,9 @@ optix::Program OpalSceneManager::createClosestHitInternalRay()
 {
 
 
-	std::cout<<"Creating closestHitReceiveInternal" <<std::endl;
 
-	optix::Program chrx = context->createProgramFromPTXString(sutil::getPtxString(cudaProgramsDir.c_str(), "singleTransmitter.cu"), "closestHitReceiverInternalRay");
+	optix::Program chrx = context->createProgramFromPTXString(sutil::getPtxString(cudaProgramsDir.c_str(), "receiver.cu"), "closestHitReceiverInternalRay");
 
-	//Add programs for complex arithmetic
-	chrx["complex_exp_only_imaginary"]->setProgramId(defaultPrograms.at("complex_exp_only_imaginary"));
-	chrx["sca_complex_prod"]->setProgramId(defaultPrograms.at("sca_complex_prod"));
-	chrx["complex_prod"]->setProgramId(defaultPrograms.at("complex_prod"));
 
 	//Program variable: common value for all receiver instances, since they all share the program. If multichannel is used, this should be set per transmission
 	chrx["k"]->setFloat(defaultChannel.k);
@@ -577,7 +567,7 @@ optix::Program OpalSceneManager::createIntersectionSphere()
 
 optix::Program OpalSceneManager::createMissProgram() 
 {
-	return context->createProgramFromPTXString(sutil::getPtxString(cudaProgramsDir.c_str(), "singleTransmitter.cu"), "miss");
+	return context->createProgramFromPTXString(sutil::getPtxString(cudaProgramsDir.c_str(), "receiver.cu"), "miss");
 
 }
 
@@ -628,6 +618,7 @@ optix::Program  OpalSceneManager::createRayGenerationProgram()
 
 }
 
+//Create and arbitrary 2D ray sphere, with ray directions provided by the user
 void OpalSceneManager::createRaySphere2D(int elevationSteps, int azimuthSteps, optix::float3*  rayDirections)
 {
 
@@ -664,6 +655,8 @@ void OpalSceneManager::createRaySphere2D(int elevationSteps, int azimuthSteps, o
 #endif
 
 }
+
+//Create a 2D ray sphere in discrete steps of elevation and azimuth
 void OpalSceneManager::createRaySphere2D(int elevationDelta, int azimuthDelta) 
 {
 
@@ -678,7 +671,7 @@ void OpalSceneManager::createRaySphere2D(int elevationDelta, int azimuthDelta)
 	optix::uint elevationSteps = (180u / elevationDelta);
 
 	optix::uint azimuthSteps = (360u / azimuthDelta);
-	// std::cout << "createRaySphere2D: elevationSteps=" << elevationSteps << "azimuthSteps=" << azimuthSteps << std::endl;
+	 //std::cout << "createRaySphere2D: elevationSteps=" << elevationSteps << "azimuthSteps=" << azimuthSteps << std::endl;
 
 	++elevationSteps; //elevation includes both 0 and 180. elevation in [0,180], but 0 and 180 maps to the same ray, so we remove them from the multiplication and add later
 
@@ -698,19 +691,22 @@ void OpalSceneManager::createRaySphere2D(int elevationDelta, int azimuthDelta)
 	int es = 0;
 	int as = 0;
 	int rc = 0;
+	const float EPS=1e-15;
 	for (size_t i = 0; i <= 180; i += elevationDelta)
 	{
 		for (size_t j = 0; j < 360; j+= azimuthDelta)
 		{
-
-			//Spherical to cartesian coordinates with r=1, ISO (physics) convention: elevation (inclination) from z-axis, azimuth on the XY plane from x counterclockwise to Y
-			//We use the Unity convention and set UP as the Y axis, being FORWARD the z-axis. That is the Y and Z axis are interchanged with respect to the previous convention
-			//All rays with elevation 0 or 180 and any azimuth  are repeated, because they map to (0,1,0) or (0,-1,0). They will not be traced, but we generate them to keep the symmetry  in the 
-			//2D and 3D buffers
 			float ir = deg2rad*i; //To radians
 			float jr = deg2rad*j;//To radians
 
-			float3 ray = make_float3(sinf(ir)*cosf(jr), cosf(ir), sinf(ir)*sinf(jr) );
+			//Spherical to cartesian coordinates with r=1, ISO (physics) convention: elevation (inclination) from z-axis, azimuth on the XY plane from x counterclockwise to Y
+			//All rays with elevation 0 or 180 and any azimuth  are repeated, because they map to (0,1,0) or (0,-1,0). They will not be traced, but we generate them to keep the symmetry  in the 
+			//2D and 3D buffers
+
+			//We use the Unity convention and set UP as the Y axis, being FORWARD the z-axis. That is the Y and Z axis are interchanged with respect to the previous convention
+			//float3 ray = make_float3(sinf(ir)*cosf(jr), cosf(ir), sinf(ir)*sinf(jr) );
+			//Unity left-handed coordinate system: Y=up, Z=forward, X=right; elevation from Y to Z (around X) clockwise, azimuth from Z to X (around Y) clockwise 
+			float3 ray = make_float3(sinf(ir)*sinf(jr), cosf(ir), sinf(ir)*cosf(jr) );
 
 			rays_host[x + elevationSteps*y] = ray;
 			y++;
@@ -739,6 +735,10 @@ void OpalSceneManager::createRaySphere2D(int elevationDelta, int azimuthDelta)
 	outputFile << "RaySphere2D rays=" << raySphere.rayCount << ". elevationSteps=" << raySphere.elevationSteps << ". azimtuhSteps=" << raySphere.azimuthSteps << std::endl;
 #endif
 }
+
+
+//Create a ray sphere with fractions of degree
+//Now elevation delta and azimuthDelta are a decimal fraction of degree, that is, every unit is 0.1 degree, so elevationDelta=1 means 0.1 degree, elevationDelta=2 means 0.2 degree
 void OpalSceneManager::createRaySphere2DSubstep(int elevationDelta, int azimuthDelta)
 {
 
@@ -785,14 +785,17 @@ void OpalSceneManager::createRaySphere2DSubstep(int elevationDelta, int azimuthD
 	{
 		for (size_t j = 0; j < 3600u; j+=azimuthDelta)
 		{
-
-			//Spherical to cartesian coordinates with r=1, ISO (physics) convention: elevation (inclination) from z-axis, azimuth on the XY plane from x counterclockwise to Y
-			//We use the Unity convention and set UP as the Y axis, being FORWARD the z-axis. That is the Y and Z axis are interchanged with respect to the previous convention
-			//All rays with elevation 0 or 180 and any azimuth  are repeated, because they map to (0,1,0) or (0,-1,0). They will not be traced, but we generate them to keep the symmetry  and use 
-			//2D and 3D buffers
 			float ir = deg2rad*(i/10.0f); //To radians
 			float jr = deg2rad*(j/10.0f);//To radians
-			float3 ray = make_float3(sinf(ir)*cosf(jr), cosf(ir), sinf(ir)*sinf(jr));
+
+			//Spherical to cartesian coordinates with r=1, ISO (physics) convention: elevation (inclination) from z-axis, azimuth on the XY plane from x counterclockwise to Y
+			//All rays with elevation 0 or 180 and any azimuth  are repeated, because they map to (0,1,0) or (0,-1,0). They will not be traced, but we generate them to keep the symmetry  and use 
+			//2D and 3D buffers
+			//If we use the Unity convention and set UP as the Y axis, being FORWARD the z-axis. That is the Y and Z axis are interchanged with respect to the previous convention
+			//float3 ray = make_float3(sinf(ir)*cosf(jr), cosf(ir), sinf(ir)*sinf(jr));
+			
+			//Unity left-handed coordinate system: Y=up, Z=forward, X=right; elevation from Y to Z (around X) clockwise, azimuth from Z to X (around Y) clockwise 
+			float3 ray = make_float3(sinf(ir)*sinf(jr), cosf(ir), sinf(ir)*cosf(jr) );
 
 			rays_host[x + elevationSteps*y] = ray;
 
@@ -1005,12 +1008,12 @@ void OpalSceneManager::transmit(int txId, float txPower,  float3 origin, float3 
 
 	checkInternalBuffers();	
 
-	Transmitter host_tx;
-	host_tx.origin = origin;
-	host_tx.polarization = polarization;
-	host_tx.externalId = txId;
-	context["tx_origin"]->setUserData(sizeof(Transmitter),&host_tx);	
-
+	//Change to buffer, according to https://devtalk.nvidia.com/default/topic/1048952/optix/recompile-question/ it is better to use a small buffer rather than setting variables
+	Transmitter* host_tx = reinterpret_cast<Transmitter*>  (txOriginBuffer->map());
+	host_tx->origin = origin;
+	host_tx->polarization = polarization;
+	host_tx->externalId = txId;
+	txOriginBuffer->unmap();
 
 	//Adaptive radio just to avoid a transmitter being inside a receiver sphere
 	bool applyDirty=false;
@@ -1043,7 +1046,7 @@ void OpalSceneManager::transmit(int txId, float txPower,  float3 origin, float3 
 	//std::cout<<"Transmitting["<<txId<<"]["<<txPower<<"]"<<origin<<std::endl;	
 	Timer timer;
 	timer.start();
-	context->launch(0, raySphere.elevationSteps, raySphere.azimuthSteps); //Launch 2D (elevation, azimuth);
+	context->launch(0, raySphere.elevationSteps, raySphere.azimuthSteps,1u); //Launch 3D (elevation, azimuth, transmitters);
 	timer.stop();
 	const double launchTime=timer.getTime();
 	transmissionLaunches++;
@@ -1122,7 +1125,7 @@ void OpalSceneManager::transmit(int txId, float txPower,  float3 origin, float3 
 void OpalSceneManager::computeReceivedPower(optix::float2 E, unsigned int index, int txId, float txPower, optix::float3 origin) {
 					float power = defaultChannel.eA*((E.x*E.x) + (E.y*E.y))*txPower;
 					std::cout << "rx["<<receivers[index]->externalId<<"]=" << receivers[index]->position << ".r=" << receivers[index]->radius << "(sphere="<<receivers[index]->geomInstance["sphere"]->getFloat4()<<"); tx["<<txId<<"]=" << origin << " eA=" << defaultChannel.eA << " txPower=" << txPower << " E=(" << E.x << "," << E.y << ")" << " p=" << power <<  " d=" << length(origin - receivers[index]->position) << std::endl;
-					std::cout<<"PR\t"<<power<<std::endl;
+					//std::cout<<"PR\t"<<power<<std::endl;
 					receivers[index]->callback(power, txId);
 
 }
@@ -1170,6 +1173,7 @@ void OpalSceneManager::setInternalBuffers() {
 	globalHitInfoBuffer = setGlobalHitInfoBuffer(elevationSize, azimuthSize, rxSize, reflectionsSize);
 	resultHitInfoBuffer = setResultHitInfoBuffer(rxSize, reflectionsSize);
 	atomicIndexBuffer=setAtomicIndexBuffer();
+	txOriginBuffer=setTransmitterBuffer(1u);	
 }
 
 
@@ -1250,6 +1254,16 @@ optix::Buffer OpalSceneManager::setAtomicIndexBuffer() {
 	context["atomicIndex"]->set(b);
 	return b;
 }
+optix::Buffer OpalSceneManager::setTransmitterBuffer(optix::uint tx) {
+	uint tra=1u;
+	if (tx>0) {
+		tra=tx;
+	}
+	optix::Buffer b = context->createBuffer(RT_BUFFER_INPUT, RT_FORMAT_USER, tra);
+	b->setElementSize(sizeof(Transmitter));
+	context["txBuffer"]->set(b);
+	return b;
+}
 
 std::string opal::OpalSceneManager::printInternalBuffersState()
 {
@@ -1276,6 +1290,12 @@ std::string opal::OpalSceneManager::printInternalBuffersState()
 		totalBytes += sb;
 		stream << "\t resulHitInfoBuffers=(" << w <<"). size=" << (sb / 1024.f) << " KiB" << std::endl;
 	}
+	if (txOriginBuffer) {
+		txOriginBuffer->getSize(w);
+		sb = sizeof(Transmitter)*w;
+		totalBytes += sb;
+		stream << "\t txOriginBuffer=(" << w <<"). size=" << (sb / 1024.f) << " KiB" << std::endl;
+	}
 	//Check memory usage
 	stream << "Total memory in internal buffers:  " << (totalBytes / (1024.f*1024.f)) << " MiB" << std::endl;
 	return stream.str();
@@ -1298,6 +1318,12 @@ void OpalSceneManager::finishSceneContext() {
 	//Set some minimum extent for the rays. Otherwise we are going to run into numerical accuracy problems with the reflections, almost surely
 	context["min_t_epsilon"]->setFloat(minEpsilon);
 	context["max_interactions"]->setUint(maxReflections);
+	if (usePenetration) {
+		context["usePenetration"]->setUint(1u);
+	} else {
+		context["usePenetration"]->setUint(0u);
+	}
+	context["attenuationLimit"]->setFloat(attenuationLimit);
 
 	context->setRayGenerationProgram(0, defaultPrograms.at("rayGeneration")); //Generation
 	context->setMissProgram(0, defaultPrograms.at("miss"));
@@ -1317,6 +1343,9 @@ std::string opal::OpalSceneManager::printSceneReport()  {
 	stream << "\t numberOfFaces=" << numberOfFaces << ". minEpsilon= " << minEpsilon << ". maxReflections=" << maxReflections << ". useExactSpeedOfLight="<<this->useExactSpeedOfLight<<std::endl;
 	stream << "\t Receivers=" << receivers.size() <<  std::endl;
 	stream << "\t RayCount=" << raySphere.rayCount << ". azimuthSteps=" << raySphere.azimuthSteps << ". elevationSteps=" << raySphere.elevationSteps << std::endl;
+	if (usePenetration) {
+			stream << "\t Penetration enabled. attenuationLimit (dB)=" << attenuationLimit<< std::endl;
+	}
 	stream << "-- Scene Graph" << std::endl;
 	stream << "\t rootGroup. Children=" << rootGroup->getChildCount() << std::endl;
 	stream << "\t max_interactions=" << context["max_interactions"]->getUint() << std::endl;
@@ -1424,9 +1453,22 @@ void OpalSceneManager::callbackUsageReport(int level, const char* tag, const cha
 	std::cout << "[" << level << "][" << std::left << std::setw(12) << tag << "] " << msg;
 }
 
+void OpalSceneManager::enablePenetration() {
+	usePenetration=true;	
+}
+void OpalSceneManager::disablePenetration() {
+	usePenetration=false;	
+}
+void OpalSceneManager::setAttenuationLimit(float a) {
+	attenuationLimit=a;
+}
+const std::map<int, OpalDynamicMeshGroup*> &  OpalSceneManager::getDynamicMeshes()  const {
+	return dynamicMeshes;
+}
 
-
-
+ChannelParameters OpalSceneManager::getChannelParameters() const {
+	return defaultChannel;
+}
 
 // Copyright NVIDIA Corporation 2011
 // Redistribution and use in source and binary forms, with or without

@@ -20,6 +20,7 @@
 
 struct MaterialEMProperties {
 	optix::float2 dielectricConstant; // Complex
+	optix::float2 tattenuation; //[Thickness, attenuation/m (dB/m)  ] //attenuation should be negative, like -15 dB/m so [0.1,-15]
 };
 
 struct HitInfo {
@@ -63,14 +64,15 @@ struct EMWavePayload {
 	optix::float3 polarization;
 	optix::float3 lastReflectionHitPoint;
 	float electricFieldAmplitude; //Can be removed if antenna gain not used
-	float t;
+	//float t;
 	int reflections;
 	int internalRayInitialReflections;
 	int hits;
 	float totalDistance;
 	float totalDistanceTillLastReflection;
+	float accumulatedAttenuation; //For penentration, in dB (Power)
 	bool end;
-	unsigned int faceId; //Can be removed
+	//unsigned int faceId; //Can be removed
 	int rxBufferIndex; //Last receiver hit 
 	unsigned int refhash; //Combined hash to filter duplicates
 };
