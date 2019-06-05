@@ -5,8 +5,8 @@
 /**************************************************************/
 
 
-#include "Common.h"
-#include "traceFunctions.h"
+#include "../Common.h"
+#include "tracePolarizationFunctions.h"
 #include <optix_world.h>
 #include <optixu/optixu_math_namespace.h>
 #include <optixu/optixu_aabb_namespace.h>
@@ -50,12 +50,19 @@ RT_PROGRAM void genRayAndReflectionsFromSphereIndex()
 	
 	float3 ray_direction = raySphere2D[idx];
 
-	HVWavePayload rayPayload;
+	LPWavePayload rayPayload;
 	rayPayload.ndtd = optix::make_float4(0.0f);
-	//rayPayload.nextDirection = optix::make_float3(0, 0, 0);
-	//rayPayload.totalDistance = 0.0f;
 	rayPayload.hitPoint = origin;
-	rayPayload.polarization = tx.polarization;
+
+	rayPayload.hor_coeff=make_float2(1.0f,0.0f);	
+	rayPayload.ver_coeff=make_float2(1.0f,0.0f);	
+
+	fillPolarization(rayPayload,tx.polarization, ray_direction);
+	
+	//rtPrintf("\t%u\t%u\tray=(%f,%f,%f),pol=(%f,%f,%f), polt=(%f,%f,%f)\n",launchIndex.x, launchIndex.y,ray_direction.x,ray_direction.y,ray_direction.z,tx.polarization.x,tx.polarization.y,tx.polarization.z,rayPayload.E.x,rayPayload.E.y,rayPayload.E.z);
+	rtPrintf("G\t%u\t%u\tray=(%f,%f,%f),pol=(%f,%f,%f),\n",launchIndex.x, launchIndex.y,ray_direction.x,ray_direction.y,ray_direction.z,tx.polarization.x,tx.polarization.y,tx.polarization.z);
+	rtPrintf("G\t%u\t%u\thor_v=(%.6e,%.6e,%.6e),ver_v=(%.6e,%.6e,%.6e), hor_coeff=(%.6e,%.6e), ver_coeff(%.6e,%.6e)\n",launchIndex.x, launchIndex.y,rayPayload.hor_v.x,rayPayload.hor_v.y,rayPayload.hor_v.z,rayPayload.ver_v.x,rayPayload.ver_v.y,rayPayload.ver_v.z, rayPayload.hor_coeff.x,rayPayload.hor_coeff.y,rayPayload.ver_coeff.x,rayPayload.ver_coeff.y);
+	
 	rayPayload.lrhpd = make_float4(origin);
 	rayPayload.lrhpd.w = 0.0f; //totalDistanceTillLastReflection
 	rayPayload.electricFieldAmplitude = 1.0f; //Normalized Eo=1. Antenna Gain = 1. TODO: Implement antenna gain with buffer dependent on the ray direction and txId : initialEFAmplitude[txId] * antennaGain[txId]);
@@ -65,14 +72,15 @@ RT_PROGRAM void genRayAndReflectionsFromSphereIndex()
 	rayPayload.hits = 0;
 	rayPayload.end = false;
 
-	rayPayload.prodReflectionCoefficient = make_float2(1.0f, 0.0f);
+	//rayPayload.prodReflectionCoefficient = make_float2(1.0f, 0.0f);
 	//rayPayload.faceId = 0u;
 	rayPayload.rxBufferIndex=-1;
 	rayPayload.refhash=0;
 	//Print all rays generated
-	rtPrintf("A\t%u\t%u\t%f\t%f\t%f\n", launchIndex.x, launchIndex.y, ray_direction.x, ray_direction.y, ray_direction.z);
+	//rtPrintf("A\t%u\t%u\t%f\t%f\t%f\n", launchIndex.x, launchIndex.y, ray_direction.x, ray_direction.y, ray_direction.z);
 
-	traceReflection(rayPayload, origin, ray_direction);
+	traceLPReflection(rayPayload, origin, ray_direction, launchIndex.x,launchIndex.y);
+
 
 }
 

@@ -450,11 +450,11 @@ namespace opal {
 		}
 	}
 
-	OPAL_API int AddReceiverFromUnity(int id, float3  position, float radius, receiverCallback callback)
+	OPAL_API int AddReceiverFromUnity(int id, float3  position, float3 polarization, float radius, receiverCallback callback)
 	{
 		CHM();
 		try {
-			sceneManager->addReceiver(id, position, radius, callback);
+			sceneManager->addReceiver(id, position, polarization, radius, callback);
 			return 0;
 		}
 		catch (opal::Exception& e) {

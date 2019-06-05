@@ -62,7 +62,7 @@ void OpalSceneManager::initMembers() {
 
 	this->deg2rad=M_PI/180.f;
 	//Change to your own directory
-	this->cudaProgramsDir="penetration";
+	this->cudaProgramsDir="opal";
 	this->maxReflections = 10u;
 	this->minEpsilon = 1.e-3f;
 	this->useExactSpeedOfLight=true;
@@ -79,6 +79,7 @@ void OpalSceneManager::initMembers() {
 
 	this->radioReductionFraction=1.0/sqrt(2); //To avoid transmitters inside reception sphere
 	this->usePenetration=false;
+	this->useDepolarization=false;
 	this->attenuationLimit = -80.0f;
 }
 void OpalSceneManager::initContext(float f,  bool useExactSpeedOfLight) {
@@ -86,6 +87,13 @@ void OpalSceneManager::initContext(float f,  bool useExactSpeedOfLight) {
 	outputFile.open("opal_log.txt");
 #endif // OPALDEBUG
 	this->useExactSpeedOfLight=useExactSpeedOfLight;
+	if (useDepolarization) {
+		this->cudaProgramsDir="opal/polarization";
+	} else {
+		//Show warning to remark the assumptions
+		std::cout<<"** You are assuming that: (1)  both transmitters and receivers have the same polarization and (2) the polarization is either purely vertical (0, 1, 0) or horizontal (1,0,0) or (0,0,1). " <<std::endl; 
+		std::cout<<"** If this is not the intended behaviour, check the use of depolarization, though it has a performance cost. " <<std::endl; 
+	}
 	setFrequency(f);
 	createSceneContext();
 	setDefaultPrograms();
@@ -117,7 +125,20 @@ void OpalSceneManager::createSceneContext()
 {
 
 	// Set up context
+	//Enable RTX...Needed to really use the RT cores. Does not seem necessary to check if the device actually supports it.
+#ifdef OPAL_USE_TRI 
+	const int RTX=1;
+	if (rtGlobalSetAttribute(RT_GLOBAL_ATTRIBUTE_ENABLE_RTX, sizeof(RTX), &RTX)!=RT_SUCCESS)  {
+		std::cout<<"ERROR: Enabling RTX mode failed!"<<std::endl;
+	}
+#endif
 	context = optix::Context::create();
+	std::vector<int> devices;
+	devices = context->getEnabledDevices();
+    for (size_t i = 0; i < devices.size(); ++i) 
+    {
+      std::cout << "context is using local device " << devices[i] << ": " << context->getDeviceName(devices[i]) << std::endl;
+}
 	context->setRayTypeCount(2); //Normal and internal ray
 	context->setEntryPointCount(1); //1 program: ray generation 
 
@@ -127,7 +148,7 @@ void opal::OpalSceneManager::setDefaultPrograms()
 {
 
 
-	//TODO: we could add an intersection program for planes (ideal infinite planes), typically used to represent flat grounds, should be more efficient than a mesh
+	//TODO: we could add an intersection program for planes (ideal infinite planes), typically used to represent flat grounds, should be more efficient than a mesh?
 	defaultPrograms.insert(std::pair<std::string, optix::Program>("meshClosestHit", createClosestHitMesh()));
 #ifdef OPAL_USE_TRI
 	defaultPrograms.insert(std::pair<std::string, optix::Program>("triangleAttributes", createTriangleAttributesProgram()));
@@ -243,12 +264,12 @@ OpalMesh OpalSceneManager::addStaticMesh(int meshVertexCount, optix::float3* mes
 	for (size_t i = 0; i < meshVertexCount; i++)
 	{
 
-		//std::cout <<"vertex=("<< meshVertices[i].x <<","<< meshVertices[i].y <<","<< meshVertices[i].z <<")"<< std::endl;
+		std::cout <<"vertex=("<< meshVertices[i].x <<","<< meshVertices[i].y <<","<< meshVertices[i].z <<")"<< std::endl;
 		const float3 v = optix::make_float3(transformationMatrix*optix::make_float4(meshVertices[i], 1.0f));
 		//#ifdef OPALDEBUG
 		//			outputFile << "v=(" << v.x << "," << v.y << "," << v.z << ")" << std::endl;
 		//#endif
-		//std::cout<<"v="<<v<<std::endl;
+		std::cout<<"v="<<v<<std::endl;
 		transformedVertices[i]=v;
 	}
 #ifdef OPAL_USE_TRI
@@ -823,10 +844,12 @@ void OpalSceneManager::createRaySphere2DSubstep(int elevationDelta, int azimuthD
 	if (elevationDelta<azimuthDelta) {
 		asRadiusConstant=elevationDelta*deg2rad*0.1f;
 	} else {
+		std::cout <<"Substep Sphere: azimuthDelta="<<azimuthDelta<<"deg2rad="<<deg2rad<<std::endl; 	
 		asRadiusConstant=azimuthDelta*deg2rad*0.1f;
+	std::cout <<"Substep Sphere: asRadiusConstant="<<asRadiusConstant<<std::endl;
 	}
 	context["asRadiusConstant"]->setFloat(asRadiusConstant);
-	std::cout <<"asRadiusConstant="<<asRadiusConstant<<". raySphere.azimuthSteps=" << raySphere.azimuthSteps << ". raySphere.elevationSteps =" << raySphere.elevationSteps << "raySphere.rayCount=" << raySphere.rayCount <<  std::endl;
+	std::cout <<"Substep Sphere: asRadiusConstant="<<asRadiusConstant<<". raySphere.azimuthSteps=" << raySphere.azimuthSteps << ". raySphere.elevationSteps =" << raySphere.elevationSteps << "raySphere.rayCount=" << raySphere.rayCount <<  std::endl;
 
 	rays->unmap();
 	raySphere.raySphereBuffer = rays;
@@ -839,11 +862,8 @@ void OpalSceneManager::createRaySphere2DSubstep(int elevationDelta, int azimuthD
 
 
 
-void OpalSceneManager::addReceiver(int id, float3  position, float radius, std::function<void(float, int)>  callback)
+void OpalSceneManager::addReceiver(int id, float3  position, float3 polarization, float radius, std::function<void(float, int)>  callback)
 {
-	//std::ofstream myfile;
-	//myfile.open("D:\\log.txt", std::ifstream::app);
-	//myfile << "Adding receiver " << id << std::endl;
 	std::cout << "Adding receiver " << id << " with radius " <<radius<<" at "<<position<< std::endl;
 	optix::Geometry geometry = context->createGeometry();
 	float4 sphere = make_float4(position.x, position.y, position.z, radius);
@@ -876,10 +896,17 @@ void OpalSceneManager::addReceiver(int id, float3  position, float radius, std::
 	uint nextId = static_cast<uint>(receivers.size());
 	geom_instance["receiverBufferIndex"]->setUint(nextId);
 	geom_instance["externalId"]->setInt(id);
-	std::cout<<"Receiver buffer index for "<<id << " is "<<nextId<< " and external Id is "<<id<<std::endl;
+
+	if (useDepolarization) {
+		geom_instance["receiverPolarization"]->setFloat(polarization);
+		std::cout<<"\tUsing depolarization. Receiver polarization is "<<polarization << std::endl;
+		
+	}
+	std::cout<<"\tReceiver buffer index for "<<id << " is "<<nextId<< " and external Id is "<<id<<std::endl;
 	SphereReceiver* rx = new SphereReceiver();
 	rx->geomInstance = geom_instance;
 	rx->position = position;
+	rx->polarization=polarization;
 	rx->radius = radius;
 	rx->callback = callback;
 	rx->closestHitProgram = chrx;
@@ -1075,7 +1102,7 @@ void OpalSceneManager::transmit(int txId, float txPower,  float3 origin, float3 
 	//Log times for performance tests
 	std::cout<<"#"<<numReceivers<<"\t"<<gsize<<"\t"<<lastHitIndex<<"\t"<<hits<<"\t"<<launchTime<<"\t"<<filterTime<<"\t"<<transferTime<<std::endl;
 
-	//Compute received power by adding EM waves of all hits. Global computation. Not done with thrust because reduce does not seem to allow a different type as output of the sum
+	//Compute received power by adding EM waves of all hits. Global computation. Not done with thrust because thrust::reduce does not seem to allow a different type as output of the sum
 
 	uint index=0u;
 	uint raysHit=0u;
@@ -1104,11 +1131,13 @@ void OpalSceneManager::transmit(int txId, float txPower,  float3 origin, float3 
 		//}
 		E += host_hits->E;
 
-		//std::cout<<"E["<<i<<"]="<<(host_hits)->E<<std::endl;
-		// std::cout<<"\t rxBufferIndex="<<(host_hits)->whrd.z<<std::endl;
-		// std::cout<<"\t written="<<(host_hits)->whrd.x<<std::endl;
-		// std::cout<<"\t refhash="<<(host_hits)->whrd.y<<std::endl;
-		// std::cout<<"\t dist="<<(host_hits)->whrd.w<<std::endl;
+//		std::cout<<"E["<<i<<"]="<<(host_hits)->E<<std::endl;
+//		 std::cout<<"\t rxBufferIndex="<<(host_hits)->thrd.z<<std::endl;
+//		 std::cout<<"\t written="<<(host_hits)->thrd.x<<std::endl;
+//		 std::cout<<"\t refhash="<<(host_hits)->thrd.y<<std::endl;
+//		 std::cout<<"\t dist="<<(host_hits)->thrd.w<<std::endl;
+		
+
 		++host_hits;
 
 	}
@@ -1202,7 +1231,7 @@ void OpalSceneManager::checkInternalBuffers() {
 
 
 void OpalSceneManager::resizeGlobalHitInfoBuffer(optix::uint ele, optix::uint azi, optix::uint rx, optix::uint reflections) {
-	uint bytes=context->getAvailableDeviceMemory(0);
+	RTsize bytes=context->getAvailableDeviceMemory(0);
 	uint rec=1u;
 	if (rx>0) {
 		rec=rx;
@@ -1220,7 +1249,7 @@ void OpalSceneManager::resizeGlobalHitInfoBuffer(optix::uint ele, optix::uint az
 }
 //TODO: change constants to parameters
 optix::Buffer OpalSceneManager::setGlobalHitInfoBuffer(optix::uint ele, optix::uint azi, optix::uint rx, optix::uint reflections) {
-	uint bytes=context->getAvailableDeviceMemory(0);
+	RTsize bytes=context->getAvailableDeviceMemory(0);
 	uint rec=1u;
 	if (rx>0) {
 		rec=rx;
@@ -1230,7 +1259,12 @@ optix::Buffer OpalSceneManager::setGlobalHitInfoBuffer(optix::uint ele, optix::u
 		bsize=floor(0.7*bytes/sizeof(HitInfo));
 		std::cout<<"WARNING: globalHitInfoBuffer size exceeds 70% of available memory. Available device memory: "<<bytes<<"; buffer size set to "<<bsize<<std::endl;
 	}
-	std::cout<<"Available device memory: "<<bytes<<". globalHitBuffer  size="<<bsize<<std::endl;
+	std::cout<<"Available device memory (0) "<<(bytes/(1024*1024))<<" MiB. globalHitBuffer  size (MiB)="<<(bsize/(1024*1024))<<std::endl;
+	//TODO: change for multidevice
+	//bytes=context->getAvailableDeviceMemory(1);
+	//std::cout<<"Available device memory (1) "<<(bytes/(1024*1024))<<" MiB. globalHitBuffer  size="<<bsize<<std::endl;
+
+
 	//optix::Buffer b = context->createBuffer(RT_BUFFER_INPUT_OUTPUT | RT_BUFFER_GPU_LOCAL, RT_FORMAT_USER, bsize );
 	optix::Buffer b = context->createBuffer(RT_BUFFER_OUTPUT, RT_FORMAT_USER, bsize );
 
@@ -1263,6 +1297,16 @@ optix::Buffer OpalSceneManager::setTransmitterBuffer(optix::uint tx) {
 	b->setElementSize(sizeof(Transmitter));
 	context["txBuffer"]->set(b);
 	return b;
+}
+std::string opal::OpalSceneManager::printContextInformation()
+{
+	std::ostringstream stream;
+	stream<<"Context: Num CPU Threads: "<<context->getCPUNumThreads()<<std::endl;
+  	int RTX;
+  	rtGlobalGetAttribute(RT_GLOBAL_ATTRIBUTE_ENABLE_RTX,sizeof(RTX),&RTX);
+	stream<<"Context: RTX mode enabled: "<<RTX<<std::endl;
+
+	return stream.str();
 }
 
 std::string opal::OpalSceneManager::printInternalBuffersState()
@@ -1320,6 +1364,8 @@ void OpalSceneManager::finishSceneContext() {
 	context["max_interactions"]->setUint(maxReflections);
 	if (usePenetration) {
 		context["usePenetration"]->setUint(1u);
+		//Show warning about assumptions
+		std::cout<<"You are using penetration: check that the  receiver sphere(s) does not overlap any wall, otherwise you are getting wrong results almost surely" <<std::endl;
 	} else {
 		context["usePenetration"]->setUint(0u);
 	}
@@ -1344,7 +1390,10 @@ std::string opal::OpalSceneManager::printSceneReport()  {
 	stream << "\t Receivers=" << receivers.size() <<  std::endl;
 	stream << "\t RayCount=" << raySphere.rayCount << ". azimuthSteps=" << raySphere.azimuthSteps << ". elevationSteps=" << raySphere.elevationSteps << std::endl;
 	if (usePenetration) {
-			stream << "\t Penetration enabled. attenuationLimit (dB)=" << attenuationLimit<< std::endl;
+			stream << "\t **Feature: Penetration enabled. attenuationLimit (dB)=" << attenuationLimit<< std::endl;
+	}
+	if (useDepolarization) {
+			stream << "\t **Feature: Depolarization enabled."<< std::endl;
 	}
 	stream << "-- Scene Graph" << std::endl;
 	stream << "\t rootGroup. Children=" << rootGroup->getChildCount() << std::endl;
@@ -1373,6 +1422,7 @@ std::string opal::OpalSceneManager::printSceneReport()  {
 		stream << "\t DynamicMesh[" << (i - 2) << "].children=" << gg->getChildCount() << std::endl;
 	}
 	stream<<printInternalBuffersState()<<std::endl;
+	stream<<printContextInformation()<<std::endl;
 	stream << "-----" << std::endl;
 	return stream.str();
 
@@ -1383,6 +1433,9 @@ void opal::OpalSceneManager::setPrintEnabled(int bufferSize)
 	context->setPrintEnabled(true);
 	context->setPrintBufferSize(bufferSize);
 	std::cout << "printEnabled" << std::endl;
+	//Set a particular print index. Comment out if necessary
+	context->setPrintLaunchIndex(1800,0,0);
+	std::cout<<"Showing launch index [1800,0,0]"<<std::endl;
 
 }
 void OpalSceneManager::setUsageReport()
@@ -1458,6 +1511,12 @@ void OpalSceneManager::enablePenetration() {
 }
 void OpalSceneManager::disablePenetration() {
 	usePenetration=false;	
+}
+void OpalSceneManager::enableDepolarization() {
+	useDepolarization=true;	
+}
+void OpalSceneManager::disableDepolarization() {
+	useDepolarization=false;	
 }
 void OpalSceneManager::setAttenuationLimit(float a) {
 	attenuationLimit=a;
