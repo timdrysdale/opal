@@ -102,7 +102,8 @@ When building an executable with Unity, you have either to use a specific script
 ### Usage remarks
 * Avoid placing receivers so that the radius of the receiver sphere overlaps walls or other interacting elements. Depending on the particular case, the result may be incorrect. This is specially important if you use penetration. In general, if the radius do not overlap, the 
 result will be correct. 
-* If you do not enable depolarization, the results are correct for horizontal and vertical elements (or just slightly leaning) in the scene, because we are assuming it for the polarization and reflections. In addition, we assume that transmitter and receiver have the same polarization. * If you enable depolarization, arbitrary LINEAR polarizations for transmitter and receiver and leaning walls and environement elements can be used. It has a performance cost, though.
+* If you do not enable depolarization, the results are correct for horizontal and vertical elements (or just slightly leaning) in the scene, because we are assuming it for the polarization and reflections. In addition, we assume that transmitter and receiver have the same polarization.
+* If you enable depolarization, arbitrary LINEAR polarizations for transmitter and receiver and leaning walls and environement elements can be used. It has a performance cost, though.
 
 
 
