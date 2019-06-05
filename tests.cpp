@@ -15,6 +15,17 @@ using namespace optix;
 #include <unistd.h>
 #endif
 
+
+
+//From optix advanced samples (see licence): https://github.com/nvpro-samples/optix_advanced_samples/blob/master/src/optixIntroduction/optixIntro_07/inc/Application.h
+// For rtDevice*() function error checking. No OptiX context present at that time.
+#define RT_CHECK_ERROR_NO_CONTEXT( func ) \
+  do { \
+    RTresult code = func; \
+    if (code != RT_SUCCESS) \
+      std::cerr << "ERROR: Function " << #func << std::endl; \
+} while (0)
+
 //Callback
 void printPower(float power, int txId) {
 	std::cout << "PR\t" << power << std::endl;
@@ -112,14 +123,14 @@ std::unique_ptr<OpalSceneManager> addCompoundDynamicMeshes(std::unique_ptr<OpalS
 
 
 		optix::float3 postx = make_float3(0.0f, 2.0f, 0.0f);
+		optix::float3 polarization = make_float3(0.0f, 1.0f, 0.0f); //Perpendicular to the floor. Assuming as in Unity that forward is z-axis and up is y-axis
 
 		std::function<void(float,int)> cb=&printPower;
-		sceneManager->addReceiver(1, posrx, 5.0f, cb);
+		sceneManager->addReceiver(1, posrx, polarization, 5.0f, cb);
 
 
 		sceneManager->finishSceneContext();
 		sceneManager->setPrintEnabled(1024 * 1024 * 1024);
-		optix::float3 polarization = make_float3(0.0f, 1.0f, 0.0f); //Perpendicular to the floor. Assuming as in Unity that forward is z-axis and up is y-axis
 
 		sceneManager->transmit(0, 1.0f, postx, polarization);
 
@@ -203,14 +214,15 @@ std::unique_ptr<OpalSceneManager> addRemoveDynamicMeshes(std::unique_ptr<OpalSce
 
 		optix::float3 postx = make_float3(0.0f, 2.0f, 0.0f);
 
-		sceneManager->addReceiver(0, posrx, 5.0f, printPower);
+		optix::float3 polarization = make_float3(0.0f, 1.0f, 0.0f); //Perpendicular to the floor. Assuming as in Unity that forward is z-axis and up is y-axis
+		
+		sceneManager->addReceiver(0, posrx, polarization, 5.0f, printPower);
 
 
 		sceneManager->finishSceneContext();
 		if (print) {
 			sceneManager->setPrintEnabled(1024 * 1024 * 1024);
 		}
-		optix::float3 polarization = make_float3(0.0f, 1.0f, 0.0f); //Perpendicular to the floor. Assuming as in Unity that forward is z-axis and up is y-axis
 
 		sceneManager->transmit(1, 1.0f, postx, polarization);
 
@@ -299,17 +311,18 @@ std::unique_ptr<OpalSceneManager> addRemoveReceivers(std::unique_ptr<OpalSceneMa
 
 		optix::float3 postx = make_float3(0.0f, 2.0f, 50.0f);
 
-		sceneManager->addReceiver(1, posrx, 5.0f, printPower);
+		optix::float3 polarization = make_float3(0.0f, 1.0f, 0.0f); //Perpendicular to the floor. Assuming as in Unity that forward is z-axis and up is y-axis
+		
+		sceneManager->addReceiver(1, posrx, polarization, 5.0f, printPower);
 
 
 		sceneManager->finishSceneContext();
 		sceneManager->setPrintEnabled(1024 * 1024 * 1024);
-		optix::float3 polarization = make_float3(0.0f, 1.0f, 0.0f); //Perpendicular to the floor. Assuming as in Unity that forward is z-axis and up is y-axis
 		sceneManager->transmit(0, 1.0f, postx, polarization);
 
 		//Add new receiver
 		posrx = make_float3(0.0f, 2.0f, 70.0f);
-		sceneManager->addReceiver(2, posrx, 5.0f, printPower);
+		sceneManager->addReceiver(2, posrx, polarization, 5.0f, printPower);
 
 		std::cout << "transmit again" << std::endl;
 		sceneManager->transmit(0, 1.0f, postx, polarization);
@@ -371,7 +384,7 @@ std::unique_ptr<OpalSceneManager> moveReceivers(std::unique_ptr<OpalSceneManager
 		optix::float3 posrx = make_float3(0.0f, 2.0f, 0.0f);
 		optix::float3 polarization = make_float3(0.0f, 1.0f, 0.0f); //Perpendicular to the floor. Assuming as in Unity that forward is z-axis and up is y-axis
 
-		sceneManager->addReceiver(1, posrx, 5.0f, printPower);
+		sceneManager->addReceiver(1, posrx, polarization, 5.0f, printPower);
 
 
 		sceneManager->finishSceneContext();
@@ -480,11 +493,12 @@ std::unique_ptr<OpalSceneManagerMultiTransmitter> crossingTestMulti(std::unique_
 	}
 
 	//receivers: symmetrical configuration, power must be almost equal
+	optix::float3 polarization = make_float3(0.0f, 1.0f, 0.0f); //Perpendicular to the floor. Assuming as in Unity that forward is z-axis and up is y-axis
 
 	optix::float3 posrx = make_float3(0.0f, 10.0f, 100.0f);
-	sceneManager->addReceiver(1, posrx, 5.0f, printPower);
+	sceneManager->addReceiver(1, posrx, polarization, 5.0f, printPower);
 	posrx = make_float3(0.0f, 10.0f, 0.0f);
-	sceneManager->addReceiver(3, posrx, 5.0f, printPower);
+	sceneManager->addReceiver(3, posrx,polarization, 5.0f, printPower);
 
 
 	//sceneManager->setMaxReflections(3u);
@@ -496,7 +510,6 @@ std::unique_ptr<OpalSceneManagerMultiTransmitter> crossingTestMulti(std::unique_
 	//sceneManager->setUsageReport();
 
 	optix::float3 postx=make_float3(0.0f,0.0f,0.f);
-	optix::float3 polarization = make_float3(0.0f, 1.0f, 0.0f); //Perpendicular to the floor. Assuming as in Unity that forward is z-axis and up is y-axis
 	timer.start();
 		sceneManager->registerTransmitter(0,postx,polarization,1.0f);
 		sceneManager->registerTransmitter(2,postx,polarization,1.0f);
@@ -542,7 +555,7 @@ std::unique_ptr<OpalSceneManager> crossingTest(std::unique_ptr<OpalSceneManager>
 	MaterialEMProperties emProp1;
 	emProp1.dielectricConstant = make_float2(3.75f, -60.0f*sceneManager->getChannelParameters().waveLength*0.038f);
 		//There is a dependency on the frequency again, we use -15 dB per 203 mm at 5 GHz => -75 dB/m
-	emProp1.tattenuation = make_float2(0.1f,-15.f );
+		emProp1.tattenuation = make_float2(0.1f,-75.f );
 	//emProp1.dielectricConstant = make_float2(3.75f, -0.4576f);
 	std::cout << "Adding NW. Em="<< emProp1.dielectricConstant << std::endl;
 	sceneManager->addStaticMesh(static_cast<int>(cubevert.size()), cubevert.data(), static_cast<int>(cubeind.size()), cubeind.data(), tm, emProp1);
@@ -595,7 +608,8 @@ std::unique_ptr<OpalSceneManager> crossingTest(std::unique_ptr<OpalSceneManager>
 	//receivers
 
 	optix::float3 posrx = make_float3(0.0f, 10.0f, 100.0f);
-	sceneManager->addReceiver(1, posrx, 5.0f, printPower);
+	optix::float3 polarization = make_float3(0.0f, 1.0f, 0.0f); //Perpendicular to the floor. Assuming as in Unity that forward is z-axis and up is y-axis
+	sceneManager->addReceiver(1, posrx,polarization, 5.0f, printPower);
 
 
 	//sceneManager->setMaxReflections(3u);
@@ -608,7 +622,6 @@ std::unique_ptr<OpalSceneManager> crossingTest(std::unique_ptr<OpalSceneManager>
 	//sceneManager->setUsageReport();
 
 	optix::float3 postx;
-	optix::float3 polarization = make_float3(0.0f, 1.0f, 0.0f); //Perpendicular to the floor. Assuming as in Unity that forward is z-axis and up is y-axis
 	timer.start();
 
 	for (int i = -50; i <= 50; ++i) {
@@ -622,7 +635,7 @@ std::unique_ptr<OpalSceneManager> crossingTest(std::unique_ptr<OpalSceneManager>
 	}
 	timer.stop();
 	std::cout<<"Time="<<timer.getTime()<<std::endl;
-//			postx = make_float3(-39.0f, 10.0f, 50.0f);
+//			postx = make_float3(15.0f, 10.0f, 50.0f);
 //			sceneManager->transmit(0, 1.0f, postx, polarization);
 
 	return sceneManager;
@@ -659,8 +672,9 @@ std::unique_ptr<OpalSceneManager> planeTest(std::unique_ptr<OpalSceneManager> sc
 
 
 	optix::float3 postx = make_float3(0.0f, 2.0f, 50.0f);
+	optix::float3 polarization = make_float3(0.0f, 1.0f, 0.0f); //Perpendicular to the floor. Assuming as in Unity that forward is z-axis and up is y-axis
 
-	sceneManager->addReceiver(1, posrx, 1.0f, printPower);
+	sceneManager->addReceiver(1, posrx,polarization, 1.0f, printPower);
 	//sceneManager->addReceiver(2, posrx2, 1.0f, printPower);
 
 
@@ -675,7 +689,6 @@ std::unique_ptr<OpalSceneManager> planeTest(std::unique_ptr<OpalSceneManager> sc
 	//std::cout << "Launching" << std::endl;
 
 
-	optix::float3 polarization = make_float3(0.0f, 1.0f, 0.0f); //Perpendicular to the floor. Assuming as in Unity that forward is z-axis and up is y-axis
 
 
 	//postx = make_float3(0.0f, 2.0f, 35.0f);
@@ -739,15 +752,17 @@ std::unique_ptr<OpalSceneManager> quadTest(std::unique_ptr<OpalSceneManager> sce
 
 
 	//sceneManager->addStaticMesh(4, quadv2, 6, quadind2, tm2, emProp2);
+	
+	optix::float3 polarization = make_float3(0.0f, 1.0f, 0.0f); //Perpendicular to the floor. Assuming as in Unity that forward is z-axis and up is y-axis
+
 
 	optix::float3 posrx = make_float3(0.f, 0.f, 97.0f);
-	//sceneManager->addReceiver(1, posrx, 1.0f, printPower);
-	sceneManager->addReceiver(1, posrx, 5.0f, printPower);
+	//sceneManager->addReceiver(1, posrx,polarization, 1.0f, printPower);
+	sceneManager->addReceiver(1, posrx,polarization, 5.0f, printPower);
 	posrx=make_float3(0.0f,0.0f,99.0f);
-	sceneManager->addReceiver(2, posrx, 5.0f, printPower);
+	sceneManager->addReceiver(2, posrx, polarization, 5.0f, printPower);
 	optix::float3 postx = make_float3(0.0f, 0.f,0.f);
 
-	optix::float3 polarization = make_float3(0.0f, 1.0f, 0.0f); //Perpendicular to the floor. Assuming as in Unity that forward is z-axis and up is y-axis
 	if (subSteps) {
 		sceneManager->createRaySphere2DSubstep(1, 1);
 	} else {
@@ -874,7 +889,8 @@ std::unique_ptr<OpalSceneManager> crossingTestAndVehicle(std::unique_ptr<OpalSce
 	//receivers
 
 	optix::float3 posrx = make_float3(0.0f, 2.0f, 100.0f);
-	sceneManager->addReceiver(1, posrx, 1.f, printPower);
+	optix::float3 polarization = make_float3(0.0f, 1.0f, 0.0f); //Perpendicular to the floor. Assuming as in Unity that forward is z-axis and up is y-axis
+	sceneManager->addReceiver(1, posrx,polarization, 1.f, printPower);
 
 
 	//sceneManager->setMaxReflections(3u);
@@ -886,7 +902,6 @@ std::unique_ptr<OpalSceneManager> crossingTestAndVehicle(std::unique_ptr<OpalSce
 
 
 	optix::float3 postx;
-	optix::float3 polarization = make_float3(0.0f, 1.0f, 0.0f); //Perpendicular to the floor. Assuming as in Unity that forward is z-axis and up is y-axis
 
 	for (int i = -50; i <= 50; ++i)
 	{
@@ -913,7 +928,7 @@ std::unique_ptr<OpalSceneManager> penetrationTest(std::unique_ptr<OpalSceneManag
 
 	Timer timer;
 
-	std::cout << "Simulating crossing streets test" << std::endl;
+	std::cout << "Penetration test" << std::endl;
 	//Cubes
 	std::vector<int> cubeind = loadTrianglesFromFile("meshes/tricube.txt");
 	std::vector<float3> cubevert = loadVerticesFromFile("meshes/vertcube.txt");
@@ -933,7 +948,7 @@ std::unique_ptr<OpalSceneManager> penetrationTest(std::unique_ptr<OpalSceneManag
 	sceneManager->addStaticMesh(static_cast<int>(cubevert.size()), cubevert.data(), static_cast<int>(cubeind.size()), cubeind.data(), tm, emProp1);
 
 
-	sceneManager->createRaySphere2D(90,60);	
+	sceneManager->createRaySphere2D(30,60);	
 //	if (subSteps) {
 //		sceneManager->createRaySphere2DSubstep(1, 1); //0.1 degree delta step
 //	} else {
@@ -943,7 +958,8 @@ std::unique_ptr<OpalSceneManager> penetrationTest(std::unique_ptr<OpalSceneManag
 	//receivers
 
 	optix::float3 posrx = make_float3(-8.48f,10.0f, 78.0856f); //Hit with 60 degrees ray reflected on cube
-	sceneManager->addReceiver(1, posrx, 5.0f, printPower);
+	optix::float3 polarization = make_float3(0.0f, 1.0f, 0.0f); //Perpendicular to the floor. Assuming as in Unity that forward is z-axis and up is y-axis
+	sceneManager->addReceiver(1, posrx, polarization, 5.0f, printPower);
 
 
 	sceneManager->enablePenetration();
@@ -955,7 +971,6 @@ std::unique_ptr<OpalSceneManager> penetrationTest(std::unique_ptr<OpalSceneManag
 	//sceneManager->setUsageReport();
 
 	optix::float3 postx;
-	optix::float3 polarization = make_float3(0.0f, 1.0f, 0.0f); //Perpendicular to the floor. Assuming as in Unity that forward is z-axis and up is y-axis
 	timer.start();
 			postx = make_float3(-50.0f, 10.0f, 50.0f);
 			sceneManager->transmit(0, 1.0f, postx, polarization);
@@ -966,8 +981,6 @@ std::unique_ptr<OpalSceneManager> penetrationTest(std::unique_ptr<OpalSceneManag
 	return sceneManager;
 
 }
-
-
 
 std::unique_ptr<OpalSceneManager> penetrationPlane(std::unique_ptr<OpalSceneManager> sceneManager, bool print, bool subSteps) {
 
@@ -1052,7 +1065,8 @@ std::unique_ptr<OpalSceneManager> penetrationPlane(std::unique_ptr<OpalSceneMana
 	//receivers
 
 	optix::float3 posrx = make_float3(0.0f, 10.0f, 100.0f);
-	sceneManager->addReceiver(1, posrx, 5.0f, printPower);
+	optix::float3 polarization = make_float3(0.0f, 1.0f, 0.0f); //Parallel to the floor. Assuming as in Unity that forward is z-axis and up is y-axis
+	sceneManager->addReceiver(1, posrx,polarization, 5.0f, printPower);
 
 
 	//sceneManager->setMaxReflections(3u);
@@ -1065,7 +1079,6 @@ std::unique_ptr<OpalSceneManager> penetrationPlane(std::unique_ptr<OpalSceneMana
 	//sceneManager->setUsageReport();
 
 	optix::float3 postx;
-	optix::float3 polarization = make_float3(0.0f, 1.0f, 0.0f); //Parallel to the floor. Assuming as in Unity that forward is z-axis and up is y-axis
 	timer.start();
 
 //	for (int i = -50; i <= 50; ++i) {
@@ -1087,13 +1100,263 @@ std::unique_ptr<OpalSceneManager> penetrationPlane(std::unique_ptr<OpalSceneMana
 }
 
 
+//Polarization test. Horizontal plane test but with arbitrary polarizations. To validate against a two-ray model
+std::unique_ptr<OpalSceneManager> polarizationPlaneTest(std::unique_ptr<OpalSceneManager> sceneManager, bool print, bool subSteps) {
+	//Horizontal plane as quad at origin. Better to use this plane, since precision problems occur when rays are aligned with triangles and some intersections with the plane may be missed
+	int quadind[6] = { 0,1,2,1,0,3 };
+	optix::float3 quadh[4] = { make_float3(-0.5f,0.0f,-0.5f),make_float3(0.5f,0.f,0.5f) ,make_float3(0.5f,0.f,-0.5f) ,make_float3(-0.5f,0.0f,0.5f) };
+
+	//Scale to 200x200
+	Matrix4x4 tm;
+	tm.setRow(0, make_float4(200, 0, 0, 0.f));
+	tm.setRow(1, make_float4(0, 1, 0, 0.f));
+	tm.setRow(2, make_float4(0, 0, 200, 0.f));
+	tm.setRow(3, make_float4(0, 0, 0,  1));
+
+	MaterialEMProperties emProp1;
+	emProp1.dielectricConstant = make_float2(3.75f, -60.0f*sceneManager->getChannelParameters().waveLength*0.038f);
+		//There is a dependency on the frequency again, we use -15 dB per 203 mm at 5 GHz => -75 dB/m
+		emProp1.tattenuation = make_float2(0.1f,-75.f );
+	sceneManager->addStaticMesh(4, quadh, 6, quadind, tm, emProp1 );
+
+
+	if (subSteps) {
+		sceneManager->createRaySphere2DSubstep(1, 1);
+	} else {
+		sceneManager->createRaySphere2D(60,120);
+	}
+	//receivers
+	//optix::float3 polarization = make_float3(1.0f, 0.0f, 0.0f); //Horizontal to the floor. Assuming as in Unity that forward is z-axis and up is y-axis
+	optix::float3 polarization = make_float3(0.0f, 1.0f, 0.0f); //Perpendicular to the floor. Assuming as in Unity that forward is z-axis and up is y-axis
+	//optix::float3 polarization = make_float3(1.0f, 1.0f, 0.0f); //Tilted to the floor. Assuming as in Unity that forward is z-axis and up is y-axis. Not normalized
+	//optix::float3 polarization = make_float3(1, 1, 0.0f); //Tilted to the floor. Assuming as in Unity that forward is z-axis and up is y-axis. Not normalized
+	//optix::float3 posrx = make_float3(0.0f, 10.0f, 20.78460f);
+	optix::float3 posrx = make_float3(0.0f, 2.0f, 0.0f);
+
+
+	optix::float3 postx = make_float3(0.0f, 10.0f, 0.0f);
+
+
+	//sceneManager->addReceiver(1, posrx, polarization, 1.0f, printPower);
+	
+	//With different polarization for the receiver
+	sceneManager->addReceiver(1, posrx, make_float3(0.0f,1.0f,0.0f), 1.0f, printPower);
+
+
+	sceneManager->finishSceneContext();
+
+	if (print) {
+		sceneManager->setPrintEnabled(1024 * 1024 * 1024);
+	}
+	//	sceneManager->setUsageReport();
+
+
+	//std::cout << "Launching" << std::endl;
+
+
+
+
+	//postx = make_float3(0.0f, 10.0f, 98.0f);
+	sceneManager->transmit(0, 1.0f, postx, polarization);
+//	Timer timer;
+//	timer.start();
+//	for (size_t i = 0; i < 100; ++i)
+//	{
+//		postx = make_float3(0.0f, 10.0f, 99.0f - i);
+//		sceneManager->transmit(0, 1.0f, postx, polarization);
+//
+//	}
+//	timer.stop();
+//	std::cout<<"Time="<<timer.getTime()<<std::endl;
+
+
+	return sceneManager;
+}
+//Street crossing test with arbitray polarizations. Cubes are intended to be buildings and a plane is the floor
+std::unique_ptr<OpalSceneManager> crossingTestDepolarization(std::unique_ptr<OpalSceneManager> sceneManager, bool print, bool subSteps) {
+
+	Timer timer;
+
+	std::cout << "Simulating crossing streets test" << std::endl;
+	//Cubes
+	std::vector<int> cubeind = loadTrianglesFromFile("meshes/tricube.txt");
+	std::vector<float3> cubevert = loadVerticesFromFile("meshes/vertcube.txt");
+	//std::cout << "indices=" << cubeind.size() << "vertices=" << cubevert.size() << std::endl;
+	//Cube(4) NW
+	Matrix4x4 tm;
+	tm.setRow(0, make_float4(40.0f, 0, 0, -30.0f));
+	tm.setRow(1, make_float4(0, 40.0f, 0, 20.0f));
+	tm.setRow(2, make_float4(0, 0, 40.0f, 80.0f));
+	tm.setRow(3, make_float4(0, 0, 0, 1));
+	MaterialEMProperties emProp1;
+	emProp1.dielectricConstant = make_float2(3.75f, -60.0f*sceneManager->getChannelParameters().waveLength*0.038f);
+		//There is a dependency on the frequency again, we use -15 dB per 203 mm at 5 GHz => -75 dB/m
+		emProp1.tattenuation = make_float2(0.1f,-75.f );
+	//emProp1.dielectricConstant = make_float2(3.75f, -0.4576f);
+	std::cout << "Adding NW. Em="<< emProp1.dielectricConstant << std::endl;
+	sceneManager->addStaticMesh(static_cast<int>(cubevert.size()), cubevert.data(), static_cast<int>(cubeind.size()), cubeind.data(), tm, emProp1);
+
+	//Cube SW
+	tm.setRow(0, make_float4(40.0f, 0, 0, -30.0f));
+	tm.setRow(1, make_float4(0, 40.0f, 0, 20.0f));
+	tm.setRow(2, make_float4(0, 0, 40.0f, 20.0f));
+	tm.setRow(3, make_float4(0, 0, 0, 1));
+	std::cout << "Adding SW. Em = "<< emProp1.dielectricConstant << std::endl;
+	sceneManager->addStaticMesh(static_cast<int>(cubevert.size()), cubevert.data(), static_cast<int>(cubeind.size()), cubeind.data(), tm, emProp1);
+	//Cube(2) NE
+
+	tm.setRow(0, make_float4(40.0f, 0, 0, 30.0f));
+	tm.setRow(1, make_float4(0, 40.0f, 0, 20.0f));
+	tm.setRow(2, make_float4(0, 0, 40.0f, 80.0f));
+	tm.setRow(3, make_float4(0, 0, 0, 1));
+	std::cout << "Adding NE. Em = "<< emProp1.dielectricConstant << std::endl;
+	sceneManager->addStaticMesh(static_cast<int>(cubevert.size()), cubevert.data(), static_cast<int>(cubeind.size()), cubeind.data(), tm, emProp1);
+
+	//Cube(1) SE
+
+	tm.setRow(0, make_float4(40.0f, 0, 0, 30.0f));
+	tm.setRow(1, make_float4(0, 40.0f, 0, 20.0f));
+	tm.setRow(2, make_float4(0, 0, 40.0f, 20.0f));
+	tm.setRow(3, make_float4(0, 0, 0, 1));
+	std::cout << "Adding SE. Em = "<< emProp1.dielectricConstant << std::endl;
+	sceneManager->addStaticMesh(static_cast<int>(cubevert.size()), cubevert.data(), static_cast<int>(cubeind.size()), cubeind.data(), tm, emProp1);
+
+	//Horizontal plane
+	std::vector<int> planeind = loadTrianglesFromFile("meshes/tri.txt");
+	std::vector<float3> planever = loadVerticesFromFile("meshes/vert.txt");
+	//std::cout << "indices=" << planeind.size() << "vertices=" << planever.size() << std::endl;
+
+	tm.setRow(0, make_float4(10.0f, 0, 0, 0.0f));
+	tm.setRow(1, make_float4(0, 1, 0, 0.0f));
+	tm.setRow(2, make_float4(0, 0, 10.0f, 50.0f));
+	tm.setRow(3, make_float4(0, 0, 0, 1));
+
+	//emProp1.dielectricConstant = make_float2(3.75f, -60.0f*sceneManager->defaultChannel.waveLength*0.15f);
+	std::cout << "Adding Plane. Em=" << emProp1.dielectricConstant << std::endl;
+	sceneManager->addStaticMesh(static_cast<int>(planever.size()), planever.data(), static_cast<int>(planeind.size()), planeind.data(), tm, emProp1);
+
+	if (subSteps) {
+		sceneManager->createRaySphere2DSubstep(1, 1); //0.1 degree delta step
+	} else {
+		sceneManager->createRaySphere2D(1, 1); //1 degree delta step
+	}
+
+	//receivers
+
+	optix::float3 posrx = make_float3(0.0f, 10.0f, 100.0f);
+	optix::float3 polarization = make_float3(0.0f, 1.0f, 0.0f); //Perpendicular to the floor. Assuming as in Unity that forward is z-axis and up is y-axis
+	sceneManager->addReceiver(1, posrx,polarization, 5.0f, printPower);
+
+
+	//sceneManager->setMaxReflections(3u);
+
+	sceneManager->finishSceneContext();
+
+	if (print) {
+		sceneManager->setPrintEnabled(1024 * 1024 * 1024);	
+	}
+	//sceneManager->setUsageReport();
+
+	optix::float3 postx;
+	timer.start();
+
+	for (int i = -50; i <= 50; ++i) {
+
+		float x=i;
+		postx = make_float3(x, 10.f, 50.0f);
+
+		sceneManager->transmit(0, 1.0f, postx, polarization);
+
+
+	}
+			//postx = make_float3(0.0f, 10.0f, 50.0f);
+			//sceneManager->transmit(0, 1.0f, postx, polarization);
+	timer.stop();
+	std::cout<<"Time="<<timer.getTime()<<std::endl;
+
+	return sceneManager;
+
+}
+
+
+
+//From NVIDIA (see license): https://github.com/nvpro-samples/optix_advanced_samples/blob/master/src/optixIntroduction/optixIntro_07/src/Application.cpp
+void getSystemInformation()
+{
+  unsigned int optixVersion;
+  RT_CHECK_ERROR_NO_CONTEXT(rtGetVersion(&optixVersion));
+  
+
+  unsigned int major = optixVersion / 1000; // Check major with old formula.
+  unsigned int minor;
+  unsigned int micro;
+  if (3 < major) // New encoding since OptiX 4.0.0 to get two digits micro numbers?
+  {
+    major =  optixVersion / 10000;
+    minor = (optixVersion % 10000) / 100;
+    micro =  optixVersion % 100;
+  }
+  else // Old encoding with only one digit for the micro number.
+  {
+    minor = (optixVersion % 1000) / 10;
+    micro =  optixVersion % 10;
+  }
+  std::cout << "OptiX " << major << "." << minor << "." << micro << std::endl;
+  
+  unsigned int numberOfDevices = 0;
+  RT_CHECK_ERROR_NO_CONTEXT(rtDeviceGetDeviceCount(&numberOfDevices));
+  std::cout << "Number of Devices = " << numberOfDevices << std::endl << std::endl;
+
+  for (unsigned int i = 0; i < numberOfDevices; ++i)
+  {
+    char name[256];
+    RT_CHECK_ERROR_NO_CONTEXT(rtDeviceGetAttribute(i, RT_DEVICE_ATTRIBUTE_NAME, sizeof(name), name));
+    std::cout << "Device " << i << ": " << name << std::endl;
+  
+    int computeCapability[2] = {0, 0};
+    RT_CHECK_ERROR_NO_CONTEXT(rtDeviceGetAttribute(i, RT_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY, sizeof(computeCapability), &computeCapability));
+    std::cout << "  Compute Support: " << computeCapability[0] << "." << computeCapability[1] << std::endl;
+
+    RTsize totalMemory = 0;
+    RT_CHECK_ERROR_NO_CONTEXT(rtDeviceGetAttribute(i, RT_DEVICE_ATTRIBUTE_TOTAL_MEMORY, sizeof(totalMemory), &totalMemory));
+    std::cout << "  Total Memory: " << (unsigned long long) totalMemory << std::endl;
+
+    int clockRate = 0;
+    RT_CHECK_ERROR_NO_CONTEXT(rtDeviceGetAttribute(i, RT_DEVICE_ATTRIBUTE_CLOCK_RATE, sizeof(clockRate), &clockRate));
+    std::cout << "  Clock Rate: " << clockRate << " kHz" << std::endl;
+
+    int maxThreadsPerBlock = 0;
+    RT_CHECK_ERROR_NO_CONTEXT(rtDeviceGetAttribute(i, RT_DEVICE_ATTRIBUTE_MAX_THREADS_PER_BLOCK, sizeof(maxThreadsPerBlock), &maxThreadsPerBlock));
+    std::cout << "  Max. Threads per Block: " << maxThreadsPerBlock << std::endl;
+
+    int smCount = 0;
+    RT_CHECK_ERROR_NO_CONTEXT(rtDeviceGetAttribute(i, RT_DEVICE_ATTRIBUTE_MULTIPROCESSOR_COUNT, sizeof(smCount), &smCount));
+    std::cout << "  Streaming Multiprocessor Count: " << smCount << std::endl;
+
+    int executionTimeoutEnabled = 0;
+    RT_CHECK_ERROR_NO_CONTEXT(rtDeviceGetAttribute(i, RT_DEVICE_ATTRIBUTE_EXECUTION_TIMEOUT_ENABLED, sizeof(executionTimeoutEnabled), &executionTimeoutEnabled));
+    std::cout << "  Execution Timeout Enabled: " << executionTimeoutEnabled << std::endl;
+
+    int maxHardwareTextureCount = 0 ;
+    RT_CHECK_ERROR_NO_CONTEXT(rtDeviceGetAttribute(i, RT_DEVICE_ATTRIBUTE_MAX_HARDWARE_TEXTURE_COUNT, sizeof(maxHardwareTextureCount), &maxHardwareTextureCount));
+    std::cout << "  Max. Hardware Texture Count: " << maxHardwareTextureCount << std::endl;
+ 
+    int tccDriver = 0;
+    RT_CHECK_ERROR_NO_CONTEXT(rtDeviceGetAttribute(i, RT_DEVICE_ATTRIBUTE_TCC_DRIVER, sizeof(tccDriver), &tccDriver));
+    std::cout << "  TCC Driver enabled: " << tccDriver << std::endl;
+ 
+    int cudaDeviceOrdinal = 0;
+    RT_CHECK_ERROR_NO_CONTEXT(rtDeviceGetAttribute(i, RT_DEVICE_ATTRIBUTE_CUDA_DEVICE_ORDINAL, sizeof(cudaDeviceOrdinal), &cudaDeviceOrdinal));
+    std::cout << "  CUDA Device Ordinal: " << cudaDeviceOrdinal << std::endl << std::endl;
+  }
+}
 
 
 int main(int argc, char** argv)
 {
 	try {
 
-
+		getSystemInformation();
 		//std::cout << "Initializing " << std::endl;
 		float freq = 5.9e9f;
 
@@ -1102,17 +1365,18 @@ int main(int argc, char** argv)
 		bool printEnabled=false;
 		bool subSteps=false;
 		bool useExactSpeedOfLight=true;
+		bool useDepolarization=false;
 #ifdef _WIN32
 #else 
 
-		std::string usage="Usage: opal [-options] \n  -r Max reflections E \n -p Enable OptiX rtPrintf on device to debug \n -s Use decimal degrees in angular spacing \n -c Use c=3e8 m/s. Default is c=299 792 458 m/s \n -h Show help";
+		std::string usage="Usage: opal [-options] \n  -r Max reflections E \n -p Enable OptiX rtPrintf on device to debug \n -s Use decimal degrees in angular spacing \n -c Use c=3e8 m/s. Default is c=299 792 458 m/s\n -d Use depolarization \n -h Show help";
 
 		int c;
 		int nr;
-		while ((c = getopt (argc, argv, "r:psch")) != -1) {
+		while ((c = getopt (argc, argv, "r:pscdh")) != -1) {
 			switch (c) {
 				case 'r':
-					std::cout<<optarg<<std::endl;
+					//std::cout<<optarg<<std::endl;
 					nr=atoi(optarg);
 					if (nr>=0) {
 
@@ -1132,6 +1396,9 @@ int main(int argc, char** argv)
 				case 'c':
 					useExactSpeedOfLight=false;
 					break;
+				case 'd':
+					useDepolarization=true;
+					break;
 				case 'h':
 					std::cout<<usage<<std::endl;
 					exit(0);
@@ -1146,16 +1413,24 @@ int main(int argc, char** argv)
 			}
 		}
 #endif
-		std::unique_ptr<OpalSceneManager> sceneManager(new OpalSceneManager(freq,useExactSpeedOfLight));
-		sceneManager->enablePenetration();
-		sceneManager->setAttenuationLimit(-200);
-		//std::unique_ptr<OpalSceneManagerMultiTransmitter> sceneManager(new OpalSceneManagerMultiTransmitter(freq,useExactSpeedOfLight));
+		//std::unique_ptr<OpalSceneManager> sceneManager(new OpalSceneManager(freq,useExactSpeedOfLight));
+		
+		//New way to initialize: first create instance
+		std::unique_ptr<OpalSceneManager> sceneManager(new OpalSceneManager());
+
+		//Now set desired features
+		//sceneManager->enablePenetration();
+		
+		if (useDepolarization) {	
+			sceneManager->enableDepolarization();
+		}
 
 		sceneManager->setMaxReflections(maxReflections);
 		//sceneManager->setUsageReport();
 
-
-
+		//Finally, init context
+		sceneManager->initContext(freq,useExactSpeedOfLight);
+		
 		//sceneManager = crossingTestAndVehicle(std::move(sceneManager));
 		//sceneManager = addRemoveDynamicMeshes(std::move(sceneManager), printEnabled, subSteps);
 		//sceneManager = addCompoundDynamicMeshes(std::move(sceneManager));
@@ -1163,11 +1438,13 @@ int main(int argc, char** argv)
 
 		//sceneManager = planeTest(std::move(sceneManager), printEnabled, subSteps);
 		//sceneManager = moveReceivers(std::move(sceneManager));
-		sceneManager = crossingTest(std::move(sceneManager), printEnabled,subSteps);
+	//	sceneManager = crossingTest(std::move(sceneManager), printEnabled,subSteps);
 		//sceneManager = quadTest(std::move(sceneManager),printEnabled,subSteps);
 		//sceneManager = crossingTestMulti(std::move(sceneManager), printEnabled,subSteps);
 		//sceneManager = penetrationTest(std::move(sceneManager), printEnabled,subSteps);
 		//sceneManager = penetrationPlane(std::move(sceneManager), printEnabled,subSteps);
+		//sceneManager = polarizationPlaneTest(std::move(sceneManager), printEnabled, subSteps);
+		sceneManager = crossingTestDepolarization(std::move(sceneManager), printEnabled,subSteps);
 
 
 

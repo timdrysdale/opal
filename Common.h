@@ -55,24 +55,49 @@ struct HitInfo {
 //TODO:Pack these structures as suggested in documentation
 
 
-//Ray payload
-struct EMWavePayload {
-	optix::float2 prodReflectionCoefficient; // Accumulated product of reflection coefficients. Complex
-	optix::float3 geomNormal;
-	optix::float3 nextDirection;
+//Ray payloads
+
+//Used for pure Horizontally or Vertically polarized waves. polarization should only be horizontal or vertical with respect to the environment
+struct HVWavePayload {
+	optix::float4 ndtd; //Packed next direction and total distance [nextDirection.x,nextDirection.y,nextDirection.z,totalDistance]
+	//Unpacked version
+	//optix::float3 nextDirection;
+	//float totalDistance;
+	optix::float4 lrhpd; //Packed lastReflectionHitPoint and totalDistanceTillLastReflection [lastReflectionHitPoint.x,lastReflectionHitPoint.y,lastReflectionHitPoint.z, totalDistanceTillLastReflection]
+	//Unpacked version
+	//optix::float3 lastReflectionHitPoint;
+	//float totalDistanceTillLastReflection;
 	optix::float3 hitPoint;
 	optix::float3 polarization;
-	optix::float3 lastReflectionHitPoint;
+	optix::float2 prodReflectionCoefficient; // Accumulated product of reflection coefficients. Complex
 	float electricFieldAmplitude; //Can be removed if antenna gain not used
-	//float t;
 	int reflections;
 	int internalRayInitialReflections;
 	int hits;
-	float totalDistance;
-	float totalDistanceTillLastReflection;
 	float accumulatedAttenuation; //For penentration, in dB (Power)
 	bool end;
 	//unsigned int faceId; //Can be removed
+	int rxBufferIndex; //Last receiver hit 
+	unsigned int refhash; //Combined hash to filter duplicates
+};
+
+//Used for arbitrary linear polarizations (LP) (given by a float3)
+struct LPWavePayload {
+	//Copy common fields. I do not see the need for inheritance here yet
+	optix::float4 ndtd; //Packed next direction and total distance [nextDirection.x,nextDirection.y,nextDirection.z,totalDistance]
+	optix::float4 lrhpd; //Packed lastReflectionHitPoint and totalDistanceTillLastReflection [lastReflectionHitPoint.x,lastReflectionHitPoint.y,lastReflectionHitPoint.z, totalDistanceTillLastReflection]
+	//optix::float3 E;
+	optix::float3 hor_v;
+	optix::float3 ver_v; 
+	optix::float3 hitPoint;
+	optix::float2 hor_coeff; //Complex 
+	optix::float2 ver_coeff; //Complex 
+	float electricFieldAmplitude; //Can be removed if antenna gain not used
+	float accumulatedAttenuation; //For penentration, in dB (Power)
+	int hits;
+	int reflections;
+	int internalRayInitialReflections;
+	bool end;
 	int rxBufferIndex; //Last receiver hit 
 	unsigned int refhash; //Combined hash to filter duplicates
 };
@@ -84,13 +109,13 @@ struct Transmitter {
 };
 
 struct TriangleHit {
-	optix::float4 geom_normal_t; //Pack normal and t 
+	optix::float4 geom_normal_t; //Pack normal and t [geom_normal.x,geom_normal.y,geom_normal.z,t] 
 	int triId;
 	unsigned int faceId;
 };
 
 struct SphereHit {
-	optix::float4 geom_normal_t; //Pack normal and t
+	optix::float4 geom_normal_t; //Pack normal and t [geom_normal.x,geom_normal.y,geom_normal.z,t] 
 };
 
 //Directly copied from boost

@@ -129,6 +129,14 @@ OPTIX_add_sample_executable( opal
   sphere.cu
   tutils.cu
   tutils.h
+  #To see it properly in Visual Studio we should add the following
+   polarization/generation.cu
+  polarization/receiver.cu
+  polarization/triangle.cu
+  polarization/tracePolarizationFunctions.h
+  polarization/sphere.cu
+  polarization/optixGeometryTriangles.cu
+
   )
 
 target_link_libraries( opal 
@@ -155,6 +163,13 @@ set(sources
   sphere.cu
   tutils.cu
   tutils.h
+   polarization/generation.cu
+  polarization/receiver.cu
+  polarization/triangle.cu
+  polarization/tracePolarizationFunctions.h
+  polarization/sphere.cu
+  polarization/optixGeometryTriangles.cu
+
 )
 OPTIX_add_sample_library( opal_s 
   Opal.cpp
@@ -174,6 +189,13 @@ OPTIX_add_sample_library( opal_s
   sphere.cu
   tutils.cu
   tutils.h
+   polarization/generation.cu
+  polarization/receiver.cu
+  polarization/triangle.cu
+  polarization/tracePolarizationFunctions.h
+  polarization/sphere.cu
+  polarization/optixGeometryTriangles.cu
+
   )
 
 target_link_libraries( opal_s 
@@ -200,4 +222,11 @@ set(sources
   sphere.cu
   tutils.cu
   tutils.h
+   polarization/generation.cu
+  polarization/receiver.cu
+  polarization/triangle.cu
+  polarization/tracePolarizationFunctions.h
+  polarization/sphere.cu
+  polarization/optixGeometryTriangles.cu
+
 )

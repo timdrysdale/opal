@@ -78,6 +78,7 @@ namespace opal {
 	class SphereReceiver {
 		public:
 			optix::float3 position;
+			optix::float3 polarization;
 			float radius;
 			optix::GeometryInstance geomInstance;
 			optix::Program closestHitProgram;
@@ -162,10 +163,11 @@ namespace opal {
 			//Control parameters
 			unsigned int numberOfFaces;
 			bool usePenetration;
+			bool useDepolarization;
 			float attenuationLimit;	
 
 			unsigned int maxReflections; //Default 10
-			float minEpsilon; //Default 1.e-4f
+			float minEpsilon; //Default 1.e-3f
 			bool useExactSpeedOfLight; //speed of light (can be exact or approximated)
 
 #ifdef OPALDEBUG
@@ -211,7 +213,7 @@ namespace opal {
 			//Now elevation delta and azimuthDelta are a decimal fraction of degree, that is, every unit is 0.1 degree, so elevationDelta=1 means 0.1 degree, elevationDelta=2 means 0.2 degree
 			void createRaySphere2DSubstep(int elevationDelta, int azimuthDelta);
 		//Receivers
-			void addReceiver(int id, optix::float3  position, float radius, std::function<void(float, int)>  callback);
+			void addReceiver(int id, optix::float3  position, optix::float3 polarization, float radius, std::function<void(float, int)>  callback);
 			void removeReceiver(int id);
 			void updateReceiver(int id, optix::float3 position);
 			void updateReceiver(int id, optix::float3 position, float radius);
@@ -225,6 +227,8 @@ namespace opal {
 		//Configure launch
 			void enablePenetration();
 			void disablePenetration();
+			void enableDepolarization(); 
+			void disableDepolarization();
 			void setFrequency(float f);
 			//Set max attenuation for penetration in dB. Rays with a higher attenuation are not traced for penetration 
 			void setAttenuationLimit(float f);
@@ -234,7 +238,7 @@ namespace opal {
 			void setUsageReport();
 			virtual std::string printInternalBuffersState();
 			virtual std::string printSceneReport();
-
+			virtual std::string printContextInformation();
 		protected:
 		//Scene
 			void extractFaces(optix::float3* meshVertices, std::vector<std::pair<optix::int3, unsigned int>> &triangleIndexBuffer);

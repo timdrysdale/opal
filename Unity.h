@@ -133,7 +133,7 @@ namespace opal {
 
 	extern "C" OPAL_API int UpdateReceiverWithRadius(int id, optix::float3 position, float radius);
 
-	extern "C" OPAL_API int AddReceiverFromUnity(int id, optix::float3 position, float radius, receiverCallback callback);
+	extern "C" OPAL_API int AddReceiverFromUnity(int id, optix::float3 position, optix::float3 polarization, float radius, receiverCallback callback);
 
 	extern "C" OPAL_API int RemoveReceiverFromUnity(int id);
 

@@ -3,7 +3,7 @@
 //Copyright (c) 2019 Esteban Egea-Lopez http://ait.upct.es/eegea
 //
 /**************************************************************/
-
+#pragma once
 #include <optix.h>
 #include <optixu/optixu_math_namespace.h>
 
