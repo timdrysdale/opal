@@ -61,7 +61,7 @@ opal::OpalSceneManager::~OpalSceneManager()
 	}
 }
 void OpalSceneManager::initMembers() {
-	
+
 	sysInfo.getSystemInformation();
 	std::cout<<sysInfo.printSystemInformation();
 	if (sysInfo.numberOfDevices ==0) {
@@ -106,6 +106,7 @@ void OpalSceneManager::initContext(float f,  bool useExactSpeedOfLight) {
 		configInfo<<"\t - You are assuming that: (1)  both transmitters and receivers have the same polarization and (2) the polarization is either purely vertical (0, 1, 0) or horizontal (1,0,0) or (0,0,1). " <<std::endl; 
 		configInfo<<"\t   If this is not the intended behaviour, check the use of depolarization, though it has a performance cost. " <<std::endl; 
 	}
+	configInfo<<"\t - CUDA programs directory: "<<cudaProgramsDir<<std::endl;
 	this->useExactSpeedOfLight=useExactSpeedOfLight;
 	setFrequency(f);
 	createSceneContext();
@@ -133,11 +134,12 @@ void OpalSceneManager::setMaxReflections(unsigned int m)
 	if (sceneFinished) {
 		context["max_interactions"]->setUint(maxReflections);
 	}
-		configInfo << "\t - maxReflections=" << maxReflections << std::endl;
+	configInfo << "\t - maxReflections=" << maxReflections << std::endl;
 
 }
 void OpalSceneManager::setEnabledDevices() {
 	if (!useMultiGPU) {
+		//TODO: Use the device with the highest compute capability
 		std::vector<int> dm;
 		dm.push_back(0);
 		context->setDevices(dm.begin(), dm.end());
@@ -288,9 +290,6 @@ OpalMesh OpalSceneManager::addStaticMesh(int meshVertexCount, optix::float3* mes
 
 		//std::cout <<"vertex=("<< meshVertices[i].x <<","<< meshVertices[i].y <<","<< meshVertices[i].z <<")"<< std::endl;
 		const float3 v = optix::make_float3(transformationMatrix*optix::make_float4(meshVertices[i], 1.0f));
-		//#ifdef OPALDEBUG
-		//			outputFile << "v=(" << v.x << "," << v.y << "," << v.z << ")" << std::endl;
-		//#endif
 		//std::cout<<"v="<<v<<std::endl;
 		transformedVertices[i]=v;
 	}
@@ -537,11 +536,6 @@ optix::Material OpalSceneManager::createMeshMaterial(unsigned int ray_type_index
 }
 optix::Program OpalSceneManager::createClosestHitMesh() {
 	optix::Program chmesh = context->createProgramFromPTXString(sutil::getPtxString(cudaProgramsDir.c_str(), "triangle.cu"), "closestHitTriangle");
-	//Add programs for complex arithmetic
-	//	chmesh["complex_sqrt"]->setProgramId(defaultPrograms.at("complex_sqrt"));
-	//	chmesh["sca_complex_prod"]->setProgramId(defaultPrograms.at("sca_complex_prod"));
-	//	chmesh["complex_prod"]->setProgramId(defaultPrograms.at("complex_prod"));
-	//	chmesh["complex_div"]->setProgramId(defaultPrograms.at("complex_div"));
 	return chmesh;
 
 }
@@ -753,16 +747,6 @@ void OpalSceneManager::createRaySphere2DSubstep(int elevationDelta, int azimuthD
 		throw  opal::Exception("Angle substep is greater than 10");
 	}
 
-	//optix::uint elevationSteps = (1800u / elevationDelta);
-
-	//optix::uint azimuthSteps = (3600u / azimuthDelta);
-
-
-
-
-
-
-
 
 	optix::uint elevationSteps = 0;
 	optix::uint azimuthSteps = 0;
@@ -780,7 +764,7 @@ void OpalSceneManager::createRaySphere2DSubstep(int elevationDelta, int azimuthD
 	raySphere.rayCount = elevationSteps*azimuthSteps;
 	raySphere.elevationSteps = elevationSteps;
 	raySphere.azimuthSteps = azimuthSteps;
-	//std::cout << "RaySphere2D rays=" << raySphere.rayCount << ". elevationSteps=" << raySphere.elevationSteps << ". azimtuhSteps=" << raySphere.azimuthSteps  << std::endl;
+	
 	int x = 0;
 	int y = 0;
 
@@ -1080,13 +1064,19 @@ void OpalSceneManager::executeTransmitLaunch(int txId, float txPower,  float3 or
 
 	//std::cout<<"lastHitIndex="<<lastHitIndex<<std::endl;
 
-	//Filter with thrust multiple hits coming from the same face
 	timer.restart();
+	//Filter with thrust multiple hits coming from the same face
 	uint hits=opalthrustutils::filterHitsWithCopyResize(globalHitInfoBuffer, resultHitInfoBuffer, lastHitIndex);
+	
+	//Performance test
 	timer.stop();
 	const double filterTime=timer.getTime();
 	timer.restart();
+
+	//Transfer the filtered hits to the host
 	HitInfo* host_hits=reinterpret_cast<HitInfo*>  (resultHitInfoBuffer->map());
+	
+	//Just for performance
 	timer.stop();
 	const double transferTime=timer.getTime();
 	float2 E=make_float2(0.0f,0.0f);
@@ -1123,11 +1113,12 @@ void OpalSceneManager::executeTransmitLaunch(int txId, float txPower,  float3 or
 		++raysHit;
 		E += host_hits->E;
 
-				std::cout<<"E["<<i<<"]="<<(host_hits)->E<<std::endl;
-				 std::cout<<"\t rxBufferIndex="<<(host_hits)->thrd.z<<std::endl;
-				 std::cout<<"\t written="<<(host_hits)->thrd.x<<std::endl;
-				 std::cout<<"\t refhash="<<(host_hits)->thrd.y<<std::endl;
-				 std::cout<<"\t dist="<<(host_hits)->thrd.w<<std::endl;
+	// Log hits received
+	//	std::cout<<"E["<<i<<"]="<<(host_hits)->E<<std::endl;
+	//	std::cout<<"\t rxBufferIndex="<<(host_hits)->thrd.z<<std::endl;
+	//	std::cout<<"\t written="<<(host_hits)->thrd.x<<std::endl;
+	//	std::cout<<"\t refhash="<<(host_hits)->thrd.y<<std::endl;
+	//	std::cout<<"\t dist="<<(host_hits)->thrd.w<<std::endl;
 
 
 		++host_hits;
@@ -1141,11 +1132,6 @@ void OpalSceneManager::executeTransmitLaunch(int txId, float txPower,  float3 or
 	resultHitInfoBuffer->unmap();
 }
 void OpalSceneManager::executeTransmitLaunchMultiGPU(int txId, float txPower,  float3 origin) {
-	//Initialize index for global buffer	
-//	uint* aib=reinterpret_cast<uint*>(atomicIndexBuffer->map());
-//	(*aib)=0u;
-//	atomicIndexBuffer->unmap();
-
 
 	//Transmission launch
 	//std::cout<<"Transmitting["<<txId<<"]["<<txPower<<"]"<<origin<<std::endl;	
@@ -1157,13 +1143,13 @@ void OpalSceneManager::executeTransmitLaunchMultiGPU(int txId, float txPower,  f
 	transmissionLaunches++;
 
 
-	//Filter with thrust multiple hits coming from the same face
 	timer.restart();
+	//Filter with thrust multiple hits coming from the same face. Directly returns the filtered vector
 	thrust::host_vector<HitInfo> host_hits=opalthrustutils::filterHitsMultiGPU(globalHitInfoBuffer,  atomicIndexBuffer, enabledDevices );
+	
+	//Log times for performance tests
 	timer.stop();
 	const double filterTime=timer.getTime();
-	//timer.restart();
-	//Log times for performance tests
 	uint numReceivers = static_cast<uint>(receivers.size());
 	std::cout<<"#"<<numReceivers<<"\t"<<host_hits.size()<<"\t"<<launchTime<<"\t"<<filterTime<<std::endl;
 
@@ -1196,11 +1182,11 @@ void OpalSceneManager::executeTransmitLaunchMultiGPU(int txId, float txPower,  f
 		++raysHit;
 		E += host_hits[i].E;
 
-				std::cout<<"E["<<i<<"]="<<host_hits[i].E<<std::endl;
-				 std::cout<<"\t rxBufferIndex="<<host_hits[i].thrd.z<<std::endl;
-				 std::cout<<"\t written="<<host_hits[i].thrd.x<<std::endl;
-				 std::cout<<"\t refhash="<<host_hits[i].thrd.y<<std::endl;
-				 std::cout<<"\t dist="<<host_hits[i].thrd.w<<std::endl;
+		std::cout<<"E["<<i<<"]="<<host_hits[i].E<<std::endl;
+		std::cout<<"\t rxBufferIndex="<<host_hits[i].thrd.z<<std::endl;
+		std::cout<<"\t written="<<host_hits[i].thrd.x<<std::endl;
+		std::cout<<"\t refhash="<<host_hits[i].thrd.y<<std::endl;
+		std::cout<<"\t dist="<<host_hits[i].thrd.w<<std::endl;
 
 
 
@@ -1339,7 +1325,7 @@ optix::Buffer OpalSceneManager::setGlobalHitInfoBuffer(optix::uint ele, optix::u
 	if (useMultiGPU) {
 		b = context->createBuffer(RT_BUFFER_INPUT_OUTPUT | RT_BUFFER_GPU_LOCAL, RT_FORMAT_USER, bsize );
 	} else {
-		 b = context->createBuffer(RT_BUFFER_OUTPUT, RT_FORMAT_USER, bsize );
+		b = context->createBuffer(RT_BUFFER_OUTPUT, RT_FORMAT_USER, bsize );
 	}
 	b->setElementSize(sizeof(HitInfo));
 	context["globalHitInfoBuffer"]->set(b);
@@ -1591,7 +1577,7 @@ void OpalSceneManager::enableMultiGPU() {
 		//It is actually perfectly safe to enable GPU devices after creating context, but for now we consider it an error
 		throw  opal::Exception("Do not enable multi GPU support after creating the context");
 		return;
-		
+
 	}
 	useMultiGPU=true;
 }
@@ -1600,7 +1586,7 @@ void OpalSceneManager::disableMultiGPU() {
 		//It is actually perfectly safe to enable GPU devices after creating context, but for now we consider it an error
 		throw  opal::Exception("Do not disable multi GPU support after creating the context");
 		return;
-		
+
 	}
 	useMultiGPU=false;
 }

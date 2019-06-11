@@ -111,7 +111,7 @@ set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/tutils.cu
   )
 
 # See top level CMakeLists.txt file for documentation of OPTIX_add_sample_executable.
-OPTIX_add_sample_executable( mopal 
+OPTIX_add_sample_executable( opal 
   Opal.cpp
   Opal.h
   Common.h
@@ -141,7 +141,7 @@ OPTIX_add_sample_executable( mopal
 
   )
 
-target_link_libraries( mopal 
+target_link_libraries( opal 
      ${CUDA_LIBRARIES}
   optix
   optixu
@@ -175,7 +175,7 @@ set(sources
   polarization/optixGeometryTriangles.cu
 
 )
-OPTIX_add_sample_library( mopal_s 
+OPTIX_add_sample_library( opal_s 
   Opal.cpp
   Opal.h
   Common.h
@@ -204,7 +204,7 @@ OPTIX_add_sample_library( mopal_s
 
   )
 
-target_link_libraries( mopal_s 
+target_link_libraries( opal_s 
      ${CUDA_LIBRARIES}
   optix
   optixu

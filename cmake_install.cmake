@@ -1,4 +1,4 @@
-# Install script for directory: /home/eegea/optix6/SDK/mopal
+# Install script for directory: /home/eegea/optix6/SDK/opal
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)

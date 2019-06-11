@@ -80,14 +80,14 @@ rebuild_cache/fast: rebuild_cache
 
 # The main all target
 all: cmake_check_build_system
-	cd /home/eegea/optix6/SDK && $(CMAKE_COMMAND) -E cmake_progress_start /home/eegea/optix6/SDK/CMakeFiles /home/eegea/optix6/SDK/mopal/CMakeFiles/progress.marks
-	cd /home/eegea/optix6/SDK && $(MAKE) -f CMakeFiles/Makefile2 mopal/all
+	cd /home/eegea/optix6/SDK && $(CMAKE_COMMAND) -E cmake_progress_start /home/eegea/optix6/SDK/CMakeFiles /home/eegea/optix6/SDK/opal/CMakeFiles/progress.marks
+	cd /home/eegea/optix6/SDK && $(MAKE) -f CMakeFiles/Makefile2 opal/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /home/eegea/optix6/SDK/CMakeFiles 0
 .PHONY : all
 
 # The main clean target
 clean:
-	cd /home/eegea/optix6/SDK && $(MAKE) -f CMakeFiles/Makefile2 mopal/clean
+	cd /home/eegea/optix6/SDK && $(MAKE) -f CMakeFiles/Makefile2 opal/clean
 .PHONY : clean
 
 # The main clean target
@@ -97,12 +97,12 @@ clean/fast: clean
 
 # Prepare targets for installation.
 preinstall: all
-	cd /home/eegea/optix6/SDK && $(MAKE) -f CMakeFiles/Makefile2 mopal/preinstall
+	cd /home/eegea/optix6/SDK && $(MAKE) -f CMakeFiles/Makefile2 opal/preinstall
 .PHONY : preinstall
 
 # Prepare targets for installation.
 preinstall/fast:
-	cd /home/eegea/optix6/SDK && $(MAKE) -f CMakeFiles/Makefile2 mopal/preinstall
+	cd /home/eegea/optix6/SDK && $(MAKE) -f CMakeFiles/Makefile2 opal/preinstall
 .PHONY : preinstall/fast
 
 # clear depends
@@ -111,34 +111,34 @@ depend:
 .PHONY : depend
 
 # Convenience name for target.
-mopal/CMakeFiles/mopal.dir/rule:
-	cd /home/eegea/optix6/SDK && $(MAKE) -f CMakeFiles/Makefile2 mopal/CMakeFiles/mopal.dir/rule
-.PHONY : mopal/CMakeFiles/mopal.dir/rule
+opal/CMakeFiles/opal.dir/rule:
+	cd /home/eegea/optix6/SDK && $(MAKE) -f CMakeFiles/Makefile2 opal/CMakeFiles/opal.dir/rule
+.PHONY : opal/CMakeFiles/opal.dir/rule
 
 # Convenience name for target.
-mopal: mopal/CMakeFiles/mopal.dir/rule
+opal: opal/CMakeFiles/opal.dir/rule
 
-.PHONY : mopal
+.PHONY : opal
 
 # fast build rule for target.
-mopal/fast:
-	cd /home/eegea/optix6/SDK && $(MAKE) -f mopal/CMakeFiles/mopal.dir/build.make mopal/CMakeFiles/mopal.dir/build
-.PHONY : mopal/fast
+opal/fast:
+	cd /home/eegea/optix6/SDK && $(MAKE) -f opal/CMakeFiles/opal.dir/build.make opal/CMakeFiles/opal.dir/build
+.PHONY : opal/fast
 
 # Convenience name for target.
-mopal/CMakeFiles/mopal_s.dir/rule:
-	cd /home/eegea/optix6/SDK && $(MAKE) -f CMakeFiles/Makefile2 mopal/CMakeFiles/mopal_s.dir/rule
-.PHONY : mopal/CMakeFiles/mopal_s.dir/rule
+opal/CMakeFiles/opal_s.dir/rule:
+	cd /home/eegea/optix6/SDK && $(MAKE) -f CMakeFiles/Makefile2 opal/CMakeFiles/opal_s.dir/rule
+.PHONY : opal/CMakeFiles/opal_s.dir/rule
 
 # Convenience name for target.
-mopal_s: mopal/CMakeFiles/mopal_s.dir/rule
+opal_s: opal/CMakeFiles/opal_s.dir/rule
 
-.PHONY : mopal_s
+.PHONY : opal_s
 
 # fast build rule for target.
-mopal_s/fast:
-	cd /home/eegea/optix6/SDK && $(MAKE) -f mopal/CMakeFiles/mopal_s.dir/build.make mopal/CMakeFiles/mopal_s.dir/build
-.PHONY : mopal_s/fast
+opal_s/fast:
+	cd /home/eegea/optix6/SDK && $(MAKE) -f opal/CMakeFiles/opal_s.dir/build.make opal/CMakeFiles/opal_s.dir/build
+.PHONY : opal_s/fast
 
 Opal.o: Opal.cpp.o
 
@@ -146,8 +146,8 @@ Opal.o: Opal.cpp.o
 
 # target to build an object file
 Opal.cpp.o:
-	cd /home/eegea/optix6/SDK && $(MAKE) -f mopal/CMakeFiles/mopal.dir/build.make mopal/CMakeFiles/mopal.dir/Opal.cpp.o
-	cd /home/eegea/optix6/SDK && $(MAKE) -f mopal/CMakeFiles/mopal_s.dir/build.make mopal/CMakeFiles/mopal_s.dir/Opal.cpp.o
+	cd /home/eegea/optix6/SDK && $(MAKE) -f opal/CMakeFiles/opal.dir/build.make opal/CMakeFiles/opal.dir/Opal.cpp.o
+	cd /home/eegea/optix6/SDK && $(MAKE) -f opal/CMakeFiles/opal_s.dir/build.make opal/CMakeFiles/opal_s.dir/Opal.cpp.o
 .PHONY : Opal.cpp.o
 
 Opal.i: Opal.cpp.i
@@ -156,8 +156,8 @@ Opal.i: Opal.cpp.i
 
 # target to preprocess a source file
 Opal.cpp.i:
-	cd /home/eegea/optix6/SDK && $(MAKE) -f mopal/CMakeFiles/mopal.dir/build.make mopal/CMakeFiles/mopal.dir/Opal.cpp.i
-	cd /home/eegea/optix6/SDK && $(MAKE) -f mopal/CMakeFiles/mopal_s.dir/build.make mopal/CMakeFiles/mopal_s.dir/Opal.cpp.i
+	cd /home/eegea/optix6/SDK && $(MAKE) -f opal/CMakeFiles/opal.dir/build.make opal/CMakeFiles/opal.dir/Opal.cpp.i
+	cd /home/eegea/optix6/SDK && $(MAKE) -f opal/CMakeFiles/opal_s.dir/build.make opal/CMakeFiles/opal_s.dir/Opal.cpp.i
 .PHONY : Opal.cpp.i
 
 Opal.s: Opal.cpp.s
@@ -166,8 +166,8 @@ Opal.s: Opal.cpp.s
 
 # target to generate assembly for a file
 Opal.cpp.s:
-	cd /home/eegea/optix6/SDK && $(MAKE) -f mopal/CMakeFiles/mopal.dir/build.make mopal/CMakeFiles/mopal.dir/Opal.cpp.s
-	cd /home/eegea/optix6/SDK && $(MAKE) -f mopal/CMakeFiles/mopal_s.dir/build.make mopal/CMakeFiles/mopal_s.dir/Opal.cpp.s
+	cd /home/eegea/optix6/SDK && $(MAKE) -f opal/CMakeFiles/opal.dir/build.make opal/CMakeFiles/opal.dir/Opal.cpp.s
+	cd /home/eegea/optix6/SDK && $(MAKE) -f opal/CMakeFiles/opal_s.dir/build.make opal/CMakeFiles/opal_s.dir/Opal.cpp.s
 .PHONY : Opal.cpp.s
 
 Unity.o: Unity.cpp.o
@@ -176,8 +176,8 @@ Unity.o: Unity.cpp.o
 
 # target to build an object file
 Unity.cpp.o:
-	cd /home/eegea/optix6/SDK && $(MAKE) -f mopal/CMakeFiles/mopal.dir/build.make mopal/CMakeFiles/mopal.dir/Unity.cpp.o
-	cd /home/eegea/optix6/SDK && $(MAKE) -f mopal/CMakeFiles/mopal_s.dir/build.make mopal/CMakeFiles/mopal_s.dir/Unity.cpp.o
+	cd /home/eegea/optix6/SDK && $(MAKE) -f opal/CMakeFiles/opal.dir/build.make opal/CMakeFiles/opal.dir/Unity.cpp.o
+	cd /home/eegea/optix6/SDK && $(MAKE) -f opal/CMakeFiles/opal_s.dir/build.make opal/CMakeFiles/opal_s.dir/Unity.cpp.o
 .PHONY : Unity.cpp.o
 
 Unity.i: Unity.cpp.i
@@ -186,8 +186,8 @@ Unity.i: Unity.cpp.i
 
 # target to preprocess a source file
 Unity.cpp.i:
-	cd /home/eegea/optix6/SDK && $(MAKE) -f mopal/CMakeFiles/mopal.dir/build.make mopal/CMakeFiles/mopal.dir/Unity.cpp.i
-	cd /home/eegea/optix6/SDK && $(MAKE) -f mopal/CMakeFiles/mopal_s.dir/build.make mopal/CMakeFiles/mopal_s.dir/Unity.cpp.i
+	cd /home/eegea/optix6/SDK && $(MAKE) -f opal/CMakeFiles/opal.dir/build.make opal/CMakeFiles/opal.dir/Unity.cpp.i
+	cd /home/eegea/optix6/SDK && $(MAKE) -f opal/CMakeFiles/opal_s.dir/build.make opal/CMakeFiles/opal_s.dir/Unity.cpp.i
 .PHONY : Unity.cpp.i
 
 Unity.s: Unity.cpp.s
@@ -196,8 +196,8 @@ Unity.s: Unity.cpp.s
 
 # target to generate assembly for a file
 Unity.cpp.s:
-	cd /home/eegea/optix6/SDK && $(MAKE) -f mopal/CMakeFiles/mopal.dir/build.make mopal/CMakeFiles/mopal.dir/Unity.cpp.s
-	cd /home/eegea/optix6/SDK && $(MAKE) -f mopal/CMakeFiles/mopal_s.dir/build.make mopal/CMakeFiles/mopal_s.dir/Unity.cpp.s
+	cd /home/eegea/optix6/SDK && $(MAKE) -f opal/CMakeFiles/opal.dir/build.make opal/CMakeFiles/opal.dir/Unity.cpp.s
+	cd /home/eegea/optix6/SDK && $(MAKE) -f opal/CMakeFiles/opal_s.dir/build.make opal/CMakeFiles/opal_s.dir/Unity.cpp.s
 .PHONY : Unity.cpp.s
 
 multitransmitter.o: multitransmitter.cpp.o
@@ -206,8 +206,8 @@ multitransmitter.o: multitransmitter.cpp.o
 
 # target to build an object file
 multitransmitter.cpp.o:
-	cd /home/eegea/optix6/SDK && $(MAKE) -f mopal/CMakeFiles/mopal.dir/build.make mopal/CMakeFiles/mopal.dir/multitransmitter.cpp.o
-	cd /home/eegea/optix6/SDK && $(MAKE) -f mopal/CMakeFiles/mopal_s.dir/build.make mopal/CMakeFiles/mopal_s.dir/multitransmitter.cpp.o
+	cd /home/eegea/optix6/SDK && $(MAKE) -f opal/CMakeFiles/opal.dir/build.make opal/CMakeFiles/opal.dir/multitransmitter.cpp.o
+	cd /home/eegea/optix6/SDK && $(MAKE) -f opal/CMakeFiles/opal_s.dir/build.make opal/CMakeFiles/opal_s.dir/multitransmitter.cpp.o
 .PHONY : multitransmitter.cpp.o
 
 multitransmitter.i: multitransmitter.cpp.i
@@ -216,8 +216,8 @@ multitransmitter.i: multitransmitter.cpp.i
 
 # target to preprocess a source file
 multitransmitter.cpp.i:
-	cd /home/eegea/optix6/SDK && $(MAKE) -f mopal/CMakeFiles/mopal.dir/build.make mopal/CMakeFiles/mopal.dir/multitransmitter.cpp.i
-	cd /home/eegea/optix6/SDK && $(MAKE) -f mopal/CMakeFiles/mopal_s.dir/build.make mopal/CMakeFiles/mopal_s.dir/multitransmitter.cpp.i
+	cd /home/eegea/optix6/SDK && $(MAKE) -f opal/CMakeFiles/opal.dir/build.make opal/CMakeFiles/opal.dir/multitransmitter.cpp.i
+	cd /home/eegea/optix6/SDK && $(MAKE) -f opal/CMakeFiles/opal_s.dir/build.make opal/CMakeFiles/opal_s.dir/multitransmitter.cpp.i
 .PHONY : multitransmitter.cpp.i
 
 multitransmitter.s: multitransmitter.cpp.s
@@ -226,8 +226,8 @@ multitransmitter.s: multitransmitter.cpp.s
 
 # target to generate assembly for a file
 multitransmitter.cpp.s:
-	cd /home/eegea/optix6/SDK && $(MAKE) -f mopal/CMakeFiles/mopal.dir/build.make mopal/CMakeFiles/mopal.dir/multitransmitter.cpp.s
-	cd /home/eegea/optix6/SDK && $(MAKE) -f mopal/CMakeFiles/mopal_s.dir/build.make mopal/CMakeFiles/mopal_s.dir/multitransmitter.cpp.s
+	cd /home/eegea/optix6/SDK && $(MAKE) -f opal/CMakeFiles/opal.dir/build.make opal/CMakeFiles/opal.dir/multitransmitter.cpp.s
+	cd /home/eegea/optix6/SDK && $(MAKE) -f opal/CMakeFiles/opal_s.dir/build.make opal/CMakeFiles/opal_s.dir/multitransmitter.cpp.s
 .PHONY : multitransmitter.cpp.s
 
 tests.o: tests.cpp.o
@@ -236,8 +236,8 @@ tests.o: tests.cpp.o
 
 # target to build an object file
 tests.cpp.o:
-	cd /home/eegea/optix6/SDK && $(MAKE) -f mopal/CMakeFiles/mopal.dir/build.make mopal/CMakeFiles/mopal.dir/tests.cpp.o
-	cd /home/eegea/optix6/SDK && $(MAKE) -f mopal/CMakeFiles/mopal_s.dir/build.make mopal/CMakeFiles/mopal_s.dir/tests.cpp.o
+	cd /home/eegea/optix6/SDK && $(MAKE) -f opal/CMakeFiles/opal.dir/build.make opal/CMakeFiles/opal.dir/tests.cpp.o
+	cd /home/eegea/optix6/SDK && $(MAKE) -f opal/CMakeFiles/opal_s.dir/build.make opal/CMakeFiles/opal_s.dir/tests.cpp.o
 .PHONY : tests.cpp.o
 
 tests.i: tests.cpp.i
@@ -246,8 +246,8 @@ tests.i: tests.cpp.i
 
 # target to preprocess a source file
 tests.cpp.i:
-	cd /home/eegea/optix6/SDK && $(MAKE) -f mopal/CMakeFiles/mopal.dir/build.make mopal/CMakeFiles/mopal.dir/tests.cpp.i
-	cd /home/eegea/optix6/SDK && $(MAKE) -f mopal/CMakeFiles/mopal_s.dir/build.make mopal/CMakeFiles/mopal_s.dir/tests.cpp.i
+	cd /home/eegea/optix6/SDK && $(MAKE) -f opal/CMakeFiles/opal.dir/build.make opal/CMakeFiles/opal.dir/tests.cpp.i
+	cd /home/eegea/optix6/SDK && $(MAKE) -f opal/CMakeFiles/opal_s.dir/build.make opal/CMakeFiles/opal_s.dir/tests.cpp.i
 .PHONY : tests.cpp.i
 
 tests.s: tests.cpp.s
@@ -256,8 +256,8 @@ tests.s: tests.cpp.s
 
 # target to generate assembly for a file
 tests.cpp.s:
-	cd /home/eegea/optix6/SDK && $(MAKE) -f mopal/CMakeFiles/mopal.dir/build.make mopal/CMakeFiles/mopal.dir/tests.cpp.s
-	cd /home/eegea/optix6/SDK && $(MAKE) -f mopal/CMakeFiles/mopal_s.dir/build.make mopal/CMakeFiles/mopal_s.dir/tests.cpp.s
+	cd /home/eegea/optix6/SDK && $(MAKE) -f opal/CMakeFiles/opal.dir/build.make opal/CMakeFiles/opal.dir/tests.cpp.s
+	cd /home/eegea/optix6/SDK && $(MAKE) -f opal/CMakeFiles/opal_s.dir/build.make opal/CMakeFiles/opal_s.dir/tests.cpp.s
 .PHONY : tests.cpp.s
 
 timer.o: timer.cpp.o
@@ -266,8 +266,8 @@ timer.o: timer.cpp.o
 
 # target to build an object file
 timer.cpp.o:
-	cd /home/eegea/optix6/SDK && $(MAKE) -f mopal/CMakeFiles/mopal.dir/build.make mopal/CMakeFiles/mopal.dir/timer.cpp.o
-	cd /home/eegea/optix6/SDK && $(MAKE) -f mopal/CMakeFiles/mopal_s.dir/build.make mopal/CMakeFiles/mopal_s.dir/timer.cpp.o
+	cd /home/eegea/optix6/SDK && $(MAKE) -f opal/CMakeFiles/opal.dir/build.make opal/CMakeFiles/opal.dir/timer.cpp.o
+	cd /home/eegea/optix6/SDK && $(MAKE) -f opal/CMakeFiles/opal_s.dir/build.make opal/CMakeFiles/opal_s.dir/timer.cpp.o
 .PHONY : timer.cpp.o
 
 timer.i: timer.cpp.i
@@ -276,8 +276,8 @@ timer.i: timer.cpp.i
 
 # target to preprocess a source file
 timer.cpp.i:
-	cd /home/eegea/optix6/SDK && $(MAKE) -f mopal/CMakeFiles/mopal.dir/build.make mopal/CMakeFiles/mopal.dir/timer.cpp.i
-	cd /home/eegea/optix6/SDK && $(MAKE) -f mopal/CMakeFiles/mopal_s.dir/build.make mopal/CMakeFiles/mopal_s.dir/timer.cpp.i
+	cd /home/eegea/optix6/SDK && $(MAKE) -f opal/CMakeFiles/opal.dir/build.make opal/CMakeFiles/opal.dir/timer.cpp.i
+	cd /home/eegea/optix6/SDK && $(MAKE) -f opal/CMakeFiles/opal_s.dir/build.make opal/CMakeFiles/opal_s.dir/timer.cpp.i
 .PHONY : timer.cpp.i
 
 timer.s: timer.cpp.s
@@ -286,8 +286,8 @@ timer.s: timer.cpp.s
 
 # target to generate assembly for a file
 timer.cpp.s:
-	cd /home/eegea/optix6/SDK && $(MAKE) -f mopal/CMakeFiles/mopal.dir/build.make mopal/CMakeFiles/mopal.dir/timer.cpp.s
-	cd /home/eegea/optix6/SDK && $(MAKE) -f mopal/CMakeFiles/mopal_s.dir/build.make mopal/CMakeFiles/mopal_s.dir/timer.cpp.s
+	cd /home/eegea/optix6/SDK && $(MAKE) -f opal/CMakeFiles/opal.dir/build.make opal/CMakeFiles/opal.dir/timer.cpp.s
+	cd /home/eegea/optix6/SDK && $(MAKE) -f opal/CMakeFiles/opal_s.dir/build.make opal/CMakeFiles/opal_s.dir/timer.cpp.s
 .PHONY : timer.cpp.s
 
 # Help Target
@@ -298,8 +298,8 @@ help:
 	@echo "... depend"
 	@echo "... edit_cache"
 	@echo "... rebuild_cache"
-	@echo "... mopal"
-	@echo "... mopal_s"
+	@echo "... opal"
+	@echo "... opal_s"
 	@echo "... Opal.o"
 	@echo "... Opal.i"
 	@echo "... Opal.s"
