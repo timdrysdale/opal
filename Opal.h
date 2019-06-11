@@ -12,6 +12,7 @@
 #include <optix_world.h>
 #include <map>
 #include <fstream>
+#include <sstream>
 #include <functional>
 #include <vector>
 #include <memory>
@@ -117,6 +118,30 @@ namespace opal {
 	typedef std::map<optix::float3, unsigned int, face_compare> FaceMap; //Used to extract the faces of the meshes
 
 
+	//Sytem information
+	
+	struct DeviceInformation {
+		char name[256];
+		int computeCapability[2] = {0, 0};
+		RTsize totalMemory = 0;
+		int clockRate = 0;
+		int maxThreadsPerBlock = 0;
+		int smCount = 0;
+		int executionTimeoutEnabled = 0;
+		int maxHardwareTextureCount = 0 ;
+		int tccDriver = 0;
+		int cudaDeviceOrdinal = 0;
+	};
+	struct SystemInformation {
+		unsigned int optixVersion;
+		unsigned int major = optixVersion / 1000; // Check major with old formula.
+		unsigned int minor;
+		unsigned int micro;
+		unsigned int numberOfDevices = 0;
+		std::vector<DeviceInformation> devices;		
+		void getSystemInformation();
+		std::string printSystemInformation();
+	};
 	class OpalSceneManager {
 		protected:
 			//Source directory in SDK, used by sutil to find .cu programs
@@ -164,12 +189,13 @@ namespace opal {
 			unsigned int numberOfFaces;
 			bool usePenetration;
 			bool useDepolarization;
+			bool useMultiGPU;
 			float attenuationLimit;	
 
 			unsigned int maxReflections; //Default 10
 			float minEpsilon; //Default 1.e-3f
 			bool useExactSpeedOfLight; //speed of light (can be exact or approximated)
-
+			std::ostringstream configInfo;
 #ifdef OPALDEBUG
 			std::ofstream outputFile;
 #endif // OPALDEBUG
@@ -178,9 +204,14 @@ namespace opal {
 			float radioReductionFraction;
 			//Default programs
 
-			float deg2rad;   //Degrees to radians
 			std::map<std::string,optix::Program> defaultPrograms;
 			optix::Material defaultMeshMaterial;
+			float deg2rad;   //Degrees to radians
+			
+			//System information
+			SystemInformation sysInfo;
+			std::vector<int> enabledDevices;
+				
 
 
 		public:
@@ -191,7 +222,7 @@ namespace opal {
 			void initContext(float f, bool useExactSpeedOfLight=true);
 			virtual void initMembers();
 			ChannelParameters getChannelParameters() const;
-				
+			void setEnabledDevices();	
 		//Static meshes	
 			void setMeshEMProperties(optix::GeometryInstance geom_instance, MaterialEMProperties emProp);
 			OpalMesh createMesh(int meshVertexCount, optix::float3* meshVertices, int meshTriangleCount, int* meshTriangles, optix::Program intersectionProgram, optix::Program boundingBoxProgram, optix::Material material);
@@ -225,6 +256,8 @@ namespace opal {
 			void finishSceneContext();
 
 		//Configure launch
+			void enableMultiGPU();
+			void disableMultiGPU();
 			void enablePenetration();
 			void disablePenetration();
 			void enableDepolarization(); 
@@ -246,6 +279,8 @@ namespace opal {
 
 			void createSceneContext();
 			void buildSceneGraph();
+
+		
 
 		//Default programs
 			void setDefaultPrograms();
@@ -273,12 +308,10 @@ namespace opal {
 			virtual optix::Program createRayGenerationProgram();
 
 
-		//Complex functions and arithmetic programs
-			optix::Program createComplexScaProd();
-			optix::Program createComplexExpImaginary();
-			optix::Program createComplexSqrt();
-			optix::Program createComplexDiv();
-			optix::Program createComplexProd();
+		//Launches and multi GPU
+			void executeTransmitLaunch(int txId, float txPower,  optix::float3 origin);
+			void executeTransmitLaunchMultiGPU(int txId, float txPower,  optix::float3 origin);
+
 
 		//Internal buffers
 			virtual void setInternalBuffers();
@@ -298,83 +331,5 @@ namespace opal {
 
 
 
-	//From NVIDIA samples
-#ifndef TIMER_H
-#define TIMER_H
-
-#if defined(_WIN32)
-#include <Windows.h>
-#else
-#include <sys/time.h>
-#endif
-
-
-	/*! \brief A simple timer class.
-	 * This timer class can be used on Windows and Linux systems to
-	 * measure time intervals in seconds.
-	 * The timer can be started and stopped several times and accumulates
-	 * time elapsed between the start() and stop() calls. */
-	class Timer
-	{
-		public:
-			//! Default constructor. Constructs a Timer, but does not start it yet. 
-			Timer();
-
-			//! Default destructor.
-			~Timer();
-
-			//! Starts the timer.
-			void start();
-
-			//! Stops the timer.
-			void stop();
-
-			//! Resets the timer.
-			void reset();
-
-			//! Resets the timer and starts it.
-			void restart();
-
-			//! Returns the current time in seconds.
-			double getTime() const;
-
-			//! Return whether the timer is still running.
-			bool isRunning() const { return m_running; }
-
-		private:
-#if defined(_WIN32)
-			typedef LARGE_INTEGER Time;
-#else
-			typedef timeval Time;
-#endif
-
-		private:
-			double calcDuration(Time begin, Time end) const;
-
-		private:
-#if defined(_WIN32)
-			LARGE_INTEGER m_freq;
-#endif
-			Time   m_begin;
-			bool   m_running;
-			double m_seconds;
-	};
-
-#endif // TIMER_H
 } //namespace opal
 
-//Load meshes
-/*std::vector<optix::float3>  loadVerticesFromFile(const char* file);
-std::vector<int>  loadTrianglesFromFile(const char* file);
-
-//Tests
-
-std::unique_ptr<opal::OpalSceneManager> crossingTest(std::unique_ptr<opal::OpalSceneManager> sceneManager, bool print, bool subSteps);
-std::unique_ptr<opal::OpalSceneManager> planeTest(std::unique_ptr<opal::OpalSceneManager> sceneManager, bool print, bool subSteps);
-std::unique_ptr<opal::OpalSceneManager> quadTest(std::unique_ptr<opal::OpalSceneManager> sceneManager, bool print, bool subSteps);
-std::unique_ptr<opal::OpalSceneManager> addRemoveReceivers(std::unique_ptr<opal::OpalSceneManager> sceneManager);
-std::unique_ptr<opal::OpalSceneManager> moveReceivers(std::unique_ptr<opal::OpalSceneManager> sceneManager);
-std::unique_ptr<opal::OpalSceneManager> addRemoveDynamicMeshes(std::unique_ptr<opal::OpalSceneManager> sceneManager, bool print, bool subSteps);
-std::unique_ptr<opal::OpalSceneManager> addCompoundDynamicMeshes(std::unique_ptr<opal::OpalSceneManager> sceneManager);
-std::unique_ptr<opal::OpalSceneManager> crossingTestAndVehicle(std::unique_ptr<opal::OpalSceneManager> sceneManager);
-*/

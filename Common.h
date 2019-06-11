@@ -86,7 +86,6 @@ struct LPWavePayload {
 	//Copy common fields. I do not see the need for inheritance here yet
 	optix::float4 ndtd; //Packed next direction and total distance [nextDirection.x,nextDirection.y,nextDirection.z,totalDistance]
 	optix::float4 lrhpd; //Packed lastReflectionHitPoint and totalDistanceTillLastReflection [lastReflectionHitPoint.x,lastReflectionHitPoint.y,lastReflectionHitPoint.z, totalDistanceTillLastReflection]
-	//optix::float3 E;
 	optix::float3 hor_v;
 	optix::float3 ver_v; 
 	optix::float3 hitPoint;

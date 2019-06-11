@@ -111,7 +111,7 @@ set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/tutils.cu
   )
 
 # See top level CMakeLists.txt file for documentation of OPTIX_add_sample_executable.
-OPTIX_add_sample_executable( opal 
+OPTIX_add_sample_executable( mopal 
   Opal.cpp
   Opal.h
   Common.h
@@ -129,6 +129,8 @@ OPTIX_add_sample_executable( opal
   sphere.cu
   tutils.cu
   tutils.h
+  timer.h
+  timer.cpp
   #To see it properly in Visual Studio we should add the following
    polarization/generation.cu
   polarization/receiver.cu
@@ -139,7 +141,7 @@ OPTIX_add_sample_executable( opal
 
   )
 
-target_link_libraries( opal 
+target_link_libraries( mopal 
      ${CUDA_LIBRARIES}
   optix
   optixu
@@ -163,6 +165,8 @@ set(sources
   sphere.cu
   tutils.cu
   tutils.h
+  timer.h
+  timer.cpp
    polarization/generation.cu
   polarization/receiver.cu
   polarization/triangle.cu
@@ -171,7 +175,7 @@ set(sources
   polarization/optixGeometryTriangles.cu
 
 )
-OPTIX_add_sample_library( opal_s 
+OPTIX_add_sample_library( mopal_s 
   Opal.cpp
   Opal.h
   Common.h
@@ -189,6 +193,8 @@ OPTIX_add_sample_library( opal_s
   sphere.cu
   tutils.cu
   tutils.h
+  timer.h
+  timer.cpp
    polarization/generation.cu
   polarization/receiver.cu
   polarization/triangle.cu
@@ -198,7 +204,7 @@ OPTIX_add_sample_library( opal_s
 
   )
 
-target_link_libraries( opal_s 
+target_link_libraries( mopal_s 
      ${CUDA_LIBRARIES}
   optix
   optixu
@@ -222,6 +228,8 @@ set(sources
   sphere.cu
   tutils.cu
   tutils.h
+  timer.h
+  timer.cpp
    polarization/generation.cu
   polarization/receiver.cu
   polarization/triangle.cu

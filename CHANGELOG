@@ -1,4 +1,14 @@
-Opal-0.3 (April 2019)
+Opal-0.4 (June 2019)
+-----------
+1. Depolarization added. Now, you can use arbitrary and different linear polarizations for transmitters and receivers. It also allows to simulate leaning (non horizontal or vertical) walls. It also has a performance cost, 
+so it can be enabled or disabled. Polarization programas are in their own folder.
+2. Multi-device. Multiple GPUs can be used seamlessly. In fact, the Optix context manages them automatically. Some minor changes have been done to support this. 
+3. Add a different different payload type. Now we have the HVWavePayload for the default mode with vertical or horizontal polarization and a LPWavePayload for arbitrary linear polarizations. In both cases, 
+the fields have been packed as suggested in the documentation to improve the performance.  
+
+
+
+Opal-0.3 (April 2019) 
 -----------
 1. Penetration added. Now rays can penetrate environment elements. Penetration uses recursive tracing and incurs in a performance penalty, so it 
 can be enabled or disabled. A transmission coefficient plus an independent material attenuation are aplied to the rays. 

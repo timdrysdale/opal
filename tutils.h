@@ -13,11 +13,13 @@
 #include <optixu/optixu_math_namespace.h>
 #include <optixu/optixu_matrix_namespace.h> 
 #include <optixu/optixpp_namespace.h>
-
+#include <thrust/host_vector.h>
+#include "Common.h"
 //Functions to filter duplicate hits on device with the Thrust library
 
 namespace opalthrustutils {
 	uint filterHitsWithCopy(optix::Buffer hitBuffer, optix::Buffer resultBuffer, unsigned int bsize); 
 	uint filterHitsWithCopyResize(optix::Buffer hitBuffer, optix::Buffer resultBuffer, unsigned int bsize); 
+	thrust::host_vector<HitInfo> filterHitsMultiGPU( optix::Buffer hitBuffer, optix::Buffer aIndex, const std::vector<int> &devices); 
 }
 

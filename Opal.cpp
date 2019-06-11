@@ -5,6 +5,7 @@
 /**************************************************************/
 
 
+#include "timer.h"
 #include "tutils.h"
 #include "Opal.h"
 #include "Common.h"
@@ -22,7 +23,7 @@
 #include <sstream>
 #endif
 #include <iomanip>
-
+#include <thrust/host_vector.h>
 
 
 using namespace opal;
@@ -49,6 +50,7 @@ opal::OpalSceneManager::~OpalSceneManager()
 		if (context) {
 			context->destroy();
 		}
+		context=nullptr;
 
 #ifdef OPALDEBUG
 		outputFile.close();
@@ -59,15 +61,26 @@ opal::OpalSceneManager::~OpalSceneManager()
 	}
 }
 void OpalSceneManager::initMembers() {
-
+	
+	sysInfo.getSystemInformation();
+	std::cout<<sysInfo.printSystemInformation();
+	if (sysInfo.numberOfDevices ==0) {
+		throw  opal::Exception("initMembers(): No supported GPU found");
+		return;
+	} else if (sysInfo.numberOfDevices ==1) {
+		useMultiGPU=false;
+	} else {
+		useMultiGPU=true;
+	}
+	this->context=nullptr;
 	this->deg2rad=M_PI/180.f;
 	//Change to your own directory
 	this->cudaProgramsDir="opal";
 	this->maxReflections = 10u;
 	this->minEpsilon = 1.e-3f;
 	this->useExactSpeedOfLight=true;
-	//Increased every time a new face is added to the scene.  
 
+	//Increased every time a new face is added to the scene.  
 	this->numberOfFaces = 0u; 
 	this->sceneGraphCreated = false;
 	this->sceneFinished = false;
@@ -86,14 +99,14 @@ void OpalSceneManager::initContext(float f,  bool useExactSpeedOfLight) {
 #ifdef OPALDEBUG
 	outputFile.open("opal_log.txt");
 #endif // OPALDEBUG
-	this->useExactSpeedOfLight=useExactSpeedOfLight;
 	if (useDepolarization) {
 		this->cudaProgramsDir="opal/polarization";
 	} else {
 		//Show warning to remark the assumptions
-		std::cout<<"** You are assuming that: (1)  both transmitters and receivers have the same polarization and (2) the polarization is either purely vertical (0, 1, 0) or horizontal (1,0,0) or (0,0,1). " <<std::endl; 
-		std::cout<<"** If this is not the intended behaviour, check the use of depolarization, though it has a performance cost. " <<std::endl; 
+		configInfo<<"\t - You are assuming that: (1)  both transmitters and receivers have the same polarization and (2) the polarization is either purely vertical (0, 1, 0) or horizontal (1,0,0) or (0,0,1). " <<std::endl; 
+		configInfo<<"\t   If this is not the intended behaviour, check the use of depolarization, though it has a performance cost. " <<std::endl; 
 	}
+	this->useExactSpeedOfLight=useExactSpeedOfLight;
 	setFrequency(f);
 	createSceneContext();
 	setDefaultPrograms();
@@ -104,8 +117,10 @@ void OpalSceneManager::setFrequency(float f)
 	this->defaultChannel.frequency = f;
 	if (useExactSpeedOfLight) {
 		this->defaultChannel.waveLength = 299792458.0f / f; // c/f
+		configInfo<<"\t - Speed of light, c= 299792458.0 m/s"<<std::endl;
 	} else {
 		this->defaultChannel.waveLength = 3.0e8f / f;
+		configInfo<<"\t - Speed of light, c= 3e8 m/s"<<std::endl;
 	}
 	this->defaultChannel.k = 2 * 3.14159265358979323846f / this->defaultChannel.waveLength; //wavenumber (2*pi/lambda)
 	this->defaultChannel.eA = 1.0f / ((2 * this->defaultChannel.k)*(2 * this->defaultChannel.k)); //Effective Area of the antenna (lambda/4*pi)^2
@@ -117,9 +132,21 @@ void OpalSceneManager::setMaxReflections(unsigned int m)
 	this->maxReflections = m;
 	if (sceneFinished) {
 		context["max_interactions"]->setUint(maxReflections);
-		std::cout << "maxReflections=" << maxReflections << std::endl;
 	}
+		configInfo << "\t - maxReflections=" << maxReflections << std::endl;
 
+}
+void OpalSceneManager::setEnabledDevices() {
+	if (!useMultiGPU) {
+		std::vector<int> dm;
+		dm.push_back(0);
+		context->setDevices(dm.begin(), dm.end());
+	}
+	enabledDevices=context->getEnabledDevices();
+	for (size_t i = 0; i < enabledDevices.size(); ++i) 
+	{
+		configInfo << " \t - Context is using local device " << enabledDevices[i] << ": " << context->getDeviceName(enabledDevices[i]) << std::endl;
+	}
 }
 void OpalSceneManager::createSceneContext()
 {
@@ -129,16 +156,11 @@ void OpalSceneManager::createSceneContext()
 #ifdef OPAL_USE_TRI 
 	const int RTX=1;
 	if (rtGlobalSetAttribute(RT_GLOBAL_ATTRIBUTE_ENABLE_RTX, sizeof(RTX), &RTX)!=RT_SUCCESS)  {
-		std::cout<<"ERROR: Enabling RTX mode failed!"<<std::endl;
+		std::cout<<"WARNING: Enabling RTX mode failed!"<<std::endl;
 	}
 #endif
 	context = optix::Context::create();
-	std::vector<int> devices;
-	devices = context->getEnabledDevices();
-    for (size_t i = 0; i < devices.size(); ++i) 
-    {
-      std::cout << "context is using local device " << devices[i] << ": " << context->getDeviceName(devices[i]) << std::endl;
-}
+	setEnabledDevices();
 	context->setRayTypeCount(2); //Normal and internal ray
 	context->setEntryPointCount(1); //1 program: ray generation 
 
@@ -264,12 +286,12 @@ OpalMesh OpalSceneManager::addStaticMesh(int meshVertexCount, optix::float3* mes
 	for (size_t i = 0; i < meshVertexCount; i++)
 	{
 
-		std::cout <<"vertex=("<< meshVertices[i].x <<","<< meshVertices[i].y <<","<< meshVertices[i].z <<")"<< std::endl;
+		//std::cout <<"vertex=("<< meshVertices[i].x <<","<< meshVertices[i].y <<","<< meshVertices[i].z <<")"<< std::endl;
 		const float3 v = optix::make_float3(transformationMatrix*optix::make_float4(meshVertices[i], 1.0f));
 		//#ifdef OPALDEBUG
 		//			outputFile << "v=(" << v.x << "," << v.y << "," << v.z << ")" << std::endl;
 		//#endif
-		std::cout<<"v="<<v<<std::endl;
+		//std::cout<<"v="<<v<<std::endl;
 		transformedVertices[i]=v;
 	}
 #ifdef OPAL_USE_TRI
@@ -328,7 +350,7 @@ void OpalSceneManager::extractFaces(optix::float3* meshVertices, std::vector<std
 			triangleIndexBuffer[i].second = (*(ret.first)).second;
 		}
 	}
-	std::cout  << normals.size() <<" faces added=. numberOfFaces="<< numberOfFaces<< std::endl;
+	std::cout  <<"\t"<< normals.size() <<" faces added=. numberOfFaces="<< numberOfFaces<< std::endl;
 	/*	for (auto v: normals)
 		{
 		std::cout << std::scientific<<"face normal=" << v.first << "id=" << v.second << std::endl;
@@ -395,7 +417,7 @@ OpalMesh OpalSceneManager::createMesh(int meshVertexCount, optix::float3* meshVe
 
 	// Create a float3 formatted buffer (each triplet of floats in the array is now a vector3 in the order x,y,z)
 
-	std::cout << "Creating mesh with " << meshVertexCount << " vertices and " << meshTriangleCount << " indices" << std::endl;
+	std::cout << "-- Create mesh: with " << meshVertexCount << " vertices and " << meshTriangleCount << " indices" << std::endl;
 	//Make int3s
 	if (meshTriangleCount % 3 != 0) {
 		throw  opal::Exception("Error: Number of triangle indices is not a multiple of 3");
@@ -464,7 +486,7 @@ OpalMesh OpalSceneManager::createMesh(int meshVertexCount, optix::float3* meshVe
 	geom_tri->setVertices( meshVertexCount, positions, RT_FORMAT_FLOAT3 );
 	geom_tri->setBuildFlags( RTgeometrybuildflags( 0 ) );
 	// Set an attribute program for the GeometryTriangles, which will compute
-	std::cout<<"Adding triangle attributes"<<std::endl;
+	std::cout<<"\t Adding triangle attributes"<<std::endl;
 	geom_tri->setAttributeProgram(intersectionProgram );
 #else
 
@@ -516,10 +538,10 @@ optix::Material OpalSceneManager::createMeshMaterial(unsigned int ray_type_index
 optix::Program OpalSceneManager::createClosestHitMesh() {
 	optix::Program chmesh = context->createProgramFromPTXString(sutil::getPtxString(cudaProgramsDir.c_str(), "triangle.cu"), "closestHitTriangle");
 	//Add programs for complex arithmetic
-//	chmesh["complex_sqrt"]->setProgramId(defaultPrograms.at("complex_sqrt"));
-//	chmesh["sca_complex_prod"]->setProgramId(defaultPrograms.at("sca_complex_prod"));
-//	chmesh["complex_prod"]->setProgramId(defaultPrograms.at("complex_prod"));
-//	chmesh["complex_div"]->setProgramId(defaultPrograms.at("complex_div"));
+	//	chmesh["complex_sqrt"]->setProgramId(defaultPrograms.at("complex_sqrt"));
+	//	chmesh["sca_complex_prod"]->setProgramId(defaultPrograms.at("sca_complex_prod"));
+	//	chmesh["complex_prod"]->setProgramId(defaultPrograms.at("complex_prod"));
+	//	chmesh["complex_div"]->setProgramId(defaultPrograms.at("complex_div"));
 	return chmesh;
 
 }
@@ -594,43 +616,6 @@ optix::Program OpalSceneManager::createMissProgram()
 
 
 
-optix::Program OpalSceneManager::createComplexProd()
-{
-
-
-	return context->createProgramFromPTXString(sutil::getPtxString(cudaProgramsDir.c_str(), "triangle.cu"), "complex_prod");
-
-
-}
-optix::Program OpalSceneManager::createComplexDiv()
-{
-
-
-	return context->createProgramFromPTXString(sutil::getPtxString(cudaProgramsDir.c_str(), "triangle.cu"), "complex_div");
-
-}
-optix::Program OpalSceneManager::createComplexScaProd()
-{
-
-
-	return context->createProgramFromPTXString(sutil::getPtxString(cudaProgramsDir.c_str(), "triangle.cu"), "sca_complex_prod");
-
-}
-optix::Program OpalSceneManager::createComplexExpImaginary()
-{
-
-
-	return context->createProgramFromPTXString(sutil::getPtxString(cudaProgramsDir.c_str(), "triangle.cu"), "complex_exp_only_imaginary");
-
-
-}
-optix::Program OpalSceneManager::createComplexSqrt()
-{
-
-
-	return context->createProgramFromPTXString(sutil::getPtxString(cudaProgramsDir.c_str(), "triangle.cu"), "complex_sqrt");
-
-}
 optix::Program  OpalSceneManager::createRayGenerationProgram()
 {
 
@@ -692,7 +677,7 @@ void OpalSceneManager::createRaySphere2D(int elevationDelta, int azimuthDelta)
 	optix::uint elevationSteps = (180u / elevationDelta);
 
 	optix::uint azimuthSteps = (360u / azimuthDelta);
-	 //std::cout << "createRaySphere2D: elevationSteps=" << elevationSteps << "azimuthSteps=" << azimuthSteps << std::endl;
+	//std::cout << "createRaySphere2D: elevationSteps=" << elevationSteps << "azimuthSteps=" << azimuthSteps << std::endl;
 
 	++elevationSteps; //elevation includes both 0 and 180. elevation in [0,180], but 0 and 180 maps to the same ray, so we remove them from the multiplication and add later
 
@@ -749,7 +734,7 @@ void OpalSceneManager::createRaySphere2D(int elevationDelta, int azimuthDelta)
 		asRadiusConstant=azimuthDelta*deg2rad;
 	}
 	context["asRadiusConstant"]->setFloat(asRadiusConstant);
-	std::cout <<"asRadiusConstant="<<asRadiusConstant<<". raySphere.azimuthSteps=" << raySphere.azimuthSteps << ". as=" << as << ". raySphere.elevationSteps =" << raySphere.elevationSteps << ". es=" << es << "raySphere.rayCount=" << raySphere.rayCount << ". rc=" << rc << std::endl;
+	std::cout <<"-- Create RaySphere 2D: asRadiusConstant="<<asRadiusConstant<<". raySphere.azimuthSteps=" << raySphere.azimuthSteps << ". as=" << as << ". raySphere.elevationSteps =" << raySphere.elevationSteps << ". es=" << es << "raySphere.rayCount=" << raySphere.rayCount << ". rc=" << rc << std::endl;
 	rays->unmap();
 	raySphere.raySphereBuffer = rays;
 #ifdef OPALDEBUG
@@ -795,7 +780,7 @@ void OpalSceneManager::createRaySphere2DSubstep(int elevationDelta, int azimuthD
 	raySphere.rayCount = elevationSteps*azimuthSteps;
 	raySphere.elevationSteps = elevationSteps;
 	raySphere.azimuthSteps = azimuthSteps;
-	std::cout << "RaySphere2D rays=" << raySphere.rayCount << ". elevationSteps=" << raySphere.elevationSteps << ". azimtuhSteps=" << raySphere.azimuthSteps  << std::endl;
+	//std::cout << "RaySphere2D rays=" << raySphere.rayCount << ". elevationSteps=" << raySphere.elevationSteps << ". azimtuhSteps=" << raySphere.azimuthSteps  << std::endl;
 	int x = 0;
 	int y = 0;
 
@@ -814,7 +799,7 @@ void OpalSceneManager::createRaySphere2DSubstep(int elevationDelta, int azimuthD
 			//2D and 3D buffers
 			//If we use the Unity convention and set UP as the Y axis, being FORWARD the z-axis. That is the Y and Z axis are interchanged with respect to the previous convention
 			//float3 ray = make_float3(sinf(ir)*cosf(jr), cosf(ir), sinf(ir)*sinf(jr));
-			
+
 			//Unity left-handed coordinate system: Y=up, Z=forward, X=right; elevation from Y to Z (around X) clockwise, azimuth from Z to X (around Y) clockwise 
 			float3 ray = make_float3(sinf(ir)*sinf(jr), cosf(ir), sinf(ir)*cosf(jr) );
 
@@ -830,7 +815,7 @@ void OpalSceneManager::createRaySphere2DSubstep(int elevationDelta, int azimuthD
 
 
 	}
-	std::cout << "RaySphere2D rays=" << raySphere.rayCount << ". elevationSteps=" << raySphere.elevationSteps << ". azimtuhSteps=" << raySphere.azimuthSteps << "rc=" << rc << std::endl;
+	std::cout << "-- Create Ray Sphere 2D with decimal dgree steps: rays=" << raySphere.rayCount << ". elevationSteps=" << raySphere.elevationSteps << ". azimtuhSteps=" << raySphere.azimuthSteps << "rc=" << rc << std::endl;
 
 
 
@@ -844,12 +829,12 @@ void OpalSceneManager::createRaySphere2DSubstep(int elevationDelta, int azimuthD
 	if (elevationDelta<azimuthDelta) {
 		asRadiusConstant=elevationDelta*deg2rad*0.1f;
 	} else {
-		std::cout <<"Substep Sphere: azimuthDelta="<<azimuthDelta<<"deg2rad="<<deg2rad<<std::endl; 	
+		std::cout <<"\t Substep Sphere: azimuthDelta="<<azimuthDelta<<"deg2rad="<<deg2rad<<std::endl; 	
 		asRadiusConstant=azimuthDelta*deg2rad*0.1f;
-	std::cout <<"Substep Sphere: asRadiusConstant="<<asRadiusConstant<<std::endl;
+		std::cout <<"\t Substep Sphere: asRadiusConstant="<<asRadiusConstant<<std::endl;
 	}
 	context["asRadiusConstant"]->setFloat(asRadiusConstant);
-	std::cout <<"Substep Sphere: asRadiusConstant="<<asRadiusConstant<<". raySphere.azimuthSteps=" << raySphere.azimuthSteps << ". raySphere.elevationSteps =" << raySphere.elevationSteps << "raySphere.rayCount=" << raySphere.rayCount <<  std::endl;
+	//std::cout <<"Substep Sphere: asRadiusConstant="<<asRadiusConstant<<". raySphere.azimuthSteps=" << raySphere.azimuthSteps << ". raySphere.elevationSteps =" << raySphere.elevationSteps << "raySphere.rayCount=" << raySphere.rayCount <<  std::endl;
 
 	rays->unmap();
 	raySphere.raySphereBuffer = rays;
@@ -864,7 +849,7 @@ void OpalSceneManager::createRaySphere2DSubstep(int elevationDelta, int azimuthD
 
 void OpalSceneManager::addReceiver(int id, float3  position, float3 polarization, float radius, std::function<void(float, int)>  callback)
 {
-	std::cout << "Adding receiver " << id << " with radius " <<radius<<" at "<<position<< std::endl;
+	std::cout << "--Add receiver: receiver " << id << " with radius " <<radius<<" at "<<position<< std::endl;
 	optix::Geometry geometry = context->createGeometry();
 	float4 sphere = make_float4(position.x, position.y, position.z, radius);
 
@@ -899,10 +884,10 @@ void OpalSceneManager::addReceiver(int id, float3  position, float3 polarization
 
 	if (useDepolarization) {
 		geom_instance["receiverPolarization"]->setFloat(polarization);
-		std::cout<<"\tUsing depolarization. Receiver polarization is "<<polarization << std::endl;
-		
+		std::cout<<"\t Using depolarization. Receiver polarization is "<<polarization << std::endl;
+
 	}
-	std::cout<<"\tReceiver buffer index for "<<id << " is "<<nextId<< " and external Id is "<<id<<std::endl;
+	std::cout<<"\t Receiver buffer index for "<<id << " is "<<nextId<< " and external Id is "<<id<<std::endl;
 	SphereReceiver* rx = new SphereReceiver();
 	rx->geomInstance = geom_instance;
 	rx->position = position;
@@ -1062,7 +1047,15 @@ void OpalSceneManager::transmit(int txId, float txPower,  float3 origin, float3 
 		receiversGroup->getAcceleration()->markDirty();
 		rootGroup->getAcceleration()->markDirty();
 	}
+	if (useMultiGPU) {
+		executeTransmitLaunchMultiGPU(txId,txPower,origin);
+	} else {
+		executeTransmitLaunch(txId,txPower,origin);
+	}
 
+}
+
+void OpalSceneManager::executeTransmitLaunch(int txId, float txPower,  float3 origin) {
 	//Initialize index for global buffer	
 	uint* aib=reinterpret_cast<uint*>(atomicIndexBuffer->map());
 	(*aib)=0u;
@@ -1100,6 +1093,7 @@ void OpalSceneManager::transmit(int txId, float txPower,  float3 origin, float3 
 	RTsize gsize;
 	globalHitInfoBuffer->getSize(gsize);
 	//Log times for performance tests
+	uint numReceivers = static_cast<uint>(receivers.size());
 	std::cout<<"#"<<numReceivers<<"\t"<<gsize<<"\t"<<lastHitIndex<<"\t"<<hits<<"\t"<<launchTime<<"\t"<<filterTime<<"\t"<<transferTime<<std::endl;
 
 	//Compute received power by adding EM waves of all hits. Global computation. Not done with thrust because thrust::reduce does not seem to allow a different type as output of the sum
@@ -1125,18 +1119,16 @@ void OpalSceneManager::transmit(int txId, float txPower,  float3 origin, float3 
 				raysHit=0u;
 			}
 		}
-		//if (host_hits->whrd.x!=0) {
 
-			++raysHit;
-		//}
+		++raysHit;
 		E += host_hits->E;
 
-//		std::cout<<"E["<<i<<"]="<<(host_hits)->E<<std::endl;
-//		 std::cout<<"\t rxBufferIndex="<<(host_hits)->thrd.z<<std::endl;
-//		 std::cout<<"\t written="<<(host_hits)->thrd.x<<std::endl;
-//		 std::cout<<"\t refhash="<<(host_hits)->thrd.y<<std::endl;
-//		 std::cout<<"\t dist="<<(host_hits)->thrd.w<<std::endl;
-		
+				std::cout<<"E["<<i<<"]="<<(host_hits)->E<<std::endl;
+				 std::cout<<"\t rxBufferIndex="<<(host_hits)->thrd.z<<std::endl;
+				 std::cout<<"\t written="<<(host_hits)->thrd.x<<std::endl;
+				 std::cout<<"\t refhash="<<(host_hits)->thrd.y<<std::endl;
+				 std::cout<<"\t dist="<<(host_hits)->thrd.w<<std::endl;
+
 
 		++host_hits;
 
@@ -1147,15 +1139,85 @@ void OpalSceneManager::transmit(int txId, float txPower,  float3 origin, float3 
 	}	
 	//timer.stop();
 	resultHitInfoBuffer->unmap();
+}
+void OpalSceneManager::executeTransmitLaunchMultiGPU(int txId, float txPower,  float3 origin) {
+	//Initialize index for global buffer	
+//	uint* aib=reinterpret_cast<uint*>(atomicIndexBuffer->map());
+//	(*aib)=0u;
+//	atomicIndexBuffer->unmap();
+
+
+	//Transmission launch
+	//std::cout<<"Transmitting["<<txId<<"]["<<txPower<<"]"<<origin<<std::endl;	
+	Timer timer;
+	timer.start();
+	context->launch(0, raySphere.elevationSteps, raySphere.azimuthSteps,1u); //Launch 3D (elevation, azimuth, transmitters);
+	timer.stop();
+	const double launchTime=timer.getTime();
+	transmissionLaunches++;
+
+
+	//Filter with thrust multiple hits coming from the same face
+	timer.restart();
+	thrust::host_vector<HitInfo> host_hits=opalthrustutils::filterHitsMultiGPU(globalHitInfoBuffer,  atomicIndexBuffer, enabledDevices );
+	timer.stop();
+	const double filterTime=timer.getTime();
+	//timer.restart();
+	//Log times for performance tests
+	uint numReceivers = static_cast<uint>(receivers.size());
+	std::cout<<"#"<<numReceivers<<"\t"<<host_hits.size()<<"\t"<<launchTime<<"\t"<<filterTime<<std::endl;
+
+	//Compute received power by adding EM waves of all hits. Global computation. Not done with thrust because thrust::reduce does not seem to allow a different type as output of the sum
+
+	float2 E=make_float2(0.0f,0.0f);
+	uint index=0u;
+	uint raysHit=0u;
+
+
+	for (uint i=0; i<host_hits.size(); i++) {
+
+		if (i==0) {
+			//Get first receiver
+			index=host_hits[i].thrd.z;
+
+		} else {
+			if (host_hits[i].thrd.z!=index) {
+				if (raysHit!=0u) {
+					//At least one hit, callback
+					computeReceivedPower(E,index,txId,txPower,origin);
+				}
+				//New receiver, start new accumulation
+				index=host_hits[i].thrd.z;
+				E=make_float2(0.0f,0.0f);
+				raysHit=0u;
+			}
+		}
+
+		++raysHit;
+		E += host_hits[i].E;
+
+				std::cout<<"E["<<i<<"]="<<host_hits[i].E<<std::endl;
+				 std::cout<<"\t rxBufferIndex="<<host_hits[i].thrd.z<<std::endl;
+				 std::cout<<"\t written="<<host_hits[i].thrd.x<<std::endl;
+				 std::cout<<"\t refhash="<<host_hits[i].thrd.y<<std::endl;
+				 std::cout<<"\t dist="<<host_hits[i].thrd.w<<std::endl;
+
+
+
+	}
+	//Last one
+	if (raysHit!=0u) {
+		computeReceivedPower(E,index,txId,txPower,origin);
+	}	
 
 
 }
 
 void OpalSceneManager::computeReceivedPower(optix::float2 E, unsigned int index, int txId, float txPower, optix::float3 origin) {
-					float power = defaultChannel.eA*((E.x*E.x) + (E.y*E.y))*txPower;
-					std::cout << "rx["<<receivers[index]->externalId<<"]=" << receivers[index]->position << ".r=" << receivers[index]->radius << "(sphere="<<receivers[index]->geomInstance["sphere"]->getFloat4()<<"); tx["<<txId<<"]=" << origin << " eA=" << defaultChannel.eA << " txPower=" << txPower << " E=(" << E.x << "," << E.y << ")" << " p=" << power <<  " d=" << length(origin - receivers[index]->position) << std::endl;
-					//std::cout<<"PR\t"<<power<<std::endl;
-					receivers[index]->callback(power, txId);
+	float power = defaultChannel.eA*((E.x*E.x) + (E.y*E.y))*txPower;
+	std::cout << "rx["<<receivers[index]->externalId<<"]=" << receivers[index]->position << ".r=" << receivers[index]->radius << "(sphere="<<receivers[index]->geomInstance["sphere"]->getFloat4()<<"); tx["<<txId<<"]=" << origin << " eA=" << defaultChannel.eA << " txPower=" << txPower << " E=(" << E.x << "," << E.y << ")" << " p=" << power <<  " d=" << length(origin - receivers[index]->position) << std::endl;
+	//std::cout<<"PR\t"<<power<<std::endl;
+	receivers[index]->callback(power, txId);
 
 }
 
@@ -1195,12 +1257,16 @@ void OpalSceneManager::setInternalBuffers() {
 
 
 	if (elevationSize==0 || azimuthSize==0) {
-		throw Exception("Cannot set internal buffers with zero rays in raySphere");
+		throw opal::Exception("setInternalBuffers(): Cannot set internal buffers with zero rays in raySphere");
 		return;	
 	}
 
 	globalHitInfoBuffer = setGlobalHitInfoBuffer(elevationSize, azimuthSize, rxSize, reflectionsSize);
-	resultHitInfoBuffer = setResultHitInfoBuffer(rxSize, reflectionsSize);
+	if (!useMultiGPU) {
+		resultHitInfoBuffer = setResultHitInfoBuffer(rxSize, reflectionsSize);
+	} else {
+		resultHitInfoBuffer=nullptr;
+	}
 	atomicIndexBuffer=setAtomicIndexBuffer();
 	txOriginBuffer=setTransmitterBuffer(1u);	
 }
@@ -1231,7 +1297,11 @@ void OpalSceneManager::checkInternalBuffers() {
 
 
 void OpalSceneManager::resizeGlobalHitInfoBuffer(optix::uint ele, optix::uint azi, optix::uint rx, optix::uint reflections) {
-	RTsize bytes=context->getAvailableDeviceMemory(0);
+	RTsize bytes=0;
+	for (size_t i = 0; i < enabledDevices.size(); ++i) 
+	{
+		bytes+=context->getAvailableDeviceMemory(enabledDevices[i]);
+	}
 	uint rec=1u;
 	if (rx>0) {
 		rec=rx;
@@ -1249,7 +1319,12 @@ void OpalSceneManager::resizeGlobalHitInfoBuffer(optix::uint ele, optix::uint az
 }
 //TODO: change constants to parameters
 optix::Buffer OpalSceneManager::setGlobalHitInfoBuffer(optix::uint ele, optix::uint azi, optix::uint rx, optix::uint reflections) {
-	RTsize bytes=context->getAvailableDeviceMemory(0);
+
+	RTsize bytes=0;
+	for (size_t i = 0; i < enabledDevices.size(); ++i) 
+	{
+		bytes+=context->getAvailableDeviceMemory(enabledDevices[i]);
+	}
 	uint rec=1u;
 	if (rx>0) {
 		rec=rx;
@@ -1259,15 +1334,13 @@ optix::Buffer OpalSceneManager::setGlobalHitInfoBuffer(optix::uint ele, optix::u
 		bsize=floor(0.7*bytes/sizeof(HitInfo));
 		std::cout<<"WARNING: globalHitInfoBuffer size exceeds 70% of available memory. Available device memory: "<<bytes<<"; buffer size set to "<<bsize<<std::endl;
 	}
-	std::cout<<"Available device memory (0) "<<(bytes/(1024*1024))<<" MiB. globalHitBuffer  size (MiB)="<<(bsize/(1024*1024))<<std::endl;
-	//TODO: change for multidevice
-	//bytes=context->getAvailableDeviceMemory(1);
-	//std::cout<<"Available device memory (1) "<<(bytes/(1024*1024))<<" MiB. globalHitBuffer  size="<<bsize<<std::endl;
-
-
-	//optix::Buffer b = context->createBuffer(RT_BUFFER_INPUT_OUTPUT | RT_BUFFER_GPU_LOCAL, RT_FORMAT_USER, bsize );
-	optix::Buffer b = context->createBuffer(RT_BUFFER_OUTPUT, RT_FORMAT_USER, bsize );
-
+	std::cout<<"-- Creating global buffer: available "<<enabledDevices.size()<<" devices with total device memory   "<<(bytes/(1024*1024))<<" MiB. globalHitBuffer  size (MiB)="<<(bsize/(1024*1024))<<std::endl;
+	optix::Buffer b;
+	if (useMultiGPU) {
+		b = context->createBuffer(RT_BUFFER_INPUT_OUTPUT | RT_BUFFER_GPU_LOCAL, RT_FORMAT_USER, bsize );
+	} else {
+		 b = context->createBuffer(RT_BUFFER_OUTPUT, RT_FORMAT_USER, bsize );
+	}
 	b->setElementSize(sizeof(HitInfo));
 	context["globalHitInfoBuffer"]->set(b);
 	context["global_info_buffer_maxsize"]->setUint(bsize);
@@ -1284,7 +1357,13 @@ optix::Buffer OpalSceneManager::setResultHitInfoBuffer(optix::uint rx, optix::ui
 	return b;
 }
 optix::Buffer OpalSceneManager::setAtomicIndexBuffer() {
-	optix::Buffer b = context->createBuffer(RT_BUFFER_INPUT_OUTPUT, RT_FORMAT_UNSIGNED_INT, 1u);
+	optix::Buffer b;
+	if (useMultiGPU) {
+		b = context->createBuffer(RT_BUFFER_INPUT_OUTPUT | RT_BUFFER_GPU_LOCAL, RT_FORMAT_UNSIGNED_INT, 1u);
+	} else {
+		b = context->createBuffer(RT_BUFFER_INPUT_OUTPUT, RT_FORMAT_UNSIGNED_INT, 1u);
+
+	}
 	context["atomicIndex"]->set(b);
 	return b;
 }
@@ -1302,8 +1381,8 @@ std::string opal::OpalSceneManager::printContextInformation()
 {
 	std::ostringstream stream;
 	stream<<"Context: Num CPU Threads: "<<context->getCPUNumThreads()<<std::endl;
-  	int RTX;
-  	rtGlobalGetAttribute(RT_GLOBAL_ATTRIBUTE_ENABLE_RTX,sizeof(RTX),&RTX);
+	int RTX;
+	rtGlobalGetAttribute(RT_GLOBAL_ATTRIBUTE_ENABLE_RTX,sizeof(RTX),&RTX);
 	stream<<"Context: RTX mode enabled: "<<RTX<<std::endl;
 
 	return stream.str();
@@ -1320,8 +1399,8 @@ std::string opal::OpalSceneManager::printInternalBuffersState()
 	RTsize h;
 	RTsize d;
 	//std::cout<<"Available device memory: "<<context->getAvailableDeviceMemory(0)<<std::endl;
-	std::cout<<"sizeof(HitInfo)="<<sizeof(HitInfo)<<std::endl;
-	std::cout<<"Receivers="<<currentInternalBuffersState.rx<<std::endl;
+	//std::cout<<"sizeof(HitInfo)="<<sizeof(HitInfo)<<std::endl;
+	//std::cout<<"Receivers="<<currentInternalBuffersState.rx<<std::endl;
 	if (globalHitInfoBuffer) {
 		globalHitInfoBuffer->getSize(w);
 		sb = sizeof(HitInfo)*w;
@@ -1365,7 +1444,7 @@ void OpalSceneManager::finishSceneContext() {
 	if (usePenetration) {
 		context["usePenetration"]->setUint(1u);
 		//Show warning about assumptions
-		std::cout<<"You are using penetration: check that the  receiver sphere(s) does not overlap any wall, otherwise you are getting wrong results almost surely" <<std::endl;
+		configInfo <<"\t - You are using penetration: check that the  receiver sphere(s) does not overlap any wall, otherwise you are getting wrong results almost surely" <<std::endl;
 	} else {
 		context["usePenetration"]->setUint(0u);
 	}
@@ -1378,8 +1457,9 @@ void OpalSceneManager::finishSceneContext() {
 	//context->setExceptionEnabled(RT_EXCEPTION_BUFFER_INDEX_OUT_OF_BOUNDS, true);
 	//context->setExceptionEnabled(RT_EXCEPTION_ALL, true);
 	sceneFinished = true;
-	std::cout<<printSceneReport();
-
+	std::cout<<"--- Check your configuration and assumptions --"<<std::endl;
+	configInfo<<printSceneReport();
+	std::cout<<configInfo.str()<<std::endl;
 }
 
 
@@ -1390,10 +1470,10 @@ std::string opal::OpalSceneManager::printSceneReport()  {
 	stream << "\t Receivers=" << receivers.size() <<  std::endl;
 	stream << "\t RayCount=" << raySphere.rayCount << ". azimuthSteps=" << raySphere.azimuthSteps << ". elevationSteps=" << raySphere.elevationSteps << std::endl;
 	if (usePenetration) {
-			stream << "\t **Feature: Penetration enabled. attenuationLimit (dB)=" << attenuationLimit<< std::endl;
+		stream << "\t **Feature: Penetration enabled. attenuationLimit (dB)=" << attenuationLimit<< std::endl;
 	}
 	if (useDepolarization) {
-			stream << "\t **Feature: Depolarization enabled."<< std::endl;
+		stream << "\t **Feature: Depolarization enabled."<< std::endl;
 	}
 	stream << "-- Scene Graph" << std::endl;
 	stream << "\t rootGroup. Children=" << rootGroup->getChildCount() << std::endl;
@@ -1506,6 +1586,24 @@ void OpalSceneManager::callbackUsageReport(int level, const char* tag, const cha
 	std::cout << "[" << level << "][" << std::left << std::setw(12) << tag << "] " << msg;
 }
 
+void OpalSceneManager::enableMultiGPU() {
+	if (context) {
+		//It is actually perfectly safe to enable GPU devices after creating context, but for now we consider it an error
+		throw  opal::Exception("Do not enable multi GPU support after creating the context");
+		return;
+		
+	}
+	useMultiGPU=true;
+}
+void OpalSceneManager::disableMultiGPU() {
+	if (context) {
+		//It is actually perfectly safe to enable GPU devices after creating context, but for now we consider it an error
+		throw  opal::Exception("Do not disable multi GPU support after creating the context");
+		return;
+		
+	}
+	useMultiGPU=false;
+}
 void OpalSceneManager::enablePenetration() {
 	usePenetration=true;	
 }
@@ -1554,97 +1652,90 @@ ChannelParameters OpalSceneManager::getChannelParameters() const {
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-// This code is part of the NVIDIA nvpro-pipeline https://github.com/nvpro-pipeline/pipeline
+//From optix advanced samples (see licence): https://github.com/nvpro-samples/optix_advanced_samples/blob/master/src/optixIntroduction/optixIntro_07/inc/Application.h
+// For rtDevice*() function error checking. No OptiX context present at that time.
+#define RT_CHECK_ERROR_NO_CONTEXT( func ) \
+	do { \
+		RTresult code = func; \
+		if (code != RT_SUCCESS) \
+		std::cerr << "ERROR: Function " << #func << std::endl; \
+	} while (0)
 
 
-
-#if defined(_WIN32)
-#  define GETTIME(x) QueryPerformanceCounter(x)
-#else     
-#  define GETTIME(x) gettimeofday( x, 0 )
-#endif 
-
-Timer::Timer()
-	: m_running(false)
-	  , m_seconds(0)
+//From NVIDIA (see license): https://github.com/nvpro-samples/optix_advanced_samples/blob/master/src/optixIntroduction/optixIntro_07/src/Application.cpp
+void SystemInformation::getSystemInformation()
 {
-#if defined(_WIN32)
-	QueryPerformanceFrequency(&m_freq);
-#endif
-}
+	RT_CHECK_ERROR_NO_CONTEXT(rtGetVersion(&optixVersion));
 
-Timer::~Timer()
-{}
 
-void Timer::start()
-{
-	if (!m_running)
+	major = optixVersion / 1000; // Check major with old formula.
+	minor;
+	micro;
+	if (3 < major) // New encoding since OptiX 4.0.0 to get two digits micro numbers?
 	{
-		m_running = true;
-		// starting a timer: store starting time last
-		GETTIME(&m_begin);
+		major =  optixVersion / 10000;
+		minor = (optixVersion % 10000) / 100;
+		micro =  optixVersion % 100;
+	}
+	else // Old encoding with only one digit for the micro number.
+	{
+		minor = (optixVersion % 1000) / 10;
+		micro =  optixVersion % 10;
+	}
+
+	numberOfDevices = 0;
+	RT_CHECK_ERROR_NO_CONTEXT(rtDeviceGetDeviceCount(&numberOfDevices));
+
+	for (unsigned int i = 0; i < numberOfDevices; ++i)
+	{ 
+
+		DeviceInformation d;	
+		RT_CHECK_ERROR_NO_CONTEXT(rtDeviceGetAttribute(i, RT_DEVICE_ATTRIBUTE_NAME, sizeof(d.name), d.name));
+
+		RT_CHECK_ERROR_NO_CONTEXT(rtDeviceGetAttribute(i, RT_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY, sizeof(d.computeCapability), &d.computeCapability));
+
+		RT_CHECK_ERROR_NO_CONTEXT(rtDeviceGetAttribute(i, RT_DEVICE_ATTRIBUTE_TOTAL_MEMORY, sizeof(d.totalMemory), &d.totalMemory));
+
+		RT_CHECK_ERROR_NO_CONTEXT(rtDeviceGetAttribute(i, RT_DEVICE_ATTRIBUTE_CLOCK_RATE, sizeof(d.clockRate), &d.clockRate));
+
+		RT_CHECK_ERROR_NO_CONTEXT(rtDeviceGetAttribute(i, RT_DEVICE_ATTRIBUTE_MAX_THREADS_PER_BLOCK, sizeof(d.maxThreadsPerBlock), &d.maxThreadsPerBlock));
+
+		RT_CHECK_ERROR_NO_CONTEXT(rtDeviceGetAttribute(i, RT_DEVICE_ATTRIBUTE_MULTIPROCESSOR_COUNT, sizeof(d.smCount), &d.smCount));
+
+		RT_CHECK_ERROR_NO_CONTEXT(rtDeviceGetAttribute(i, RT_DEVICE_ATTRIBUTE_EXECUTION_TIMEOUT_ENABLED, sizeof(d.executionTimeoutEnabled), &d.executionTimeoutEnabled));
+
+		RT_CHECK_ERROR_NO_CONTEXT(rtDeviceGetAttribute(i, RT_DEVICE_ATTRIBUTE_MAX_HARDWARE_TEXTURE_COUNT, sizeof(d.maxHardwareTextureCount), &d.maxHardwareTextureCount));
+
+		RT_CHECK_ERROR_NO_CONTEXT(rtDeviceGetAttribute(i, RT_DEVICE_ATTRIBUTE_TCC_DRIVER, sizeof(d.tccDriver), &d.tccDriver));
+
+		RT_CHECK_ERROR_NO_CONTEXT(rtDeviceGetAttribute(i, RT_DEVICE_ATTRIBUTE_CUDA_DEVICE_ORDINAL, sizeof(d.cudaDeviceOrdinal), &d.cudaDeviceOrdinal));
+		devices.push_back(d);
 	}
 }
 
-void Timer::stop()
-{
-	// stopping a timer: store stopping time first
-	Time tmp;
-	GETTIME(&tmp);
-	if (m_running)
+std::string SystemInformation::printSystemInformation() {
+	std::ostringstream stream;
+	stream << "-- System information --  " << std::endl;
+	stream << "OptiX " << major << "." << minor << "." << micro << std::endl;
+	stream << "Number of Devices = " << numberOfDevices << std::endl << std::endl;
+	for (unsigned int i = 0; i < numberOfDevices; ++i)
 	{
-		m_seconds += calcDuration(m_begin, tmp);
-		m_running = false;
+		DeviceInformation d=devices[i]; 
+		stream << "Device " << i << ": " << d.name << std::endl;
+		stream << "  Compute Support: " << d.computeCapability[0] << "." << d.computeCapability[1] << std::endl;
+		stream << "  Total Memory: " << (unsigned long long) d.totalMemory << std::endl;
+		stream << "  Clock Rate: " << d.clockRate << " kHz" << std::endl;
+		stream << "  Max. Threads per Block: " << d.maxThreadsPerBlock << std::endl;
+		stream << "  Streaming Multiprocessor Count: " << d.smCount << std::endl;
+		stream << "  Execution Timeout Enabled: " << d.executionTimeoutEnabled << std::endl;
+		stream << "  Max. Hardware Texture Count: " << d.maxHardwareTextureCount << std::endl;
+		stream << "  TCC Driver enabled: " << d.tccDriver << std::endl;
+		stream << "  CUDA Device Ordinal: " << d.cudaDeviceOrdinal << std::endl ;
 	}
+	stream << "------  " << std::endl;
+	return stream.str();
 }
 
-void Timer::reset()
-{
-	m_running = false;
-	m_seconds = 0;
-}
 
-void Timer::restart()
-{
-	reset();
-	start();
-}
 
-double Timer::getTime() const
-{
-	Time tmp;
-	GETTIME(&tmp);
-	if (m_running)
-	{
-		return m_seconds + calcDuration(m_begin, tmp);
-	}
-	else
-	{
-		return m_seconds;
-	}
-}
-
-double Timer::calcDuration(Time begin, Time end) const
-{
-	double seconds;
-#if defined(_WIN32)
-	LARGE_INTEGER diff;
-	diff.QuadPart = (end.QuadPart - begin.QuadPart);
-	seconds = (double)diff.QuadPart / (double)m_freq.QuadPart;
-#else
-	timeval diff;
-	if (begin.tv_usec <= end.tv_usec)
-	{
-		diff.tv_sec = end.tv_sec - begin.tv_sec;
-		diff.tv_usec = end.tv_usec - begin.tv_usec;
-	}
-	else
-	{
-		diff.tv_sec = end.tv_sec - begin.tv_sec - 1;
-		diff.tv_usec = end.tv_usec - begin.tv_usec + (int)1e6;
-	}
-	seconds = diff.tv_sec + diff.tv_usec / 1e6;
-#endif
-	return seconds;
-}
 

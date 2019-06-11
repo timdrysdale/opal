@@ -4,6 +4,7 @@
 //
 /**************************************************************/
 #include "multitransmitter.h"
+#include "timer.h"
 #include <iostream>
 #include <sstream>
 #include "sutil.h"

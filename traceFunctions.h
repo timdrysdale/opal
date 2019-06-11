@@ -20,26 +20,6 @@ __forceinline__ __device__ void traceInternalRay(HVWavePayload& rayPayload, floa
 			HVWavePayload internalRayPayload = rayPayload;
 			internalRayPayload.ndtd  = optix::make_float4(0, 0, 0, rayPayload.ndtd.w);
 			internalRayPayload.end = false;
-			//EMWavePayload internalRayPayload;
-			//internalRayPayload.ndtd = optix::make_float3(0, 0, 0);
-			//internalRayPayload.hitPoint = rayPayload.hitPoint;
-			//internalRayPayload.lastReflectionHitPoint = rayPayload.lastReflectionHitPoint;
-			//internalRayPayload.polarization = rayPayload.polarization;
-			//internalRayPayload.electricFieldAmplitude = rayPayload.electricFieldAmplitude; //Normalized Eo=1. Antenna Gain = 1. Implement antenna gain with antennaBuffer dependent on the ray direction and txId : initialEFAmplitude[txId] * antennaGain[txId]);
-			//internalRayPayload.accumulatedAttenuation=rayPayload.accumulatedAttenuation;
-			////internalRayPayload.t = -1.0f;
-			//internalRayPayload.reflections = rayPayload.reflections;
-			//internalRayPayload.internalRayInitialReflections = rayPayload.reflections;
-
-			//internalRayPayload.hits = rayPayload.hits;
-			//internalRayPayload.totalDistance = rayPayload.totalDistance;
-			//internalRayPayload.totalDistanceTillLastReflection = rayPayload.totalDistanceTillLastReflection;
-			//internalRayPayload.end = false;
-			//internalRayPayload.refhash = rayPayload.refhash;
-
-			//internalRayPayload.prodReflectionCoefficient = rayPayload.prodReflectionCoefficient; 
-			////internalRayPayload.faceId = rayPayload.faceId;
-			//internalRayPayload.rxBufferIndex=rayPayload.rxBufferIndex;
 			float3 internal_ray_direction = rd;
 			float3 internal_origin=ro;
 			while (true) {

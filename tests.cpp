@@ -4,6 +4,7 @@
 //
 /**************************************************************/
 
+#include "timer.h"
 #include "Opal.h"
 #include "multitransmitter.h"
 #include <memory>
@@ -17,14 +18,6 @@ using namespace optix;
 
 
 
-//From optix advanced samples (see licence): https://github.com/nvpro-samples/optix_advanced_samples/blob/master/src/optixIntroduction/optixIntro_07/inc/Application.h
-// For rtDevice*() function error checking. No OptiX context present at that time.
-#define RT_CHECK_ERROR_NO_CONTEXT( func ) \
-  do { \
-    RTresult code = func; \
-    if (code != RT_SUCCESS) \
-      std::cerr << "ERROR: Function " << #func << std::endl; \
-} while (0)
 
 //Callback
 void printPower(float power, int txId) {
@@ -1222,19 +1215,31 @@ std::unique_ptr<OpalSceneManager> crossingTestDepolarization(std::unique_ptr<Opa
 	sceneManager->addStaticMesh(static_cast<int>(cubevert.size()), cubevert.data(), static_cast<int>(cubeind.size()), cubeind.data(), tm, emProp1);
 
 	//Horizontal plane
-	std::vector<int> planeind = loadTrianglesFromFile("meshes/tri.txt");
-	std::vector<float3> planever = loadVerticesFromFile("meshes/vert.txt");
-	//std::cout << "indices=" << planeind.size() << "vertices=" << planever.size() << std::endl;
+//	std::vector<int> planeind = loadTrianglesFromFile("meshes/tri.txt");
+//	std::vector<float3> planever = loadVerticesFromFile("meshes/vert.txt");
+//	//std::cout << "indices=" << planeind.size() << "vertices=" << planever.size() << std::endl;
+//
+//	tm.setRow(0, make_float4(10.0f, 0, 0, 0.0f));
+//	tm.setRow(1, make_float4(0, 1, 0, 0.0f));
+//	tm.setRow(2, make_float4(0, 0, 10.0f, 50.0f));
+//	tm.setRow(3, make_float4(0, 0, 0, 1));
+	
 
-	tm.setRow(0, make_float4(10.0f, 0, 0, 0.0f));
-	tm.setRow(1, make_float4(0, 1, 0, 0.0f));
-	tm.setRow(2, make_float4(0, 0, 10.0f, 50.0f));
-	tm.setRow(3, make_float4(0, 0, 0, 1));
+	//Horizontal plane as quad at origin. Better to use this plane, since precision problems occur when rays are aligned with triangles and some intersections with the plane may be missed
+	int quadind[6] = { 0,1,2,1,0,3 };
+	optix::float3 quadh[4] = { make_float3(-0.5f,0.0f,-0.5f),make_float3(0.5f,0.f,0.5f) ,make_float3(0.5f,0.f,-0.5f) ,make_float3(-0.5f,0.0f,0.5f) };
+
+	//Scale to 200x200
+	tm.setRow(0, make_float4(200, 0, 0, 0.f));
+	tm.setRow(1, make_float4(0, 1, 0, 0.f));
+	tm.setRow(2, make_float4(0, 0, 200, 0.f));
+	tm.setRow(3, make_float4(0, 0, 0,  1));
 
 	//emProp1.dielectricConstant = make_float2(3.75f, -60.0f*sceneManager->defaultChannel.waveLength*0.15f);
 	std::cout << "Adding Plane. Em=" << emProp1.dielectricConstant << std::endl;
-	sceneManager->addStaticMesh(static_cast<int>(planever.size()), planever.data(), static_cast<int>(planeind.size()), planeind.data(), tm, emProp1);
-
+	//sceneManager->addStaticMesh(static_cast<int>(planever.size()), planever.data(), static_cast<int>(planeind.size()), planeind.data(), tm, emProp1);
+	sceneManager->addStaticMesh(4, quadh, 6, quadind, tm, emProp1 );
+//
 	if (subSteps) {
 		sceneManager->createRaySphere2DSubstep(1, 1); //0.1 degree delta step
 	} else {
@@ -1280,83 +1285,12 @@ std::unique_ptr<OpalSceneManager> crossingTestDepolarization(std::unique_ptr<Opa
 
 
 
-//From NVIDIA (see license): https://github.com/nvpro-samples/optix_advanced_samples/blob/master/src/optixIntroduction/optixIntro_07/src/Application.cpp
-void getSystemInformation()
-{
-  unsigned int optixVersion;
-  RT_CHECK_ERROR_NO_CONTEXT(rtGetVersion(&optixVersion));
-  
-
-  unsigned int major = optixVersion / 1000; // Check major with old formula.
-  unsigned int minor;
-  unsigned int micro;
-  if (3 < major) // New encoding since OptiX 4.0.0 to get two digits micro numbers?
-  {
-    major =  optixVersion / 10000;
-    minor = (optixVersion % 10000) / 100;
-    micro =  optixVersion % 100;
-  }
-  else // Old encoding with only one digit for the micro number.
-  {
-    minor = (optixVersion % 1000) / 10;
-    micro =  optixVersion % 10;
-  }
-  std::cout << "OptiX " << major << "." << minor << "." << micro << std::endl;
-  
-  unsigned int numberOfDevices = 0;
-  RT_CHECK_ERROR_NO_CONTEXT(rtDeviceGetDeviceCount(&numberOfDevices));
-  std::cout << "Number of Devices = " << numberOfDevices << std::endl << std::endl;
-
-  for (unsigned int i = 0; i < numberOfDevices; ++i)
-  {
-    char name[256];
-    RT_CHECK_ERROR_NO_CONTEXT(rtDeviceGetAttribute(i, RT_DEVICE_ATTRIBUTE_NAME, sizeof(name), name));
-    std::cout << "Device " << i << ": " << name << std::endl;
-  
-    int computeCapability[2] = {0, 0};
-    RT_CHECK_ERROR_NO_CONTEXT(rtDeviceGetAttribute(i, RT_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY, sizeof(computeCapability), &computeCapability));
-    std::cout << "  Compute Support: " << computeCapability[0] << "." << computeCapability[1] << std::endl;
-
-    RTsize totalMemory = 0;
-    RT_CHECK_ERROR_NO_CONTEXT(rtDeviceGetAttribute(i, RT_DEVICE_ATTRIBUTE_TOTAL_MEMORY, sizeof(totalMemory), &totalMemory));
-    std::cout << "  Total Memory: " << (unsigned long long) totalMemory << std::endl;
-
-    int clockRate = 0;
-    RT_CHECK_ERROR_NO_CONTEXT(rtDeviceGetAttribute(i, RT_DEVICE_ATTRIBUTE_CLOCK_RATE, sizeof(clockRate), &clockRate));
-    std::cout << "  Clock Rate: " << clockRate << " kHz" << std::endl;
-
-    int maxThreadsPerBlock = 0;
-    RT_CHECK_ERROR_NO_CONTEXT(rtDeviceGetAttribute(i, RT_DEVICE_ATTRIBUTE_MAX_THREADS_PER_BLOCK, sizeof(maxThreadsPerBlock), &maxThreadsPerBlock));
-    std::cout << "  Max. Threads per Block: " << maxThreadsPerBlock << std::endl;
-
-    int smCount = 0;
-    RT_CHECK_ERROR_NO_CONTEXT(rtDeviceGetAttribute(i, RT_DEVICE_ATTRIBUTE_MULTIPROCESSOR_COUNT, sizeof(smCount), &smCount));
-    std::cout << "  Streaming Multiprocessor Count: " << smCount << std::endl;
-
-    int executionTimeoutEnabled = 0;
-    RT_CHECK_ERROR_NO_CONTEXT(rtDeviceGetAttribute(i, RT_DEVICE_ATTRIBUTE_EXECUTION_TIMEOUT_ENABLED, sizeof(executionTimeoutEnabled), &executionTimeoutEnabled));
-    std::cout << "  Execution Timeout Enabled: " << executionTimeoutEnabled << std::endl;
-
-    int maxHardwareTextureCount = 0 ;
-    RT_CHECK_ERROR_NO_CONTEXT(rtDeviceGetAttribute(i, RT_DEVICE_ATTRIBUTE_MAX_HARDWARE_TEXTURE_COUNT, sizeof(maxHardwareTextureCount), &maxHardwareTextureCount));
-    std::cout << "  Max. Hardware Texture Count: " << maxHardwareTextureCount << std::endl;
- 
-    int tccDriver = 0;
-    RT_CHECK_ERROR_NO_CONTEXT(rtDeviceGetAttribute(i, RT_DEVICE_ATTRIBUTE_TCC_DRIVER, sizeof(tccDriver), &tccDriver));
-    std::cout << "  TCC Driver enabled: " << tccDriver << std::endl;
- 
-    int cudaDeviceOrdinal = 0;
-    RT_CHECK_ERROR_NO_CONTEXT(rtDeviceGetAttribute(i, RT_DEVICE_ATTRIBUTE_CUDA_DEVICE_ORDINAL, sizeof(cudaDeviceOrdinal), &cudaDeviceOrdinal));
-    std::cout << "  CUDA Device Ordinal: " << cudaDeviceOrdinal << std::endl << std::endl;
-  }
-}
 
 
 int main(int argc, char** argv)
 {
 	try {
 
-		getSystemInformation();
 		//std::cout << "Initializing " << std::endl;
 		float freq = 5.9e9f;
 
@@ -1366,14 +1300,16 @@ int main(int argc, char** argv)
 		bool subSteps=false;
 		bool useExactSpeedOfLight=true;
 		bool useDepolarization=false;
+		bool usePenetration = false;
+		bool useMultiGPU=true;
 #ifdef _WIN32
 #else 
 
-		std::string usage="Usage: opal [-options] \n  -r Max reflections E \n -p Enable OptiX rtPrintf on device to debug \n -s Use decimal degrees in angular spacing \n -c Use c=3e8 m/s. Default is c=299 792 458 m/s\n -d Use depolarization \n -h Show help";
+		std::string usage="Usage: opal [-options] \n  -r Max reflections E \n -p Enable OptiX rtPrintf on device to debug \n -s Use decimal degrees in angular spacing \n -c Use c=3e8 m/s. Default is c=299 792 458 m/s\n -d Enable depolarization \n -a Enable penetration -h Show help";
 
 		int c;
 		int nr;
-		while ((c = getopt (argc, argv, "r:pscdh")) != -1) {
+		while ((c = getopt (argc, argv, "r:pscdagh")) != -1) {
 			switch (c) {
 				case 'r':
 					//std::cout<<optarg<<std::endl;
@@ -1399,6 +1335,12 @@ int main(int argc, char** argv)
 				case 'd':
 					useDepolarization=true;
 					break;
+				case 'a':
+					usePenetration=true;
+					break;
+				case 'g':
+					useMultiGPU=false;
+					break;
 				case 'h':
 					std::cout<<usage<<std::endl;
 					exit(0);
@@ -1419,17 +1361,25 @@ int main(int argc, char** argv)
 		std::unique_ptr<OpalSceneManager> sceneManager(new OpalSceneManager());
 
 		//Now set desired features
-		//sceneManager->enablePenetration();
+	
+		if (usePenetration) {	
+			sceneManager->enablePenetration();
+		}
 		
 		if (useDepolarization) {	
 			sceneManager->enableDepolarization();
 		}
-
+		if (!useMultiGPU) {
+			sceneManager->disableMultiGPU();	
+		}
 		sceneManager->setMaxReflections(maxReflections);
-		//sceneManager->setUsageReport();
+		
 
 		//Finally, init context
 		sceneManager->initContext(freq,useExactSpeedOfLight);
+		
+		//Now, set additional utilities
+		//sceneManager->setUsageReport();
 		
 		//sceneManager = crossingTestAndVehicle(std::move(sceneManager));
 		//sceneManager = addRemoveDynamicMeshes(std::move(sceneManager), printEnabled, subSteps);
@@ -1438,7 +1388,7 @@ int main(int argc, char** argv)
 
 		//sceneManager = planeTest(std::move(sceneManager), printEnabled, subSteps);
 		//sceneManager = moveReceivers(std::move(sceneManager));
-	//	sceneManager = crossingTest(std::move(sceneManager), printEnabled,subSteps);
+		//sceneManager = crossingTest(std::move(sceneManager), printEnabled,subSteps);
 		//sceneManager = quadTest(std::move(sceneManager),printEnabled,subSteps);
 		//sceneManager = crossingTestMulti(std::move(sceneManager), printEnabled,subSteps);
 		//sceneManager = penetrationTest(std::move(sceneManager), printEnabled,subSteps);
