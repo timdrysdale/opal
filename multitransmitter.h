@@ -15,6 +15,7 @@ namespace opal {
 		public:
 			virtual void initMembers() override;
 			OpalSceneManagerMultiTransmitter(float f, bool useExactSpeedOfLight);
+			OpalSceneManagerMultiTransmitter();
 
 
 			//Register transmitter in Opal. Add to transmitters map
@@ -37,6 +38,8 @@ namespace opal {
 			virtual void checkInternalBuffers() override;
 			void resizeTransmitterBuffer(optix::uint tx);
 
+			void executeTransmitLaunch(optix::uint numTransmitters);
+			void executeTransmitLaunchMultiGPU(optix::uint numTransmitters);
 
 
 			std::vector<BaseTransmitter*> activeTransmitters; //Map from internal buffer index to external Id. Used for grouping transmissions (batches)

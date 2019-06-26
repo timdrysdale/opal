@@ -1305,7 +1305,7 @@ int main(int argc, char** argv)
 #ifdef _WIN32
 #else 
 
-		std::string usage="Usage: opal [-options] \n  -r Max reflections E \n -p Enable OptiX rtPrintf on device to debug \n -s Use decimal degrees in angular spacing \n -c Use c=3e8 m/s. Default is c=299 792 458 m/s\n -d Enable depolarization \n -a Enable penetration -h Show help";
+		std::string usage="Usage: opal [-options] \n  -r Max reflections E \n -p Enable OptiX rtPrintf on device to debug \n -s Use decimal degrees in angular spacing \n -c Use c=3e8 m/s. Default is c=299 792 458 m/s\n -d Enable depolarization \n -a Enable penetration \n -g Disable multiGPU \n -h Show help";
 
 		int c;
 		int nr;
@@ -1359,6 +1359,10 @@ int main(int argc, char** argv)
 		
 		//New way to initialize: first create instance
 		std::unique_ptr<OpalSceneManager> sceneManager(new OpalSceneManager());
+	
+
+		//For multiple transmitters simulateneously
+		//std::unique_ptr<OpalSceneManagerMultiTransmitter> sceneManager(new OpalSceneManagerMultiTransmitter());
 
 		//Now set desired features
 	
@@ -1388,13 +1392,13 @@ int main(int argc, char** argv)
 
 		//sceneManager = planeTest(std::move(sceneManager), printEnabled, subSteps);
 		//sceneManager = moveReceivers(std::move(sceneManager));
-		//sceneManager = crossingTest(std::move(sceneManager), printEnabled,subSteps);
+		sceneManager = crossingTest(std::move(sceneManager), printEnabled,subSteps);
 		//sceneManager = quadTest(std::move(sceneManager),printEnabled,subSteps);
 		//sceneManager = crossingTestMulti(std::move(sceneManager), printEnabled,subSteps);
 		//sceneManager = penetrationTest(std::move(sceneManager), printEnabled,subSteps);
 		//sceneManager = penetrationPlane(std::move(sceneManager), printEnabled,subSteps);
 		//sceneManager = polarizationPlaneTest(std::move(sceneManager), printEnabled, subSteps);
-		sceneManager = crossingTestDepolarization(std::move(sceneManager), printEnabled,subSteps);
+		//sceneManager = crossingTestDepolarization(std::move(sceneManager), printEnabled,subSteps);
 
 
 
