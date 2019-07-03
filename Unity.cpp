@@ -92,7 +92,10 @@ namespace opal {
 				sceneManager = new OpalSceneManagerMultiTransmitter(frequency,useExactSpeedOfLight);
 			} else {
 
-				sceneManager = new OpalSceneManager(frequency,  useExactSpeedOfLight);
+				sceneManager = new OpalSceneManager();
+				//TODO: add features here
+				
+				sceneManager->initContext(frequency,  useExactSpeedOfLight);
 			}
 
 

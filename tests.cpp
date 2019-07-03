@@ -578,19 +578,34 @@ std::unique_ptr<OpalSceneManager> crossingTest(std::unique_ptr<OpalSceneManager>
 	std::cout << "Adding SE. Em = "<< emProp1.dielectricConstant << std::endl;
 	sceneManager->addStaticMesh(static_cast<int>(cubevert.size()), cubevert.data(), static_cast<int>(cubeind.size()), cubeind.data(), tm, emProp1);
 
-	//Horizontal plane
-	std::vector<int> planeind = loadTrianglesFromFile("meshes/tri.txt");
-	std::vector<float3> planever = loadVerticesFromFile("meshes/vert.txt");
-	//std::cout << "indices=" << planeind.size() << "vertices=" << planever.size() << std::endl;
+	//Horizontal plane as quad at origin. Better to use this plane, since precision problems occur when rays are aligned with triangles and some intersections with the plane may be missed
+	int quadind[6] = { 0,1,2,1,0,3 };
+	optix::float3 quadh[4] = { make_float3(-0.5f,0.0f,-0.5f),make_float3(0.5f,0.f,0.5f) ,make_float3(0.5f,0.f,-0.5f) ,make_float3(-0.5f,0.0f,0.5f) };
 
-	tm.setRow(0, make_float4(10.0f, 0, 0, 0.0f));
-	tm.setRow(1, make_float4(0, 1, 0, 0.0f));
-	tm.setRow(2, make_float4(0, 0, 10.0f, 50.0f));
-	tm.setRow(3, make_float4(0, 0, 0, 1));
+	//Scale to 200x200
+	tm.setRow(0, make_float4(200, 0, 0, 0.f));
+	tm.setRow(1, make_float4(0, 1, 0, 0.f));
+	tm.setRow(2, make_float4(0, 0, 200, 0.f));
+	tm.setRow(3, make_float4(0, 0, 0,  1));
 
-	//emProp1.dielectricConstant = make_float2(3.75f, -60.0f*sceneManager->defaultChannel.waveLength*0.15f);
+	emProp1.dielectricConstant = make_float2(3.75f, -60.0f*sceneManager->getChannelParameters().waveLength*0.038f);
+		//There is a dependency on the frequency again, we use -15 dB per 203 mm at 5 GHz => -75 dB/m
+		emProp1.tattenuation = make_float2(0.1f,-75.f );
+	sceneManager->addStaticMesh(4, quadh, 6, quadind, tm, emProp1 );
 	std::cout << "Adding Plane. Em=" << emProp1.dielectricConstant << std::endl;
-	sceneManager->addStaticMesh(static_cast<int>(planever.size()), planever.data(), static_cast<int>(planeind.size()), planeind.data(), tm, emProp1);
+	//Horizontal plane
+//	std::vector<int> planeind = loadTrianglesFromFile("meshes/tri.txt");
+//	std::vector<float3> planever = loadVerticesFromFile("meshes/vert.txt");
+//	//std::cout << "indices=" << planeind.size() << "vertices=" << planever.size() << std::endl;
+//
+//	tm.setRow(0, make_float4(10.0f, 0, 0, 0.0f));
+//	tm.setRow(1, make_float4(0, 1, 0, 0.0f));
+//	tm.setRow(2, make_float4(0, 0, 10.0f, 50.0f));
+//	tm.setRow(3, make_float4(0, 0, 0, 1));
+//
+//	//emProp1.dielectricConstant = make_float2(3.75f, -60.0f*sceneManager->defaultChannel.waveLength*0.15f);
+//	std::cout << "Adding Plane. Em=" << emProp1.dielectricConstant << std::endl;
+//	sceneManager->addStaticMesh(static_cast<int>(planever.size()), planever.data(), static_cast<int>(planeind.size()), planeind.data(), tm, emProp1);
 
 	if (subSteps) {
 		sceneManager->createRaySphere2DSubstep(1, 1); //0.1 degree delta step
@@ -602,7 +617,7 @@ std::unique_ptr<OpalSceneManager> crossingTest(std::unique_ptr<OpalSceneManager>
 
 	optix::float3 posrx = make_float3(0.0f, 10.0f, 100.0f);
 	optix::float3 polarization = make_float3(0.0f, 1.0f, 0.0f); //Perpendicular to the floor. Assuming as in Unity that forward is z-axis and up is y-axis
-	sceneManager->addReceiver(1, posrx,polarization, 5.0f, printPower);
+	sceneManager->addReceiver(1, posrx,polarization, 1.0f, printPower);
 
 
 	//sceneManager->setMaxReflections(3u);
@@ -729,7 +744,7 @@ std::unique_ptr<OpalSceneManager> quadTest(std::unique_ptr<OpalSceneManager> sce
 	emProp1.dielectricConstant = make_float2(3.75f, -60.0f*sceneManager->getChannelParameters().waveLength*0.038f);
 
 	sceneManager->addStaticMesh(4, quadv, 6, quadind, tm, emProp1 );
-
+	std::cout<<"Adding quad"<<std::endl;
 	//Second quad at (0,0,-10)
 	int quadind2[6] = { 0,1,2,1,0,3 };
 	optix::float3 quadv2[4] = { make_float3(-0.5f,-0.5f,0.f),make_float3(0.5f,0.5f,0.f) ,make_float3(0.5f,-0.5f,0.f) ,make_float3(-0.5f,0.5f,0.f) };
@@ -744,7 +759,7 @@ std::unique_ptr<OpalSceneManager> quadTest(std::unique_ptr<OpalSceneManager> sce
 	emProp2.dielectricConstant = make_float2(3.75f, -60.0f*sceneManager->getChannelParameters().waveLength*0.038f);
 
 
-	//sceneManager->addStaticMesh(4, quadv2, 6, quadind2, tm2, emProp2);
+	sceneManager->addStaticMesh(4, quadv2, 6, quadind2, tm2, emProp2);
 	
 	optix::float3 polarization = make_float3(0.0f, 1.0f, 0.0f); //Perpendicular to the floor. Assuming as in Unity that forward is z-axis and up is y-axis
 
@@ -756,19 +771,18 @@ std::unique_ptr<OpalSceneManager> quadTest(std::unique_ptr<OpalSceneManager> sce
 	sceneManager->addReceiver(2, posrx, polarization, 5.0f, printPower);
 	optix::float3 postx = make_float3(0.0f, 0.f,0.f);
 
-	if (subSteps) {
-		sceneManager->createRaySphere2DSubstep(1, 1);
-	} else {
-		sceneManager->createRaySphere2D(1, 1);
-	}
-	//sceneManager->createRaySphere2D(30, 30); //1 degree delta step
+//	if (subSteps) {
+//		sceneManager->createRaySphere2DSubstep(1, 1);
+//	} else {
+//		sceneManager->createRaySphere2D(1, 1);
+//	}
+	sceneManager->createRaySphere2D(30, 30); //1 degree delta step
 
 	sceneManager->finishSceneContext();
 
 	if (print) {
-		sceneManager->setPrintEnabled(1024 * 1024 * 1024);
+		sceneManager->setPrintEnabled(1024*1024*1024);
 	}
-	sceneManager->setUsageReport();
 	sceneManager->transmit(0, 1.0f,postx, polarization);
 	return sceneManager;
 }

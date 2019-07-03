@@ -289,7 +289,6 @@ namespace opal {
 			optix::Program createClosestHitMesh();
 
 			virtual optix::Program createClosestHitReceiver();
-			virtual optix::Program createClosestHitInternalRay();
 
 
 			optix::Program createBoundingBoxTriangle();

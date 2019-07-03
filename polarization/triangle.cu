@@ -164,8 +164,7 @@ RT_PROGRAM void closestHitTriangle()
 			LPWavePayload penPayload=rayPayload;
 			penPayload.ndtd  = optix::make_float4(0, 0, 0, rayPayload.ndtd.w);
 			penPayload.hits=rayPayload.hits+1;
-			penPayload.internalRayInitialReflections=rayPayload.reflections;
-			penPayload.end = false;
+			penPayload.flags = FLAG_NONE;
 			//Assuming the media on both sides of the plane are the same (air, most likely), then the incidence angle is equal to the transmission angle, so the ray does not change trajectory
 			//Otherwise, we have to rotate the ray by the transmission angle, where a_t (angle_transmission) and theta= 90-a_t, with respect to the vector ortoghonal to the normal and ray,
 			//that is the normal vector of the plane defined by ray and mesh face normal.

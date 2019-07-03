@@ -44,145 +44,6 @@ rtDeclareVariable(float, asRadiusConstant, ,);
 rtDeclareVariable(uint, usePenetration, , );
 
 
-//Closest hit program for internal rays 
-RT_PROGRAM void closestHitReceiverInternalRay()
-{
-
-	//Log internal ray
-	//	rtPrintf("IR hit\t%u\t%u\t%u\t%d\t%d\t%d\n", receiverLaunchIndex.x, receiverLaunchIndex.y, receiverBufferIndex,hitPayload.rxId,receiverBufferIndex );
-
-
-	//Update ray data
-
-	const float rayLength = hit_attr.geom_normal_t.w;
-	hitPayload.hitPoint = ray_receiver.origin + rayLength*ray_receiver.direction;
-	const float aux= hitPayload.ndtd.w; //Previous total distance
-	hitPayload.ndtd = make_float4(ray_receiver.direction); //Next direction only
-	hitPayload.ndtd.w = aux+ rayLength; //totalDistance 
-
-	//Check if we are hitting the receiver for this internal ray
-	if (hitPayload.rxBufferIndex!=receiverBufferIndex) {
-		//rtPrintf("IR not receiver\t%u\t%u\t%u\t%d\t%d\t%d\n", receiverLaunchIndex.x, receiverLaunchIndex.y, receiverBufferIndex,hitPayload.rxBufferIndex,receiverBufferIndex );
-		return;
-	} else {
-		//We finish the internal ray always once we hit the sphere again
-		hitPayload.end=true; 
-	}
-
-
-	//TODO: We do not check polarization between tx and rx. Can be done comparing payload polarization and receiver polarization
-
-	//Do not end the ray, it can pass through the reception sphere and reflect on a wall, inside or outside the receiver sphere
-	const uint txBufferIndex=receiverLaunchIndex.z;
-	const Transmitter current_tx=txBuffer[txBufferIndex];
-
-
-	//Check if ray is hitting his own tx (transmitter are also receivers usually) A transmitter cannot receive while it is transmitting, unless other channel is used.
-	if (externalId == current_tx.externalId) {
-		//My own outgoing ray
-		//rtPrintf("External hit for internal ray. txId=%d i.x=%u i.y=%u, ray=(%f,%f,%f) origin=(%f,%f,%f) t=%f rId[%u]=%d\n", txBuffer.externalId, receiverLaunchIndex.x, receiverLaunchIndex.y, ray_receiver.direction.x, ray_receiver.direction.y, ray_receiver.direction.z, ray_receiver.origin.x, ray_receiver.origin.y, ray_receiver.origin.z, hit_attr.t, receiverBufferIndex,externalId);
-		return;
-	}
-
-
-	int reflections = hitPayload.reflections;
-	if (reflections==hitPayload.internalRayInitialReflections) {
-		//Not reflected, do not do anything else
-		//rtPrintf("Not reflected\t%u\t%u\t%u\t%d\n", receiverLaunchIndex.x, receiverLaunchIndex.y, receiverBufferIndex,hitPayload.rxBufferIndex);
-		return;
-	}
-
-
-	//Reflected ray. Means that the internal ray has been reflected on some element which is also inside the sphere radius. Add this contribution
-	//We do not consider transmitted rays here. In fact, if we have a transmitted ray internally, it means either (1) that the wave has gone through some element and is not reflected back to the 
-	//receiver or (2) it has gone through some element before reaching the receiver, i.e., the receiver sphere overlaps both sides of an element and the result is almost surely wrong.
-	if (reflections>0) {
-
-
-
-		//Distance from ray line to receiver position
-		//Line is defined by ray
-		float3 prx = make_float3(sphere.x, sphere.y, sphere.z);
-		float3 pd = prx - hitPayload.hitPoint;
-		float u = dot(pd, ray_receiver.direction);
-		float3 p3 = hitPayload.hitPoint + u*ray_receiver.direction;
-
-
-		const float dm = length(prx - p3)*1000000.0f;  //Multiply by 1000 000 to truncate later take 6 digits
-		const int dmt = __float2int_rz(dm);   //Truncate
-		const float3 lastReflectionHitPoint = make_float3(hitPayload.lrhpd.x,hitPayload.lrhpd.y,hitPayload.lrhpd.z);
-		float d=length(prx-lastReflectionHitPoint);
-
-
-		//Compute electric field
-		d+=hitPayload.lrhpd.w;//totalDistanceTillLastReflection
-
-		//Compute electric field. Here we take into account polarization
-
-
-		//Transform the receiver polarization according to the incident ray direction (-ray.direction) to get the vertical and horizontal components of the receiver polarization
-		float3 ver_o; //Receiver vertical field vector
-		float3 hor_o; //Receiver horizontal field vector
-
-		//float3 pol=make_float3(0.0f,1.0f,0.0f);
-		float2 Epolrx;
-		const float3 ray=-ray_receiver.direction;	
-
-		//Get polarization for receiver for this ray
-		getLinearPolarizationForRay(receiverPolarization, ray,  hor_o,ver_o);
-
-		//Get the  components of received field for the normal and parallel field vectors (geometric projection on receiver polarization vectors times reflection coefficients)
-		const float2 Einorm=sca_complex_prod(dot(hitPayload.hor_v,hor_o),hitPayload.hor_coeff) + sca_complex_prod(dot(hitPayload.ver_v,hor_o),hitPayload.ver_coeff);
-		const float2 Eipar=sca_complex_prod(dot(hitPayload.hor_v,ver_o),hitPayload.hor_coeff) + sca_complex_prod(dot(hitPayload.ver_v,ver_o),hitPayload.ver_coeff);
-
-		//The received field
-		Epolrx=Einorm+Eipar;
-
-
-
-
-
-		float2 z = make_float2(0.0f, -k*d);
-		float2 zexp = complex_exp_only_imaginary(z);
-		float2 Rzexp = complex_prod(Epolrx, zexp);
-
-		uint hitIndex=atomicAdd(&atomicIndex[0u],1u);
-		//Check if global buffer is full
-		if (hitIndex>=global_info_buffer_maxsize) {
-			rtThrow(GLOBALHITBUFFEROVERFLOW);
-			//if exceptions are disabled, let it crash...?
-			hitIndex=global_info_buffer_maxsize-1;
-		}
-
-		float2 E = sca_complex_prod((hitPayload.electricFieldAmplitude / d), Rzexp);
-		float attE=0.0f;
-		if (usePenetration==1u) {
-			//Switch to linear
-			attE=hitPayload.accumulatedAttenuation*0.05f;
-			//Check to avoid float overflows
-			if (attE>-15.f) {
-				attE=exp10f(attE);
-				//rtPrintf("Eatt=(%.10e,%.10e) attExp=%f hits=%u\n",E.x,E.y,attE,hitPayload.hits );
-			} else {
-				attE=1.e-15f; //Set this value directly to avoid overflows, it is neglectable anyway
-
-			}
-			E=sca_complex_prod(attE,E);
-
-		}
-		HitInfo internalHit;
-		internalHit.thrd=make_uint4(txBufferIndex,hitPayload.refhash,receiverBufferIndex,static_cast<uint>(dmt));
-		internalHit.E=E;
-
-		//Store hit in global buffer
-		globalHitInfoBuffer[hitIndex]=internalHit;
-
-		//Log hit
-
-		rtPrintf("IH\t%u\t%u\t%u\t%u\t%f\t%f\t%f\t%f\t%u\t%u\t%u\t%d\n", receiverLaunchIndex.x, receiverLaunchIndex.y,receiverBufferIndex, hitPayload.reflections, attE,  E.x, E.y,d, internalHit.thrd.x,internalHit.thrd.y,internalHit.thrd.w,externalId);
-
-	}
-}
 
 
 
@@ -215,26 +76,6 @@ RT_PROGRAM void closestHitReceiver()
 	float3 prx = make_float3(sphere.x, sphere.y, sphere.z);
 
 	//Check if ray originated inside the reception radius of this receiver
-
-	//Distance from ray origin to receiver
-	//float dor=length(ray_receiver.origin-prx);
-	float3 raytorx=ray_receiver.origin-prx;	
-	float dorsquare=dot(raytorx,raytorx);
-
-
-	if (dorsquare<=((sphere.w*sphere.w)+0.0001)) { //Give some epsilon, otherwise numerical inaccuracies may make it fail the check
-
-		// Origin is inside the reception radius: This ray has hit us before, ignore it. Internal ray may compute additional contributions from potential reflections inside the reception sphere
-
-		//rtPrintf("Ignored. txId=%d i.x=%u i.y=%u, ray=(%f,%f,%f) origin=(%f,%f,%f) t=%f rId[%u]=%d\n", current_tx.externalId, receiverLaunchIndex.x, receiverLaunchIndex.y, ray_receiver.direction.x, ray_receiver.direction.y, ray_receiver.direction.z, ray_receiver.origin.x, ray_receiver.origin.y, ray_receiver.origin.z, hit_attr.geom_normal_t.w, receiverBufferIndex,externalId);
-		return;
-
-	} else {
-		//If ray origin is outside the reception radius an internal ray is always created to keep track of internal reflections 
-		//Mark to  trace the internal ray to check if it collides with another thing and hits the receiver again
-
-		hitPayload.rxBufferIndex=receiverBufferIndex;	
-	}
 
 
 	//HitInfo values
@@ -379,6 +220,6 @@ rtDeclareVariable(LPWavePayload, missPayload, rtPayload, );
 RT_PROGRAM void miss()
 {
 	//rtPrintf("miss i.x=%u. iy=%u \n", receiverLaunchIndex.x, receiverLaunchIndex.y);
-	missPayload.end = true;
+	missPayload.flags = FLAG_END;
 }
 

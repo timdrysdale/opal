@@ -69,9 +69,9 @@ RT_PROGRAM void closestHitTriangle()
 	const float aux=rayPayload.ndtd.w;
 	rayPayload.ndtd = make_float4(reflection_dir); //initialized with float3, w is set to 0. and updated below
 	//hash_combine_impl<uint>(rayPayload.refhash,ch_triangle_data.faceId);
-	//rtPrintf("HASH \t%u\t%u\t%u\t%u\n",ch_triangle_date.faceId,rayPayload.reflections,rayPayload.hits,rayPayload.refhash);
 	//Use reflections and hits to create hash
 	hash_combine_impl<uint>(rayPayload.refhash,ch_triangle_data.faceId+rayPayload.reflections+rayPayload.hits);
+	rtPrintf("HASH \t%u\t%u\t%u\t%u\n",ch_triangle_data.faceId,rayPayload.reflections,rayPayload.hits,rayPayload.refhash);
 	
 	rayPayload.ndtd.w = aux+ rayLength;
 	rayPayload.lrhpd =make_float4(hp); //lastReflectionHitPoint;
@@ -150,9 +150,8 @@ RT_PROGRAM void closestHitTriangle()
 			//Copy payload
 			HVWavePayload penPayload=rayPayload;
 			penPayload.ndtd  = optix::make_float4(0, 0, 0, rayPayload.ndtd.w);
-			penPayload.internalRayInitialReflections=rayPayload.reflections;
 			penPayload.hits=rayPayload.hits+1;
-			penPayload.end = false;
+			penPayload.flags = FLAG_NONE;
 			//Assuming the media on both sides of the plane are the same (air, most likely), then the incidence angle is equal to the transmission angle, so the ray does not change trajectory
 			//Otherwise, we have to rotate the ray by the transmission angle, where a_t (angle_transmission) and theta= 90-a_t, with respect to the vector ortoghonal to the normal and ray,
 			//that is the normal vector of the plane defined by ray and mesh face normal.

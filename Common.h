@@ -57,7 +57,14 @@ struct HitInfo {
 
 //Ray payloads
 
+
+
+
+#define FLAG_NONE 0
+#define FLAG_END 1
+
 //Used for pure Horizontally or Vertically polarized waves. polarization should only be horizontal or vertical with respect to the environment
+//Order matters: using CUDA vector alignment rules: https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#vector-types__alignment-requirements-in-device-code
 struct HVWavePayload {
 	optix::float4 ndtd; //Packed next direction and total distance [nextDirection.x,nextDirection.y,nextDirection.z,totalDistance]
 	//Unpacked version
@@ -67,37 +74,33 @@ struct HVWavePayload {
 	//Unpacked version
 	//optix::float3 lastReflectionHitPoint;
 	//float totalDistanceTillLastReflection;
+	optix::float2 prodReflectionCoefficient; // Accumulated product of reflection coefficients. Complex
 	optix::float3 hitPoint;
 	optix::float3 polarization;
-	optix::float2 prodReflectionCoefficient; // Accumulated product of reflection coefficients. Complex
+	float accumulatedAttenuation; //For penenetration, in dB (Power)
 	float electricFieldAmplitude; //Can be removed if antenna gain not used
 	int reflections;
-	int internalRayInitialReflections;
 	int hits;
-	float accumulatedAttenuation; //For penentration, in dB (Power)
-	bool end;
-	//unsigned int faceId; //Can be removed
-	int rxBufferIndex; //Last receiver hit 
+	int flags; //Better to use int with flags (bool is system dependent), 
 	unsigned int refhash; //Combined hash to filter duplicates
 };
 
 //Used for arbitrary linear polarizations (LP) (given by a float3)
+//Order matters: using CUDA vector alignment rules: https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#vector-types__alignment-requirements-in-device-code
 struct LPWavePayload {
 	//Copy common fields. I do not see the need for inheritance here yet
 	optix::float4 ndtd; //Packed next direction and total distance [nextDirection.x,nextDirection.y,nextDirection.z,totalDistance]
 	optix::float4 lrhpd; //Packed lastReflectionHitPoint and totalDistanceTillLastReflection [lastReflectionHitPoint.x,lastReflectionHitPoint.y,lastReflectionHitPoint.z, totalDistanceTillLastReflection]
+	optix::float2 hor_coeff; //Complex 
+	optix::float2 ver_coeff; //Complex 
 	optix::float3 hor_v;
 	optix::float3 ver_v; 
 	optix::float3 hitPoint;
-	optix::float2 hor_coeff; //Complex 
-	optix::float2 ver_coeff; //Complex 
 	float electricFieldAmplitude; //Can be removed if antenna gain not used
 	float accumulatedAttenuation; //For penentration, in dB (Power)
 	int hits;
 	int reflections;
-	int internalRayInitialReflections;
-	bool end;
-	int rxBufferIndex; //Last receiver hit 
+	int flags;
 	unsigned int refhash; //Combined hash to filter duplicates
 };
 

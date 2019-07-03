@@ -16,37 +16,6 @@ rtDeclareVariable(rtObject, root, , );
 rtDeclareVariable(float, min_t_epsilon, , );
 rtDeclareVariable(unsigned int, max_interactions, , );
 
-__forceinline__ __device__ void traceLPInternalRay(LPWavePayload& rayPayload, float3 ro, float3 rd) {
-	//Hit a receiver. Trace internal ray	
-	//Copy payload
-	LPWavePayload internalRayPayload = rayPayload;
-	internalRayPayload.ndtd  = optix::make_float4(0, 0, 0, rayPayload.ndtd.w);
-	internalRayPayload.end = false;
-	float3 internal_ray_direction = rd;
-	float3 internal_origin=ro;
-	while (true) {
-		optix::Ray internalRay(internal_origin, internal_ray_direction, 1u, min_t_epsilon, RT_DEFAULT_MAX); //Internal ray type =1
-		//rtPrintf("IR\taccAtt=%f\tr=\t%u\tray=(%f,%f,%f)\n",internalRayPayload.accumulatedAttenuation,internalRayPayload.reflections, internal_ray_direction.x,internal_ray_direction.y,internal_ray_direction.z);
-
-		rtTrace(root, internalRay, internalRayPayload);
-		//Miss or too much attenuation
-		if (internalRayPayload.end) {
-			break;
-		}
-		//Max number of reflections
-		if (internalRayPayload.reflections > max_interactions) {
-			break;
-		}
-
-		//Reflection or going through receiver
-		// Update ray data for the next path segment
-		internal_ray_direction = make_float3(internalRayPayload.ndtd.x,internalRayPayload.ndtd.y,internalRayPayload.ndtd.z);
-
-		internal_origin = internalRayPayload.hitPoint;
-	}
-
-
-}
 
 
 __forceinline__ __device__ void traceLPReflection(LPWavePayload& rayPayload, float3 ro, float3 rd, unsigned int x, unsigned int y) 
@@ -58,16 +27,13 @@ __forceinline__ __device__ void traceLPReflection(LPWavePayload& rayPayload, flo
 	while (true) {
 		optix::Ray myRay(origin, ray_direction, 0u, min_t_epsilon, RT_DEFAULT_MAX);
 
-		if (rayPayload.rxBufferIndex>=0) {
-			traceLPInternalRay(rayPayload,rayPayload.hitPoint,make_float3(rayPayload.ndtd.x,rayPayload.ndtd.y,rayPayload.ndtd.z));	
-		}
 
-		rtTrace(root, myRay, rayPayload);
+		rtTrace(root, myRay, rayPayload, RT_VISIBILITY_ALL, RT_RAY_FLAG_DISABLE_ANYHIT);
 
 
 
 		//Miss or too much attenuation
-		if (rayPayload.end) {
+		if (rayPayload.flags==FLAG_END) {
 			break;
 		}
 		//Max number of reflections
@@ -79,7 +45,6 @@ __forceinline__ __device__ void traceLPReflection(LPWavePayload& rayPayload, flo
 		// Update ray data for the next path segment
 		ray_direction =make_float3(rayPayload.ndtd.x,rayPayload.ndtd.y,rayPayload.ndtd.z);
 		origin = rayPayload.hitPoint;
-		rayPayload.rxBufferIndex=-1;	
 
 
 		//Reflection info log (to be used in external programs)

@@ -61,14 +61,11 @@ RT_PROGRAM void genRayAndReflectionsFromSphereIndex()
 	rayPayload.electricFieldAmplitude = 1.0f; //Normalized Eo=1. Antenna Gain = 1. TODO: Implement antenna gain with buffer dependent on the ray direction and txId : initialEFAmplitude[txId] * antennaGain[txId]);
 	rayPayload.accumulatedAttenuation=0.0f;
 	rayPayload.reflections = 0;
-	rayPayload.internalRayInitialReflections=0;
 	rayPayload.hits = 0;
-	rayPayload.end = false;
-
+	rayPayload.flags = FLAG_NONE;	
 	rayPayload.prodReflectionCoefficient = make_float2(1.0f, 0.0f);
-	//rayPayload.faceId = 0u;
-	rayPayload.rxBufferIndex=-1;
 	rayPayload.refhash=0;
+	
 	//Print all rays generated
 	rtPrintf("A\t%u\t%u\t%f\t%f\t%f\n", launchIndex.x, launchIndex.y, ray_direction.x, ray_direction.y, ray_direction.z);
 

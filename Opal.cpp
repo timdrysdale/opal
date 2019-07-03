@@ -163,7 +163,7 @@ void OpalSceneManager::createSceneContext()
 #endif
 	context = optix::Context::create();
 	setEnabledDevices();
-	context->setRayTypeCount(2); //Normal and internal ray
+	context->setRayTypeCount(1); //Normal  ray
 	context->setEntryPointCount(1); //1 program: ray generation 
 
 }
@@ -182,7 +182,6 @@ void opal::OpalSceneManager::setDefaultPrograms()
 #endif
 
 	defaultPrograms.insert(std::pair<std::string, optix::Program>("receiverClosestHit", createClosestHitReceiver()));
-	defaultPrograms.insert(std::pair<std::string, optix::Program>("receiverClosestHitInternalRay", createClosestHitInternalRay()));
 
 
 	defaultPrograms.insert(std::pair<std::string, optix::Program>("receiverIntersection", createIntersectionSphere()));
@@ -193,7 +192,6 @@ void opal::OpalSceneManager::setDefaultPrograms()
 
 
 	defaultMeshMaterial = createMeshMaterial(0u,defaultPrograms.at("meshClosestHit")); //For normal rays
-	defaultMeshMaterial->setClosestHitProgram(1u, defaultPrograms.at("meshClosestHit")); //Add the same program for internal rays
 
 #ifdef OPALDEBUG
 	outputFile << "defaultPrograms size=" << defaultPrograms.size() << std::endl;
@@ -552,18 +550,6 @@ optix::Program OpalSceneManager::createClosestHitReceiver()
 
 	return chrx;
 }
-optix::Program OpalSceneManager::createClosestHitInternalRay()
-{
-
-
-
-	optix::Program chrx = context->createProgramFromPTXString(sutil::getPtxString(cudaProgramsDir.c_str(), "receiver.cu"), "closestHitReceiverInternalRay");
-
-
-	//Program variable: common value for all receiver instances, since they all share the program. If multichannel is used, this should be set per transmission
-	chrx["k"]->setFloat(defaultChannel.k);
-	return chrx;
-}
 
 
 optix::Program OpalSceneManager::createBoundingBoxTriangle()
@@ -847,9 +833,6 @@ void OpalSceneManager::addReceiver(int id, float3  position, float3 polarization
 
 	optix::Material mat = context->createMaterial();
 	mat->setClosestHitProgram(0u, chrx);
-
-	optix::Program chrxInternal = defaultPrograms.at("receiverClosestHitInternalRay");
-	mat->setClosestHitProgram(1u, chrxInternal);
 	optix_materials.push_back(mat);
 
 
@@ -1076,7 +1059,7 @@ void OpalSceneManager::executeTransmitLaunch(int txId, float txPower,  float3 or
 	//Transfer the filtered hits to the host
 	HitInfo* host_hits=reinterpret_cast<HitInfo*>  (resultHitInfoBuffer->map());
 	
-	//Just for performance
+	//Just for logging performance
 	timer.stop();
 	const double transferTime=timer.getTime();
 	float2 E=make_float2(0.0f,0.0f);
@@ -1182,11 +1165,11 @@ void OpalSceneManager::executeTransmitLaunchMultiGPU(int txId, float txPower,  f
 		++raysHit;
 		E += host_hits[i].E;
 
-		std::cout<<"E["<<i<<"]="<<host_hits[i].E<<std::endl;
-		std::cout<<"\t rxBufferIndex="<<host_hits[i].thrd.z<<std::endl;
-		std::cout<<"\t written="<<host_hits[i].thrd.x<<std::endl;
-		std::cout<<"\t refhash="<<host_hits[i].thrd.y<<std::endl;
-		std::cout<<"\t dist="<<host_hits[i].thrd.w<<std::endl;
+	//	std::cout<<"E["<<i<<"]="<<host_hits[i].E<<std::endl;
+	//	std::cout<<"\t rxBufferIndex="<<host_hits[i].thrd.z<<std::endl;
+	//	std::cout<<"\t written="<<host_hits[i].thrd.x<<std::endl;
+	//	std::cout<<"\t refhash="<<host_hits[i].thrd.y<<std::endl;
+	//	std::cout<<"\t dist="<<host_hits[i].thrd.w<<std::endl;
 
 
 
@@ -1438,9 +1421,7 @@ void OpalSceneManager::finishSceneContext() {
 
 	context->setRayGenerationProgram(0, defaultPrograms.at("rayGeneration")); //Generation
 	context->setMissProgram(0, defaultPrograms.at("miss"));
-	context->setMissProgram(1, defaultPrograms.at("miss"));
 	context->validate();
-	//context->setExceptionEnabled(RT_EXCEPTION_BUFFER_INDEX_OUT_OF_BOUNDS, true);
 	//context->setExceptionEnabled(RT_EXCEPTION_ALL, true);
 	sceneFinished = true;
 	std::cout<<"--- Check your configuration and assumptions --"<<std::endl;
@@ -1500,8 +1481,8 @@ void opal::OpalSceneManager::setPrintEnabled(int bufferSize)
 	context->setPrintBufferSize(bufferSize);
 	std::cout << "printEnabled" << std::endl;
 	//Set a particular print index. Comment out if necessary
-	context->setPrintLaunchIndex(1800,0,0);
-	std::cout<<"Showing launch index [1800,0,0]"<<std::endl;
+	context->setPrintLaunchIndex(3,0,0);
+	std::cout<<"Showing launch index [3,0,0]"<<std::endl;
 
 }
 void OpalSceneManager::setUsageReport()
