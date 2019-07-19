@@ -202,6 +202,7 @@ void opal::OpalSceneManager::setDefaultPrograms()
 
 void OpalSceneManager::addMeshToGroup(int id, int meshVertexCount, optix::float3* meshVertices, int meshTriangleCount, int* meshTriangles, MaterialEMProperties emProp) {
 	OpalDynamicMeshGroup* dmg;
+	
 	try {
 		dmg	= dynamicMeshes.at(id);
 	}
@@ -210,7 +211,14 @@ void OpalSceneManager::addMeshToGroup(int id, int meshVertexCount, optix::float3
 		throw  opal::Exception("addMeshToGroup(): Not found OpalDynamicMeshGroup with this id");
 		return;
 	}
+#ifdef OPAL_USE_TRI
+	OpalMesh mesh=createMesh(meshVertexCount, meshVertices, meshTriangleCount, meshTriangles,  defaultPrograms.at("triangleAttributes"), defaultPrograms.at("triangleAttributes"), defaultMeshMaterial);
+#else
 	OpalMesh mesh = createMesh(meshVertexCount, meshVertices, meshTriangleCount, meshTriangles,  defaultPrograms.at("meshIntersection"), defaultPrograms.at("meshBounds"), defaultMeshMaterial);
+
+#endif
+
+
 	setMeshEMProperties(mesh.geom_instance, emProp);
 
 	dmg->geom_group->addChild(mesh.geom_instance);
@@ -348,12 +356,12 @@ void OpalSceneManager::extractFaces(optix::float3* meshVertices, std::vector<std
 		}
 	}
 	std::cout  <<"\t"<< normals.size() <<" faces added=. numberOfFaces="<< numberOfFaces<< std::endl;
-	/*	for (auto v: normals)
+	/*		for (auto v: normals)
 		{
 		std::cout << std::scientific<<"face normal=" << v.first << "id=" << v.second << std::endl;
 
-		}*/
-
+		}
+*/
 
 
 
@@ -432,11 +440,11 @@ OpalMesh OpalSceneManager::createMesh(int meshVertexCount, optix::float3* meshVe
 
 
 	extractFaces(meshVertices, triangleIndexBuffer);
-	/*for (size_t i = 0; i < triangleIndexBuffer.size(); i++)
-	  {
-	  std::cout<<triangleIndexBuffer[i].second << std::endl;
+	//for (size_t i = 0; i < triangleIndexBuffer.size(); i++)
+	//  {
+	//  std::cout<<triangleIndexBuffer[i].second << std::endl;
 
-	  }*/
+	//  }
 
 	OpalMesh mesh;
 
@@ -1481,8 +1489,8 @@ void opal::OpalSceneManager::setPrintEnabled(int bufferSize)
 	context->setPrintBufferSize(bufferSize);
 	std::cout << "printEnabled" << std::endl;
 	//Set a particular print index. Comment out if necessary
-	context->setPrintLaunchIndex(3,0,0);
-	std::cout<<"Showing launch index [3,0,0]"<<std::endl;
+	//context->setPrintLaunchIndex(3,0,0);
+	//std::cout<<"Showing launch index [3,0,0]"<<std::endl;
 
 }
 void OpalSceneManager::setUsageReport()

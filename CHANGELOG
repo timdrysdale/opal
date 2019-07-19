@@ -1,3 +1,6 @@
+Opal-0.4.3 (July 2019)
+-----------
+1. Fixed bug when adding a dynamic mesh to group
 Opal-0.4.2 (July 2019)
 -----------
 1. Removed internal rays. Not necessary since THRUST filtering takes care of double hitting on the same receiver and internal reflections. In addition, there was a bug and was not actually working
