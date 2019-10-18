@@ -15,10 +15,12 @@ dynamical scene,
 which is built from meshes loaded from files or from another application, such 
 as a game engine.
 
-At the moment, only reflections are computed. In future releases we will add difraction.
-
-It supports simultaneous transmissions from multiple transmitters to multiple receivers.
-
+Features:
+* Reflections
+* Penetration
+* Depolarization 
+* It supports simultaneous transmissions from multiple transmitters to multiple receivers.
+* In future releases we will add difraction.
 
 It can be used as a standalone application or as a Unity plugin. If used as
 a Unity plugin, a Unity program will send the meshes and update the transforms 
@@ -37,9 +39,14 @@ CMake 3.10
 Download Optix from the [NVIDIA site](https://developer.nvidia.com/optix) and 
 follow instructions to install it.
 
+**Do not use Optix 7**. It is not backward compatible and uses a completely different API.
+
 **Updated to Optix 6.0**
-It has been tested with the last Optix version, 6.0, and **the performance on the same hardware has improved remarkably**, even without using RTX cores. With Optix 6.0 
+It has been tested with the last Optix version, 6.5, and **the performance on the same hardware has improved remarkably**, even without using RTX cores. 
+With Optix 6.0 
  use CUDA 10.0 and requires a NVIDIA driver at least 418.30. Follow exactly the same steps as below, but with Optix 6.0 and CUDA 10.0.
+ With Optix 6.5 
+ use CUDA 10.1 and requires a NVIDIA driver at least 435.17. Follow exactly the same steps as below, but with Optix 6.0 and CUDA 10.0.
 
 With Optix 5.1.
 Basically you need to install CUDA first, which for Optix 5.1 should be 9.0 
@@ -87,7 +94,7 @@ Make sure that you do that for both Debug and Release configurations, or any oth
 
 
 ## Usage
-As a standalone application, you can find an `main` method in `tests.cpp` with some tests. You can do your own, include it in your application, and 
+As a standalone application, you can find an `main` method in `main.cpp` with some tests. Test code can be found in the `tests` folder. You can do your own, include it in your application, and 
 so on. Recompile and execute. 
 
 As a library link appropriately and go. 
