@@ -30,7 +30,7 @@ For more information visit the [Veneris project website](http://pcacribia.upct.e
 ## Installation
 
 ### Requirements
-You need a modern NVIDIA GPU and updated driver.  CUDA 9.0 or later. Optix 6.0 or 5.1. gcc or Visual Studio.
+You need a modern NVIDIA GPU and updated driver.  CUDA 9.0 or later. Optix 6.0 or 5.1. gcc or Visual Studio (use a recent version, since it uses nested namespaces. I use g++ 7.4.0).
 CMake 3.10
 
 ### Install Optix
