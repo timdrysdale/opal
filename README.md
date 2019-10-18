@@ -41,12 +41,16 @@ follow instructions to install it.
 
 **Do not use Optix 7**. It is not backward compatible and uses a completely different API.
 
-**Updated to Optix 6.0**
+**Updated to Optix 6.0**.
 It has been tested with the last Optix version, 6.5, and **the performance on the same hardware has improved remarkably**, even without using RTX cores. 
+ 
+ With Optix 6.5 
+ use CUDA 10.1 and requires a NVIDIA driver at least 435.17. Follow exactly the same steps as below, but with Optix 6.5 and CUDA 10.1.
+
 With Optix 6.0 
  use CUDA 10.0 and requires a NVIDIA driver at least 418.30. Follow exactly the same steps as below, but with Optix 6.0 and CUDA 10.0.
- With Optix 6.5 
- use CUDA 10.1 and requires a NVIDIA driver at least 435.17. Follow exactly the same steps as below, but with Optix 6.0 and CUDA 10.0.
+ 
+
 
 With Optix 5.1.
 Basically you need to install CUDA first, which for Optix 5.1 should be 9.0 
