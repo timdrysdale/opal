@@ -3,7 +3,10 @@
 //Copyright (c) 2019 Esteban Egea-Lopez http://ait.upct.es/eegea
 //
 /**************************************************************/
-#pragma once
+
+#ifndef COMPLEX_H
+#define COMPLEX_H
+
 #include <optix.h>
 #include <optixu/optixu_math_namespace.h>
 
@@ -117,7 +120,8 @@ __forceinline__ __device__ float2 sca_complex_prod(float f, float2 z) {
 //Complex exponential JUST FOR  IMAGINARY EXPONENTS . Adapted from thrust :https://github.com/thrust/thrust/blob/master/thrust/detail/complex/arithmetic.h
 
 __forceinline__ __device__ float2 complex_exp_only_imaginary(float2 z) {
-	return make_float2(cos(z.y), sin(z.y));
+	return make_float2(cosf(z.y), sinf(z.y));
 }
 
+#endif
 

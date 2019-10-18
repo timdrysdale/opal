@@ -7,7 +7,7 @@
 
 #include "../Common.h"
 #include "../Complex.h"
-#include "tracePolarizationFunctions.h"
+#include "linearPolarizationFunctions.h"
 #include <optix_world.h>
 #include <optixu/optixu_math_namespace.h>
 #include <optixu/optixu_aabb_namespace.h>
@@ -16,7 +16,6 @@ using namespace optix;
 
 
 //Receiver global buffers
-rtBuffer<HitInfo, 1> resultHitInfoBuffer; //Results buffer to be used  by thrust to store filtering resutls 
 rtBuffer<HitInfo, 1> globalHitInfoBuffer; //Buffer to store all the hits
 rtBuffer<uint, 1> atomicIndex; //Buffer to store the current global buffer index 
 rtDeclareVariable(uint, global_info_buffer_maxsize, ,);
@@ -138,7 +137,7 @@ RT_PROGRAM void closestHitReceiver()
 	const float3 ray=-ray_receiver.direction;	
 
 	//Get polarization for receiver for this ray
-	getLinearPolarizationForRay(receiverPolarization, ray,  hor_o,ver_o);
+	getLinearPolarizationInRayBasis(receiverPolarization, ray,  hor_o,ver_o);
 
 	//Get the  components of received field for the normal and parallel field vectors (geometric projection on receiver polarization vectors times reflection coefficients)
 	const float2 Einorm=sca_complex_prod(dot(hitPayload.hor_v,hor_o),hitPayload.hor_coeff) + sca_complex_prod(dot(hitPayload.ver_v,hor_o),hitPayload.ver_coeff);

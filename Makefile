@@ -56,17 +56,6 @@ CMAKE_BINARY_DIR = /home/eegea/optix6/SDK
 #=============================================================================
 # Targets provided globally by CMake.
 
-# Special rule for the target edit_cache
-edit_cache:
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "Running CMake cache editor..."
-	/usr/bin/ccmake -H$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR)
-.PHONY : edit_cache
-
-# Special rule for the target edit_cache
-edit_cache/fast: edit_cache
-
-.PHONY : edit_cache/fast
-
 # Special rule for the target rebuild_cache
 rebuild_cache:
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "Running CMake to regenerate build system..."
@@ -78,16 +67,27 @@ rebuild_cache/fast: rebuild_cache
 
 .PHONY : rebuild_cache/fast
 
+# Special rule for the target edit_cache
+edit_cache:
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "Running CMake cache editor..."
+	/usr/bin/ccmake -H$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR)
+.PHONY : edit_cache
+
+# Special rule for the target edit_cache
+edit_cache/fast: edit_cache
+
+.PHONY : edit_cache/fast
+
 # The main all target
 all: cmake_check_build_system
-	cd /home/eegea/optix6/SDK && $(CMAKE_COMMAND) -E cmake_progress_start /home/eegea/optix6/SDK/CMakeFiles /home/eegea/optix6/SDK/opal/CMakeFiles/progress.marks
-	cd /home/eegea/optix6/SDK && $(MAKE) -f CMakeFiles/Makefile2 opal/all
+	cd /home/eegea/optix6/SDK && $(CMAKE_COMMAND) -E cmake_progress_start /home/eegea/optix6/SDK/CMakeFiles /home/eegea/optix6/SDK/tunnels/CMakeFiles/progress.marks
+	cd /home/eegea/optix6/SDK && $(MAKE) -f CMakeFiles/Makefile2 tunnels/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /home/eegea/optix6/SDK/CMakeFiles 0
 .PHONY : all
 
 # The main clean target
 clean:
-	cd /home/eegea/optix6/SDK && $(MAKE) -f CMakeFiles/Makefile2 opal/clean
+	cd /home/eegea/optix6/SDK && $(MAKE) -f CMakeFiles/Makefile2 tunnels/clean
 .PHONY : clean
 
 # The main clean target
@@ -97,12 +97,12 @@ clean/fast: clean
 
 # Prepare targets for installation.
 preinstall: all
-	cd /home/eegea/optix6/SDK && $(MAKE) -f CMakeFiles/Makefile2 opal/preinstall
+	cd /home/eegea/optix6/SDK && $(MAKE) -f CMakeFiles/Makefile2 tunnels/preinstall
 .PHONY : preinstall
 
 # Prepare targets for installation.
 preinstall/fast:
-	cd /home/eegea/optix6/SDK && $(MAKE) -f CMakeFiles/Makefile2 opal/preinstall
+	cd /home/eegea/optix6/SDK && $(MAKE) -f CMakeFiles/Makefile2 tunnels/preinstall
 .PHONY : preinstall/fast
 
 # clear depends
@@ -111,34 +111,34 @@ depend:
 .PHONY : depend
 
 # Convenience name for target.
-opal/CMakeFiles/opal.dir/rule:
-	cd /home/eegea/optix6/SDK && $(MAKE) -f CMakeFiles/Makefile2 opal/CMakeFiles/opal.dir/rule
-.PHONY : opal/CMakeFiles/opal.dir/rule
+tunnels/CMakeFiles/tunnels.dir/rule:
+	cd /home/eegea/optix6/SDK && $(MAKE) -f CMakeFiles/Makefile2 tunnels/CMakeFiles/tunnels.dir/rule
+.PHONY : tunnels/CMakeFiles/tunnels.dir/rule
 
 # Convenience name for target.
-opal: opal/CMakeFiles/opal.dir/rule
+tunnels: tunnels/CMakeFiles/tunnels.dir/rule
 
-.PHONY : opal
+.PHONY : tunnels
 
 # fast build rule for target.
-opal/fast:
-	cd /home/eegea/optix6/SDK && $(MAKE) -f opal/CMakeFiles/opal.dir/build.make opal/CMakeFiles/opal.dir/build
-.PHONY : opal/fast
+tunnels/fast:
+	cd /home/eegea/optix6/SDK && $(MAKE) -f tunnels/CMakeFiles/tunnels.dir/build.make tunnels/CMakeFiles/tunnels.dir/build
+.PHONY : tunnels/fast
 
 # Convenience name for target.
-opal/CMakeFiles/opal_s.dir/rule:
-	cd /home/eegea/optix6/SDK && $(MAKE) -f CMakeFiles/Makefile2 opal/CMakeFiles/opal_s.dir/rule
-.PHONY : opal/CMakeFiles/opal_s.dir/rule
+tunnels/CMakeFiles/tunnels_s.dir/rule:
+	cd /home/eegea/optix6/SDK && $(MAKE) -f CMakeFiles/Makefile2 tunnels/CMakeFiles/tunnels_s.dir/rule
+.PHONY : tunnels/CMakeFiles/tunnels_s.dir/rule
 
 # Convenience name for target.
-opal_s: opal/CMakeFiles/opal_s.dir/rule
+tunnels_s: tunnels/CMakeFiles/tunnels_s.dir/rule
 
-.PHONY : opal_s
+.PHONY : tunnels_s
 
 # fast build rule for target.
-opal_s/fast:
-	cd /home/eegea/optix6/SDK && $(MAKE) -f opal/CMakeFiles/opal_s.dir/build.make opal/CMakeFiles/opal_s.dir/build
-.PHONY : opal_s/fast
+tunnels_s/fast:
+	cd /home/eegea/optix6/SDK && $(MAKE) -f tunnels/CMakeFiles/tunnels_s.dir/build.make tunnels/CMakeFiles/tunnels_s.dir/build
+.PHONY : tunnels_s/fast
 
 Opal.o: Opal.cpp.o
 
@@ -146,8 +146,8 @@ Opal.o: Opal.cpp.o
 
 # target to build an object file
 Opal.cpp.o:
-	cd /home/eegea/optix6/SDK && $(MAKE) -f opal/CMakeFiles/opal.dir/build.make opal/CMakeFiles/opal.dir/Opal.cpp.o
-	cd /home/eegea/optix6/SDK && $(MAKE) -f opal/CMakeFiles/opal_s.dir/build.make opal/CMakeFiles/opal_s.dir/Opal.cpp.o
+	cd /home/eegea/optix6/SDK && $(MAKE) -f tunnels/CMakeFiles/tunnels.dir/build.make tunnels/CMakeFiles/tunnels.dir/Opal.cpp.o
+	cd /home/eegea/optix6/SDK && $(MAKE) -f tunnels/CMakeFiles/tunnels_s.dir/build.make tunnels/CMakeFiles/tunnels_s.dir/Opal.cpp.o
 .PHONY : Opal.cpp.o
 
 Opal.i: Opal.cpp.i
@@ -156,8 +156,8 @@ Opal.i: Opal.cpp.i
 
 # target to preprocess a source file
 Opal.cpp.i:
-	cd /home/eegea/optix6/SDK && $(MAKE) -f opal/CMakeFiles/opal.dir/build.make opal/CMakeFiles/opal.dir/Opal.cpp.i
-	cd /home/eegea/optix6/SDK && $(MAKE) -f opal/CMakeFiles/opal_s.dir/build.make opal/CMakeFiles/opal_s.dir/Opal.cpp.i
+	cd /home/eegea/optix6/SDK && $(MAKE) -f tunnels/CMakeFiles/tunnels.dir/build.make tunnels/CMakeFiles/tunnels.dir/Opal.cpp.i
+	cd /home/eegea/optix6/SDK && $(MAKE) -f tunnels/CMakeFiles/tunnels_s.dir/build.make tunnels/CMakeFiles/tunnels_s.dir/Opal.cpp.i
 .PHONY : Opal.cpp.i
 
 Opal.s: Opal.cpp.s
@@ -166,8 +166,8 @@ Opal.s: Opal.cpp.s
 
 # target to generate assembly for a file
 Opal.cpp.s:
-	cd /home/eegea/optix6/SDK && $(MAKE) -f opal/CMakeFiles/opal.dir/build.make opal/CMakeFiles/opal.dir/Opal.cpp.s
-	cd /home/eegea/optix6/SDK && $(MAKE) -f opal/CMakeFiles/opal_s.dir/build.make opal/CMakeFiles/opal_s.dir/Opal.cpp.s
+	cd /home/eegea/optix6/SDK && $(MAKE) -f tunnels/CMakeFiles/tunnels.dir/build.make tunnels/CMakeFiles/tunnels.dir/Opal.cpp.s
+	cd /home/eegea/optix6/SDK && $(MAKE) -f tunnels/CMakeFiles/tunnels_s.dir/build.make tunnels/CMakeFiles/tunnels_s.dir/Opal.cpp.s
 .PHONY : Opal.cpp.s
 
 Unity.o: Unity.cpp.o
@@ -176,8 +176,8 @@ Unity.o: Unity.cpp.o
 
 # target to build an object file
 Unity.cpp.o:
-	cd /home/eegea/optix6/SDK && $(MAKE) -f opal/CMakeFiles/opal.dir/build.make opal/CMakeFiles/opal.dir/Unity.cpp.o
-	cd /home/eegea/optix6/SDK && $(MAKE) -f opal/CMakeFiles/opal_s.dir/build.make opal/CMakeFiles/opal_s.dir/Unity.cpp.o
+	cd /home/eegea/optix6/SDK && $(MAKE) -f tunnels/CMakeFiles/tunnels.dir/build.make tunnels/CMakeFiles/tunnels.dir/Unity.cpp.o
+	cd /home/eegea/optix6/SDK && $(MAKE) -f tunnels/CMakeFiles/tunnels_s.dir/build.make tunnels/CMakeFiles/tunnels_s.dir/Unity.cpp.o
 .PHONY : Unity.cpp.o
 
 Unity.i: Unity.cpp.i
@@ -186,8 +186,8 @@ Unity.i: Unity.cpp.i
 
 # target to preprocess a source file
 Unity.cpp.i:
-	cd /home/eegea/optix6/SDK && $(MAKE) -f opal/CMakeFiles/opal.dir/build.make opal/CMakeFiles/opal.dir/Unity.cpp.i
-	cd /home/eegea/optix6/SDK && $(MAKE) -f opal/CMakeFiles/opal_s.dir/build.make opal/CMakeFiles/opal_s.dir/Unity.cpp.i
+	cd /home/eegea/optix6/SDK && $(MAKE) -f tunnels/CMakeFiles/tunnels.dir/build.make tunnels/CMakeFiles/tunnels.dir/Unity.cpp.i
+	cd /home/eegea/optix6/SDK && $(MAKE) -f tunnels/CMakeFiles/tunnels_s.dir/build.make tunnels/CMakeFiles/tunnels_s.dir/Unity.cpp.i
 .PHONY : Unity.cpp.i
 
 Unity.s: Unity.cpp.s
@@ -196,9 +196,39 @@ Unity.s: Unity.cpp.s
 
 # target to generate assembly for a file
 Unity.cpp.s:
-	cd /home/eegea/optix6/SDK && $(MAKE) -f opal/CMakeFiles/opal.dir/build.make opal/CMakeFiles/opal.dir/Unity.cpp.s
-	cd /home/eegea/optix6/SDK && $(MAKE) -f opal/CMakeFiles/opal_s.dir/build.make opal/CMakeFiles/opal_s.dir/Unity.cpp.s
+	cd /home/eegea/optix6/SDK && $(MAKE) -f tunnels/CMakeFiles/tunnels.dir/build.make tunnels/CMakeFiles/tunnels.dir/Unity.cpp.s
+	cd /home/eegea/optix6/SDK && $(MAKE) -f tunnels/CMakeFiles/tunnels_s.dir/build.make tunnels/CMakeFiles/tunnels_s.dir/Unity.cpp.s
 .PHONY : Unity.cpp.s
+
+main.o: main.cpp.o
+
+.PHONY : main.o
+
+# target to build an object file
+main.cpp.o:
+	cd /home/eegea/optix6/SDK && $(MAKE) -f tunnels/CMakeFiles/tunnels.dir/build.make tunnels/CMakeFiles/tunnels.dir/main.cpp.o
+	cd /home/eegea/optix6/SDK && $(MAKE) -f tunnels/CMakeFiles/tunnels_s.dir/build.make tunnels/CMakeFiles/tunnels_s.dir/main.cpp.o
+.PHONY : main.cpp.o
+
+main.i: main.cpp.i
+
+.PHONY : main.i
+
+# target to preprocess a source file
+main.cpp.i:
+	cd /home/eegea/optix6/SDK && $(MAKE) -f tunnels/CMakeFiles/tunnels.dir/build.make tunnels/CMakeFiles/tunnels.dir/main.cpp.i
+	cd /home/eegea/optix6/SDK && $(MAKE) -f tunnels/CMakeFiles/tunnels_s.dir/build.make tunnels/CMakeFiles/tunnels_s.dir/main.cpp.i
+.PHONY : main.cpp.i
+
+main.s: main.cpp.s
+
+.PHONY : main.s
+
+# target to generate assembly for a file
+main.cpp.s:
+	cd /home/eegea/optix6/SDK && $(MAKE) -f tunnels/CMakeFiles/tunnels.dir/build.make tunnels/CMakeFiles/tunnels.dir/main.cpp.s
+	cd /home/eegea/optix6/SDK && $(MAKE) -f tunnels/CMakeFiles/tunnels_s.dir/build.make tunnels/CMakeFiles/tunnels_s.dir/main.cpp.s
+.PHONY : main.cpp.s
 
 multitransmitter.o: multitransmitter.cpp.o
 
@@ -206,8 +236,8 @@ multitransmitter.o: multitransmitter.cpp.o
 
 # target to build an object file
 multitransmitter.cpp.o:
-	cd /home/eegea/optix6/SDK && $(MAKE) -f opal/CMakeFiles/opal.dir/build.make opal/CMakeFiles/opal.dir/multitransmitter.cpp.o
-	cd /home/eegea/optix6/SDK && $(MAKE) -f opal/CMakeFiles/opal_s.dir/build.make opal/CMakeFiles/opal_s.dir/multitransmitter.cpp.o
+	cd /home/eegea/optix6/SDK && $(MAKE) -f tunnels/CMakeFiles/tunnels.dir/build.make tunnels/CMakeFiles/tunnels.dir/multitransmitter.cpp.o
+	cd /home/eegea/optix6/SDK && $(MAKE) -f tunnels/CMakeFiles/tunnels_s.dir/build.make tunnels/CMakeFiles/tunnels_s.dir/multitransmitter.cpp.o
 .PHONY : multitransmitter.cpp.o
 
 multitransmitter.i: multitransmitter.cpp.i
@@ -216,8 +246,8 @@ multitransmitter.i: multitransmitter.cpp.i
 
 # target to preprocess a source file
 multitransmitter.cpp.i:
-	cd /home/eegea/optix6/SDK && $(MAKE) -f opal/CMakeFiles/opal.dir/build.make opal/CMakeFiles/opal.dir/multitransmitter.cpp.i
-	cd /home/eegea/optix6/SDK && $(MAKE) -f opal/CMakeFiles/opal_s.dir/build.make opal/CMakeFiles/opal_s.dir/multitransmitter.cpp.i
+	cd /home/eegea/optix6/SDK && $(MAKE) -f tunnels/CMakeFiles/tunnels.dir/build.make tunnels/CMakeFiles/tunnels.dir/multitransmitter.cpp.i
+	cd /home/eegea/optix6/SDK && $(MAKE) -f tunnels/CMakeFiles/tunnels_s.dir/build.make tunnels/CMakeFiles/tunnels_s.dir/multitransmitter.cpp.i
 .PHONY : multitransmitter.cpp.i
 
 multitransmitter.s: multitransmitter.cpp.s
@@ -226,39 +256,69 @@ multitransmitter.s: multitransmitter.cpp.s
 
 # target to generate assembly for a file
 multitransmitter.cpp.s:
-	cd /home/eegea/optix6/SDK && $(MAKE) -f opal/CMakeFiles/opal.dir/build.make opal/CMakeFiles/opal.dir/multitransmitter.cpp.s
-	cd /home/eegea/optix6/SDK && $(MAKE) -f opal/CMakeFiles/opal_s.dir/build.make opal/CMakeFiles/opal_s.dir/multitransmitter.cpp.s
+	cd /home/eegea/optix6/SDK && $(MAKE) -f tunnels/CMakeFiles/tunnels.dir/build.make tunnels/CMakeFiles/tunnels.dir/multitransmitter.cpp.s
+	cd /home/eegea/optix6/SDK && $(MAKE) -f tunnels/CMakeFiles/tunnels_s.dir/build.make tunnels/CMakeFiles/tunnels_s.dir/multitransmitter.cpp.s
 .PHONY : multitransmitter.cpp.s
 
-tests.o: tests.cpp.o
+tests/tests.o: tests/tests.cpp.o
 
-.PHONY : tests.o
+.PHONY : tests/tests.o
 
 # target to build an object file
-tests.cpp.o:
-	cd /home/eegea/optix6/SDK && $(MAKE) -f opal/CMakeFiles/opal.dir/build.make opal/CMakeFiles/opal.dir/tests.cpp.o
-	cd /home/eegea/optix6/SDK && $(MAKE) -f opal/CMakeFiles/opal_s.dir/build.make opal/CMakeFiles/opal_s.dir/tests.cpp.o
-.PHONY : tests.cpp.o
+tests/tests.cpp.o:
+	cd /home/eegea/optix6/SDK && $(MAKE) -f tunnels/CMakeFiles/tunnels.dir/build.make tunnels/CMakeFiles/tunnels.dir/tests/tests.cpp.o
+	cd /home/eegea/optix6/SDK && $(MAKE) -f tunnels/CMakeFiles/tunnels_s.dir/build.make tunnels/CMakeFiles/tunnels_s.dir/tests/tests.cpp.o
+.PHONY : tests/tests.cpp.o
 
-tests.i: tests.cpp.i
+tests/tests.i: tests/tests.cpp.i
 
-.PHONY : tests.i
+.PHONY : tests/tests.i
 
 # target to preprocess a source file
-tests.cpp.i:
-	cd /home/eegea/optix6/SDK && $(MAKE) -f opal/CMakeFiles/opal.dir/build.make opal/CMakeFiles/opal.dir/tests.cpp.i
-	cd /home/eegea/optix6/SDK && $(MAKE) -f opal/CMakeFiles/opal_s.dir/build.make opal/CMakeFiles/opal_s.dir/tests.cpp.i
-.PHONY : tests.cpp.i
+tests/tests.cpp.i:
+	cd /home/eegea/optix6/SDK && $(MAKE) -f tunnels/CMakeFiles/tunnels.dir/build.make tunnels/CMakeFiles/tunnels.dir/tests/tests.cpp.i
+	cd /home/eegea/optix6/SDK && $(MAKE) -f tunnels/CMakeFiles/tunnels_s.dir/build.make tunnels/CMakeFiles/tunnels_s.dir/tests/tests.cpp.i
+.PHONY : tests/tests.cpp.i
 
-tests.s: tests.cpp.s
+tests/tests.s: tests/tests.cpp.s
 
-.PHONY : tests.s
+.PHONY : tests/tests.s
 
 # target to generate assembly for a file
-tests.cpp.s:
-	cd /home/eegea/optix6/SDK && $(MAKE) -f opal/CMakeFiles/opal.dir/build.make opal/CMakeFiles/opal.dir/tests.cpp.s
-	cd /home/eegea/optix6/SDK && $(MAKE) -f opal/CMakeFiles/opal_s.dir/build.make opal/CMakeFiles/opal_s.dir/tests.cpp.s
-.PHONY : tests.cpp.s
+tests/tests.cpp.s:
+	cd /home/eegea/optix6/SDK && $(MAKE) -f tunnels/CMakeFiles/tunnels.dir/build.make tunnels/CMakeFiles/tunnels.dir/tests/tests.cpp.s
+	cd /home/eegea/optix6/SDK && $(MAKE) -f tunnels/CMakeFiles/tunnels_s.dir/build.make tunnels/CMakeFiles/tunnels_s.dir/tests/tests.cpp.s
+.PHONY : tests/tests.cpp.s
+
+tests/tunnels.o: tests/tunnels.cpp.o
+
+.PHONY : tests/tunnels.o
+
+# target to build an object file
+tests/tunnels.cpp.o:
+	cd /home/eegea/optix6/SDK && $(MAKE) -f tunnels/CMakeFiles/tunnels.dir/build.make tunnels/CMakeFiles/tunnels.dir/tests/tunnels.cpp.o
+	cd /home/eegea/optix6/SDK && $(MAKE) -f tunnels/CMakeFiles/tunnels_s.dir/build.make tunnels/CMakeFiles/tunnels_s.dir/tests/tunnels.cpp.o
+.PHONY : tests/tunnels.cpp.o
+
+tests/tunnels.i: tests/tunnels.cpp.i
+
+.PHONY : tests/tunnels.i
+
+# target to preprocess a source file
+tests/tunnels.cpp.i:
+	cd /home/eegea/optix6/SDK && $(MAKE) -f tunnels/CMakeFiles/tunnels.dir/build.make tunnels/CMakeFiles/tunnels.dir/tests/tunnels.cpp.i
+	cd /home/eegea/optix6/SDK && $(MAKE) -f tunnels/CMakeFiles/tunnels_s.dir/build.make tunnels/CMakeFiles/tunnels_s.dir/tests/tunnels.cpp.i
+.PHONY : tests/tunnels.cpp.i
+
+tests/tunnels.s: tests/tunnels.cpp.s
+
+.PHONY : tests/tunnels.s
+
+# target to generate assembly for a file
+tests/tunnels.cpp.s:
+	cd /home/eegea/optix6/SDK && $(MAKE) -f tunnels/CMakeFiles/tunnels.dir/build.make tunnels/CMakeFiles/tunnels.dir/tests/tunnels.cpp.s
+	cd /home/eegea/optix6/SDK && $(MAKE) -f tunnels/CMakeFiles/tunnels_s.dir/build.make tunnels/CMakeFiles/tunnels_s.dir/tests/tunnels.cpp.s
+.PHONY : tests/tunnels.cpp.s
 
 timer.o: timer.cpp.o
 
@@ -266,8 +326,8 @@ timer.o: timer.cpp.o
 
 # target to build an object file
 timer.cpp.o:
-	cd /home/eegea/optix6/SDK && $(MAKE) -f opal/CMakeFiles/opal.dir/build.make opal/CMakeFiles/opal.dir/timer.cpp.o
-	cd /home/eegea/optix6/SDK && $(MAKE) -f opal/CMakeFiles/opal_s.dir/build.make opal/CMakeFiles/opal_s.dir/timer.cpp.o
+	cd /home/eegea/optix6/SDK && $(MAKE) -f tunnels/CMakeFiles/tunnels.dir/build.make tunnels/CMakeFiles/tunnels.dir/timer.cpp.o
+	cd /home/eegea/optix6/SDK && $(MAKE) -f tunnels/CMakeFiles/tunnels_s.dir/build.make tunnels/CMakeFiles/tunnels_s.dir/timer.cpp.o
 .PHONY : timer.cpp.o
 
 timer.i: timer.cpp.i
@@ -276,8 +336,8 @@ timer.i: timer.cpp.i
 
 # target to preprocess a source file
 timer.cpp.i:
-	cd /home/eegea/optix6/SDK && $(MAKE) -f opal/CMakeFiles/opal.dir/build.make opal/CMakeFiles/opal.dir/timer.cpp.i
-	cd /home/eegea/optix6/SDK && $(MAKE) -f opal/CMakeFiles/opal_s.dir/build.make opal/CMakeFiles/opal_s.dir/timer.cpp.i
+	cd /home/eegea/optix6/SDK && $(MAKE) -f tunnels/CMakeFiles/tunnels.dir/build.make tunnels/CMakeFiles/tunnels.dir/timer.cpp.i
+	cd /home/eegea/optix6/SDK && $(MAKE) -f tunnels/CMakeFiles/tunnels_s.dir/build.make tunnels/CMakeFiles/tunnels_s.dir/timer.cpp.i
 .PHONY : timer.cpp.i
 
 timer.s: timer.cpp.s
@@ -286,9 +346,39 @@ timer.s: timer.cpp.s
 
 # target to generate assembly for a file
 timer.cpp.s:
-	cd /home/eegea/optix6/SDK && $(MAKE) -f opal/CMakeFiles/opal.dir/build.make opal/CMakeFiles/opal.dir/timer.cpp.s
-	cd /home/eegea/optix6/SDK && $(MAKE) -f opal/CMakeFiles/opal_s.dir/build.make opal/CMakeFiles/opal_s.dir/timer.cpp.s
+	cd /home/eegea/optix6/SDK && $(MAKE) -f tunnels/CMakeFiles/tunnels.dir/build.make tunnels/CMakeFiles/tunnels.dir/timer.cpp.s
+	cd /home/eegea/optix6/SDK && $(MAKE) -f tunnels/CMakeFiles/tunnels_s.dir/build.make tunnels/CMakeFiles/tunnels_s.dir/timer.cpp.s
 .PHONY : timer.cpp.s
+
+util.o: util.cpp.o
+
+.PHONY : util.o
+
+# target to build an object file
+util.cpp.o:
+	cd /home/eegea/optix6/SDK && $(MAKE) -f tunnels/CMakeFiles/tunnels.dir/build.make tunnels/CMakeFiles/tunnels.dir/util.cpp.o
+	cd /home/eegea/optix6/SDK && $(MAKE) -f tunnels/CMakeFiles/tunnels_s.dir/build.make tunnels/CMakeFiles/tunnels_s.dir/util.cpp.o
+.PHONY : util.cpp.o
+
+util.i: util.cpp.i
+
+.PHONY : util.i
+
+# target to preprocess a source file
+util.cpp.i:
+	cd /home/eegea/optix6/SDK && $(MAKE) -f tunnels/CMakeFiles/tunnels.dir/build.make tunnels/CMakeFiles/tunnels.dir/util.cpp.i
+	cd /home/eegea/optix6/SDK && $(MAKE) -f tunnels/CMakeFiles/tunnels_s.dir/build.make tunnels/CMakeFiles/tunnels_s.dir/util.cpp.i
+.PHONY : util.cpp.i
+
+util.s: util.cpp.s
+
+.PHONY : util.s
+
+# target to generate assembly for a file
+util.cpp.s:
+	cd /home/eegea/optix6/SDK && $(MAKE) -f tunnels/CMakeFiles/tunnels.dir/build.make tunnels/CMakeFiles/tunnels.dir/util.cpp.s
+	cd /home/eegea/optix6/SDK && $(MAKE) -f tunnels/CMakeFiles/tunnels_s.dir/build.make tunnels/CMakeFiles/tunnels_s.dir/util.cpp.s
+.PHONY : util.cpp.s
 
 # Help Target
 help:
@@ -296,25 +386,34 @@ help:
 	@echo "... all (the default if no target is provided)"
 	@echo "... clean"
 	@echo "... depend"
-	@echo "... edit_cache"
 	@echo "... rebuild_cache"
-	@echo "... opal"
-	@echo "... opal_s"
+	@echo "... tunnels"
+	@echo "... edit_cache"
+	@echo "... tunnels_s"
 	@echo "... Opal.o"
 	@echo "... Opal.i"
 	@echo "... Opal.s"
 	@echo "... Unity.o"
 	@echo "... Unity.i"
 	@echo "... Unity.s"
+	@echo "... main.o"
+	@echo "... main.i"
+	@echo "... main.s"
 	@echo "... multitransmitter.o"
 	@echo "... multitransmitter.i"
 	@echo "... multitransmitter.s"
-	@echo "... tests.o"
-	@echo "... tests.i"
-	@echo "... tests.s"
+	@echo "... tests/tests.o"
+	@echo "... tests/tests.i"
+	@echo "... tests/tests.s"
+	@echo "... tests/tunnels.o"
+	@echo "... tests/tunnels.i"
+	@echo "... tests/tunnels.s"
 	@echo "... timer.o"
 	@echo "... timer.i"
 	@echo "... timer.s"
+	@echo "... util.o"
+	@echo "... util.i"
+	@echo "... util.s"
 .PHONY : help
 
 

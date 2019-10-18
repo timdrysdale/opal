@@ -119,14 +119,18 @@ RT_PROGRAM void closestHitTriangle()
 
 	//Hard reflection.  
 	//Parallel reflection coefficient (Electric field in plane of incidence)
-	float2 num = sca_complex_prod(cosA, make_float2(-EMProperties.dielectricConstant.x, -EMProperties.dielectricConstant.y));
+	//float2 num = sca_complex_prod(cosA, make_float2(-EMProperties.dielectricConstant.x, -EMProperties.dielectricConstant.y));
+	float2 num = sca_complex_prod(cosA, EMProperties.dielectricConstant);
+	float2 div=num;
 
-	float2 div = sca_complex_prod(cosA, EMProperties.dielectricConstant);
+	//float2 div = sca_complex_prod(cosA, EMProperties.dielectricConstant);
 
-	num.x += root.x;
-	num.y += root.y;
-	div.x += root.x;
-	div.y += root.y;
+//	num.x += root.x;
+//	num.y += root.y;
+//	div.x += root.x;
+//	div.y += root.y;
+	num -=root;
+	div +=root;
 	const float2	Rpar = complex_div(num, div);
 	
 

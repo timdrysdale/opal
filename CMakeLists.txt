@@ -118,7 +118,9 @@ OPTIX_add_sample_executable( opal
   Complex.h
   Unity.h
   Unity.cpp
-  tests.cpp
+  main.cpp
+  tests/tests.h
+  tests/tests.cpp
   traceFunctions.h
   multitransmitter.h
   multitransmitter.cpp
@@ -131,6 +133,10 @@ OPTIX_add_sample_executable( opal
   tutils.h
   timer.h
   timer.cpp
+  tests/tunnels.cpp
+  tests/tunnels.h
+  util.cpp
+  util.h
   #To see it properly in Visual Studio we should add the following
    polarization/generation.cu
   polarization/receiver.cu
@@ -154,7 +160,9 @@ set(sources
   Complex.h
   Unity.h
   Unity.cpp
-  tests.cpp
+  main.cpp
+  tests/tests.h
+  tests/tests.cpp
   multitransmitter.h
   multitransmitter.cpp
   traceFunctions.h
@@ -167,6 +175,10 @@ set(sources
   tutils.h
   timer.h
   timer.cpp
+  tests/tunnels.cpp
+  tests/tunnels.h
+  util.cpp
+  util.h
    polarization/generation.cu
   polarization/receiver.cu
   polarization/triangle.cu
@@ -182,7 +194,9 @@ OPTIX_add_sample_library( opal_s
   Complex.h
   Unity.h
   Unity.cpp
-  tests.cpp
+  main.cpp
+  tests/tests.h
+  tests/tests.cpp
   multitransmitter.h
   multitransmitter.cpp
   traceFunctions.h
@@ -195,6 +209,10 @@ OPTIX_add_sample_library( opal_s
   tutils.h
   timer.h
   timer.cpp
+  tests/tunnels.cpp
+  tests/tunnels.h
+  util.cpp
+  util.h
    polarization/generation.cu
   polarization/receiver.cu
   polarization/triangle.cu
@@ -217,7 +235,10 @@ set(sources
   Complex.h
   Unity.h
   Unity.cpp
-  tests.cpp
+  tests/tests.h
+  tests/tests.cpp
+  tests/tunnels.cpp
+  tests/tunnels.h
   multitransmitter.h
   multitransmitter.cpp
   traceFunctions.h
@@ -230,6 +251,8 @@ set(sources
   tutils.h
   timer.h
   timer.cpp
+  util.cpp
+  util.h
    polarization/generation.cu
   polarization/receiver.cu
   polarization/triangle.cu

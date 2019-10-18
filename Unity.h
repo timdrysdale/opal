@@ -5,8 +5,9 @@
 /**************************************************************/
 
 
+#ifndef UNITY_H
+#define UNITY_H
 
-#pragma once
 #ifdef _WIN32
 #if defined(OPAL_EXPORTS) || defined(opal_s_EXPORTS)
 #define OPAL_API  __declspec(dllexport)   
@@ -166,4 +167,5 @@ namespace opal {
 
 
 }
+#endif
 

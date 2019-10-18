@@ -15,7 +15,6 @@ using namespace optix;
 
 
 //Receiver global buffers
-rtBuffer<HitInfo, 1> resultHitInfoBuffer; //Results buffer to be used  by thrust to store filtering resutls 
 rtBuffer<HitInfo, 1> globalHitInfoBuffer; //Buffer to store all the hits
 rtBuffer<uint, 1> atomicIndex; //Buffer to store the current global buffer index 
 rtDeclareVariable(uint, global_info_buffer_maxsize, ,);
@@ -125,6 +124,10 @@ RT_PROGRAM void closestHitReceiver()
 
 
 	float2 E = sca_complex_prod((hitPayload.electricFieldAmplitude / d), Rzexp);
+//	if (reflections==0) {
+//	//Log hit
+//		rtPrintf("HE\t%u\t%u\t%u\t%6e\t%6e\t%6e\t%6e\t%6e\t%6e\t%6e \n", receiverLaunchIndex.x, receiverLaunchIndex.y, hitPayload.reflections, k,  E.x, E.y,d,Rzexp.x,Rzexp.y,-k*d);
+//	}
 	float attE=0.0f;
 	if (usePenetration==1u) {
 		//Switch to linear
@@ -143,7 +146,11 @@ RT_PROGRAM void closestHitReceiver()
 	HitInfo aHit;
 	aHit.thrd=make_uint4(txBufferIndex,hash,receiverBufferIndex,dtrx);
 	aHit.E=E;
-
+	//Debug
+	//const float3 lastReflectionHitPoint = make_float3(hitPayload.lrhpd.x,hitPayload.lrhpd.y,hitPayload.lrhpd.z);
+	//aHit.lh=lastReflectionHitPoint;
+	//aHit.r=reflections;
+	//aHit.in=receiverLaunchIndex;
 	//Check if global buffer is full
 	uint hitIndex=atomicAdd(&atomicIndex[0u],1u);
 	if (hitIndex>=global_info_buffer_maxsize) {
@@ -153,10 +160,8 @@ RT_PROGRAM void closestHitReceiver()
 	}
 	//Store hit in global buffer
 	globalHitInfoBuffer[hitIndex]=aHit;
-
 	//Log hit
 	rtPrintf("H\t%u\t%u\t%u\t%u\t%f\t%f\t%f\t%f\t%u\t%u\t%u\t%d\n", receiverLaunchIndex.x, receiverLaunchIndex.y,receiverBufferIndex, hitPayload.reflections, attE,  E.x, E.y,d, aHit.thrd.x,aHit.thrd.y,aHit.thrd.w,externalId);
-
 }
 
 

@@ -4,8 +4,9 @@
 //
 /**************************************************************/
 
+#ifndef OPAL_H
+#define OPAL_H
 
-#pragma once
 
 
 #include "tutils.h"
@@ -118,7 +119,7 @@ namespace opal {
 	typedef std::map<optix::float3, unsigned int, face_compare> FaceMap; //Used to extract the faces of the meshes
 
 
-	//Sytem information
+	//System information
 	
 	struct DeviceInformation {
 		char name[256];
@@ -142,6 +143,7 @@ namespace opal {
 		void getSystemInformation();
 		std::string printSystemInformation();
 	};
+
 	class OpalSceneManager {
 		protected:
 			//Source directory in SDK, used by sutil to find .cu programs
@@ -162,11 +164,11 @@ namespace opal {
 			InternalBuffersParameters currentInternalBuffersState;
 
 			optix::Buffer globalHitInfoBuffer;
-			optix::Buffer resultHitInfoBuffer;
 			optix::Buffer atomicIndexBuffer;
 			optix::Buffer txOriginBuffer;
 
-
+			float fractionMemGlobalBufferSize;
+			uint maxGlobalBufferSize;
 			//Scene graph variables
 			optix::GeometryGroup receiversGroup;
 			optix::Group rootGroup;
@@ -201,7 +203,12 @@ namespace opal {
 #endif // OPALDEBUG
 
 
+			//Launch variables
+			Transmitter currentTransmitter;
+			opalthrustutils::PartialLaunchState* partialLaunchState;
 			float radioReductionFraction;
+			
+			
 			//Default programs
 
 			std::map<std::string,optix::Program> defaultPrograms;
@@ -243,13 +250,15 @@ namespace opal {
 			//Create a ray sphere with fractions of degree
 			//Now elevation delta and azimuthDelta are a decimal fraction of degree, that is, every unit is 0.1 degree, so elevationDelta=1 means 0.1 degree, elevationDelta=2 means 0.2 degree
 			void createRaySphere2DSubstep(int elevationDelta, int azimuthDelta);
+			//Create a 2D ray sphere with arbitray angular separation and solid angle coverage
+			void createRaySphere2D(float initElevation, float elevationDelta, float endElevation, float initAzimuth, float azimuthDelta, float endAzimuth);
 		//Receivers
 			void addReceiver(int id, optix::float3  position, optix::float3 polarization, float radius, std::function<void(float, int)>  callback);
 			void removeReceiver(int id);
 			void updateReceiver(int id, optix::float3 position);
 			void updateReceiver(int id, optix::float3 position, float radius);
 		//Transmit
-			void transmit(int txId, float txPower, optix::float3 origin, optix::float3 polarization);
+			void transmit(int txId, float txPower, optix::float3 origin, optix::float3 polarization, bool partial=false);
 
 	
 		//Finish building scene
@@ -266,6 +275,11 @@ namespace opal {
 			//Set max attenuation for penetration in dB. Rays with a higher attenuation are not traced for penetration 
 			void setAttenuationLimit(float f);
 			void setMaxReflections(unsigned int m);
+			void setMinEpsilon(float f);
+			
+			void endPartialLaunch();
+			
+			void enableExceptions();
 		//Log
 			void setPrintEnabled(int bufferSize);
 			void setUsageReport();
@@ -307,10 +321,10 @@ namespace opal {
 			virtual optix::Program createRayGenerationProgram();
 
 
-		//Launches and multi GPU
-			void executeTransmitLaunch(int txId, float txPower,  optix::float3 origin);
-			void executeTransmitLaunchMultiGPU(int txId, float txPower,  optix::float3 origin);
-
+		//Launches 
+			void executeTransmitLaunch(uint numTransmitters, bool partial);
+		//Hits processing
+			virtual void  processHits(HitInfo* host_hits, uint hits);
 
 		//Internal buffers
 			virtual void setInternalBuffers();
@@ -319,7 +333,6 @@ namespace opal {
 
 			virtual optix::Buffer setGlobalHitInfoBuffer(optix::uint ele, optix::uint azi, optix::uint rx, optix::uint reflections);
 			void resizeGlobalHitInfoBuffer(optix::uint ele, optix::uint azi, optix::uint rx, optix::uint reflections);
-			virtual optix::Buffer setResultHitInfoBuffer(optix::uint rx, optix::uint reflections);
 			optix::Buffer setAtomicIndexBuffer();
 			optix::Buffer setTransmitterBuffer(optix::uint tx);
 
@@ -331,4 +344,5 @@ namespace opal {
 
 
 } //namespace opal
+#endif
 

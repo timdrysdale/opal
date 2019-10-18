@@ -4,6 +4,9 @@
 //
 /**************************************************************/
 
+#ifndef MULTITRANSMITTER_H
+#define MULTITRANSMITTER_H_H
+
 
 #pragma once
 
@@ -29,7 +32,7 @@ namespace opal {
 			//Clear current transmit group
 			void clearGroup();
 			//Transmit simultaneously all transmitters in group
-			void groupTransmit() ;
+			void groupTransmit(bool partial=false) ;
 
 
 
@@ -38,9 +41,7 @@ namespace opal {
 			virtual void checkInternalBuffers() override;
 			void resizeTransmitterBuffer(optix::uint tx);
 
-			void executeTransmitLaunch(optix::uint numTransmitters);
-			void executeTransmitLaunchMultiGPU(optix::uint numTransmitters);
-
+			virtual void processHits(HitInfo* host_hits, uint hits) override;
 
 			std::vector<BaseTransmitter*> activeTransmitters; //Map from internal buffer index to external Id. Used for grouping transmissions (batches)
 
@@ -48,3 +49,5 @@ namespace opal {
 
 	};
 } //namespace opal
+#endif
+

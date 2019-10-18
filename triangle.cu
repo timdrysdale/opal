@@ -71,7 +71,7 @@ RT_PROGRAM void closestHitTriangle()
 	//hash_combine_impl<uint>(rayPayload.refhash,ch_triangle_data.faceId);
 	//Use reflections and hits to create hash
 	hash_combine_impl<uint>(rayPayload.refhash,ch_triangle_data.faceId+rayPayload.reflections+rayPayload.hits);
-	rtPrintf("HASH \t%u\t%u\t%u\t%u\n",ch_triangle_data.faceId,rayPayload.reflections,rayPayload.hits,rayPayload.refhash);
+	//rtPrintf("HASH \t%u\t%u\t%u\t%u\n",ch_triangle_data.faceId,rayPayload.reflections,rayPayload.hits,rayPayload.refhash);
 	
 	rayPayload.ndtd.w = aux+ rayLength;
 	rayPayload.lrhpd =make_float4(hp); //lastReflectionHitPoint;
@@ -114,14 +114,17 @@ RT_PROGRAM void closestHitTriangle()
 		//Approximation (no depolarization)
 		//Hard reflection. Electric field is perpendicular to the wall, ie, parallel to the normal
 
-		float2 num = sca_complex_prod(cosA, make_float2(-EMProperties.dielectricConstant.x, -EMProperties.dielectricConstant.y));
+		//float2 num = sca_complex_prod(cosA, make_float2(EMProperties.dielectricConstant.x, EMProperties.dielectricConstant.y));
+		float2 num = sca_complex_prod(cosA, EMProperties.dielectricConstant);
+		float2 div=num;
+		//float2 div = sca_complex_prod(cosA, EMProperties.dielectricConstant);
 
-		float2 div = sca_complex_prod(cosA, EMProperties.dielectricConstant);
-
-		num.x += root.x;
-		num.y += root.y;
-		div.x += root.x;
-		div.y += root.y;
+	//	num.x -= root.x;
+	//	num.y -= root.y;
+	//	div.x += root.x;
+	//	div.y += root.y;
+		num -=root;
+		div +=root;
 		R = complex_div(num, div);
 
 		//Reflection info log (to be used in external programs)

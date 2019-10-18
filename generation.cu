@@ -30,6 +30,7 @@ rtDeclareVariable(uint3, launchIndex, rtLaunchIndex, );
 //Configuration variables
 rtDeclareVariable(uint2, raySphereSize, , );
 rtDeclareVariable(uint, usePenetration, , );
+rtDeclareVariable(uint, standardSphere, , );
 
 RT_PROGRAM void genRayAndReflectionsFromSphereIndex()
 {
@@ -38,10 +39,12 @@ RT_PROGRAM void genRayAndReflectionsFromSphereIndex()
 	//3D kernel launch [elevation, azimuth, transmitters]	
 
 	uint2 idx = make_uint2(launchIndex.x, launchIndex.y); //[elevation, azimuth]
-	//index goes from 0 to raySphereSize.x-1 //The last elevation step corresponds to 180 degrees elevation
-	if ((idx.x == 0 ||idx.x==  raySphereSize.x-1  ) && idx.y != 0) {
-		//These rays are all the same (0,1,0) or (0,-1,0). Only trace  (0,0) and (last,0) corresponding to 0 and 180 elevation degrees
-		return;
+	if (standardSphere==1u) {
+		//index goes from 0 to raySphereSize.x-1 //The last elevation step corresponds to 180 degrees elevation
+		if ((idx.x == 0 ||idx.x==  raySphereSize.x-1  ) && idx.y != 0) {
+			//These rays are all the same (0,1,0) or (0,-1,0). Only trace  (0,0) and (last,0) corresponding to 0 and 180 elevation degrees
+			return;
+		}
 	}
 
 	const Transmitter tx = txBuffer[launchIndex.z];
@@ -67,7 +70,7 @@ RT_PROGRAM void genRayAndReflectionsFromSphereIndex()
 	rayPayload.refhash=0;
 	
 	//Print all rays generated
-	rtPrintf("A\t%u\t%u\t%f\t%f\t%f\n", launchIndex.x, launchIndex.y, ray_direction.x, ray_direction.y, ray_direction.z);
+	//rtPrintf("A\t%u\t%u\t%f\t%f\t%f\n", launchIndex.x, launchIndex.y, ray_direction.x, ray_direction.y, ray_direction.z);
 
 	traceReflection(rayPayload, origin, ray_direction);
 

@@ -4,8 +4,9 @@
 //
 /**************************************************************/
 
+#ifndef COMMON_H
+#define COMMON_H
 
-#pragma once
 #define GLOBALHITBUFFEROVERFLOW RT_EXCEPTION_USER + 0
 //Comment out if using Optix 5.1
 #define OPAL_USE_TRI 
@@ -27,7 +28,11 @@ struct HitInfo {
 	//Packed to fullfill alignment rules, see for instance https://devtalk.nvidia.com/default/topic/1037798/optix/optix-time-for-launch/
 	optix::uint4 thrd; // [txBufferIndex,refhash,rxBufferIndex,distance] 
 	optix::float2 E;   // Complex
-
+	//For debug only
+	//optix::uint3 in; //launchIndex 
+	//optix::float3 lh; //LastHitPoint
+	//optix::uint r; //LastHitPoint
+	
 	//Equality operator: hits are equal if the combined has is equal and the transmitter is the same, that is, the have hit the same sequence of faces
 	__forceinline__  __device__ bool operator==(const HitInfo &h) const {
 		return ((thrd.x==h.thrd.x) && (thrd.y == h.thrd.y)  );
@@ -105,8 +110,10 @@ struct LPWavePayload {
 };
 
 struct Transmitter {
+	//TODO: Pack polarization and transmit power [polarization.x,polarization.y,polarization.z,txPower]
+	optix::float3 polarization; 	
 	optix::float3 origin;
-	optix::float3 polarization;
+	float txPower;
 	int externalId;
 };
 
@@ -125,3 +132,7 @@ template <typename SizeT>
 inline void hash_combine_impl(SizeT &seed, SizeT value) {
 	seed ^= value + 0x9e3779b9 + (seed << 6) + (seed >> 2);
 }
+
+
+#endif
+
