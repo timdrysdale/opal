@@ -177,67 +177,67 @@ void OpalSceneManagerMultiTransmitter::groupTransmit(bool partial) {
 
 }
 void OpalSceneManagerMultiTransmitter::processHits(HitInfo* host_hits,uint hits) {
-	float2 E=make_float2(0.0f,0.0f);
-	uint index=0u;
-	uint raysHit=0u;
-
-	uint currentTx=0u;
-	for (uint i=0; i<hits; i++) {
-		if (i==0) {
-			//Get first transmitter 			
-			currentTx=host_hits->thrd.x;
-			//Get first receiver
-			index=host_hits->thrd.z;
-
-		} else {
-
-			if (host_hits->thrd.x!=currentTx) {
-				if (raysHit!=0) {
-					computeReceivedPower(E,index,activeTransmitters[currentTx]->externalId,activeTransmitters[currentTx]->transmitPower,activeTransmitters[currentTx]->origin); 			
-				} 				
-				//New transmitter 				
-				currentTx=host_hits->thrd.x; 				
-				//New receiver,  start new accumulation 				
-				index=host_hits->thrd.z; 				
-				E=make_float2(0.0f,0.0f); 				
-				raysHit=0u; 				
-				//std::cout<<"New transmitter tx="<<currentTx<<";rx="<<index<<std::endl; 			
-			} else { 				
-				if (host_hits->thrd.z!=index) { 					
-					if (raysHit!=0u) { 						
-						//At least one hit, callback 						
-						computeReceivedPower(E,index,activeTransmitters[currentTx]->externalId,activeTransmitters[currentTx]->transmitPower,activeTransmitters[currentTx]->origin);
-					} 			
-					//New receiver, same transmitter, start new accumulation
-					//std::cout<<"New receiver tx="<<currentTx<<";rx="<<index<<std::endl; 					
-					index=host_hits->thrd.z;
-					E=make_float2(0.0f,0.0f);
-					raysHit=0u;
-				} 			
-			}
-
-
-		}
-
-		++raysHit;
-		E += host_hits->E;
-
-	// Log hits received
-	//	std::cout<<"E["<<i<<"]="<<(host_hits)->E<<std::endl;
-	//	std::cout<<"\t rxBufferIndex="<<(host_hits)->thrd.z<<std::endl;
-	//	std::cout<<"\t written="<<(host_hits)->thrd.x<<std::endl;
-	//	std::cout<<"\t refhash="<<(host_hits)->thrd.y<<std::endl;
-	//	std::cout<<"\t dist="<<(host_hits)->thrd.w<<std::endl;
-
-
-		++host_hits;
-
-	}
-	//Last one
-	if (raysHit!=0u) {
-		computeReceivedPower(E,index,activeTransmitters[currentTx]->externalId,activeTransmitters[currentTx]->transmitPower,activeTransmitters[currentTx]->origin); 
-	}	
-	//timer.stop();
+//	float2 E=make_float2(0.0f,0.0f);
+//	uint index=0u;
+//	uint raysHit=0u;
+//
+//	uint currentTx=0u;
+//	for (uint i=0; i<hits; i++) {
+//		if (i==0) {
+//			//Get first transmitter 			
+//			currentTx=host_hits->thrd.x;
+//			//Get first receiver
+//			index=host_hits->thrd.z;
+//
+//		} else {
+//
+//			if (host_hits->thrd.x!=currentTx) {
+//				if (raysHit!=0) {
+//					computeReceivedPower(E,index,activeTransmitters[currentTx]->externalId,activeTransmitters[currentTx]->transmitPower,activeTransmitters[currentTx]->origin); 			
+//				} 				
+//				//New transmitter 				
+//				currentTx=host_hits->thrd.x; 				
+//				//New receiver,  start new accumulation 				
+//				index=host_hits->thrd.z; 				
+//				E=make_float2(0.0f,0.0f); 				
+//				raysHit=0u; 				
+//				//std::cout<<"New transmitter tx="<<currentTx<<";rx="<<index<<std::endl; 			
+//			} else { 				
+//				if (host_hits->thrd.z!=index) { 					
+//					if (raysHit!=0u) { 						
+//						//At least one hit, callback 						
+//						computeReceivedPower(E,index,activeTransmitters[currentTx]->externalId,activeTransmitters[currentTx]->transmitPower,activeTransmitters[currentTx]->origin);
+//					} 			
+//					//New receiver, same transmitter, start new accumulation
+//					//std::cout<<"New receiver tx="<<currentTx<<";rx="<<index<<std::endl; 					
+//					index=host_hits->thrd.z;
+//					E=make_float2(0.0f,0.0f);
+//					raysHit=0u;
+//				} 			
+//			}
+//
+//
+//		}
+//
+//		++raysHit;
+//		E += host_hits->E;
+//
+//	// Log hits received
+//	//	std::cout<<"E["<<i<<"]="<<(host_hits)->E<<std::endl;
+//	//	std::cout<<"\t rxBufferIndex="<<(host_hits)->thrd.z<<std::endl;
+//	//	std::cout<<"\t written="<<(host_hits)->thrd.x<<std::endl;
+//	//	std::cout<<"\t refhash="<<(host_hits)->thrd.y<<std::endl;
+//	//	std::cout<<"\t dist="<<(host_hits)->thrd.w<<std::endl;
+//
+//
+//		++host_hits;
+//
+//	}
+//	//Last one
+//	if (raysHit!=0u) {
+//		computeReceivedPower(E,index,activeTransmitters[currentTx]->externalId,activeTransmitters[currentTx]->transmitPower,activeTransmitters[currentTx]->origin); 
+//	}	
+//	//timer.stop();
 }
 void OpalSceneManagerMultiTransmitter::checkInternalBuffers() {
 	OpalSceneManager::checkInternalBuffers();

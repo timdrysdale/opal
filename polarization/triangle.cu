@@ -89,18 +89,19 @@ RT_PROGRAM void closestHitTriangle()
 	//Compute local incidence coordinate system for reflection (components parallel and normal to the incidence plane)
 	const float3 anorm_i=normalize(cross(ray.direction,n));
 	const float3 apar_i=normalize(cross(anorm_i,ray.direction)); 
-	//rtPrintf("\t%u\t%u\tn=(%.6e,%.6e,%.6e)|anorm_i|=(%.6e,%.6e,%.6e)=%.6e\t|apar_i|=(%.6e,%.6e,%.6e)=%.6e \n",launchIndexTriangle.x,launchIndexTriangle.y,n.x,n.y,n.z,anorm_i.x,anorm_i.y,anorm_i.z,length(anorm_i),apar_i.x,apar_i.y,apar_i.z,length(apar_i));
+	//rtPrintf("IRG\t%u\t%u\tn=(%.6e,%.6e,%.6e)|anorm_i|=(%.6e,%.6e,%.6e)=%.6e\t|apar_i|=(%.6e,%.6e,%.6e)=%.6e \n",launchIndexTriangle.x,launchIndexTriangle.y,n.x,n.y,n.z,anorm_i.x,anorm_i.y,anorm_i.z,length(anorm_i),apar_i.x,apar_i.y,apar_i.z,length(apar_i));
 
 
 	
 	//Reflected ray basis
 	const float3 anorm_r=anorm_i; 
 	const float3 apar_r=cross(anorm_r,reflection_dir); //Should change the direction with respect to the incidence parallel
+	//rtPrintf("RRG\t%u\t%u\tn=(%.6e,%.6e,%.6e)|anorm_r|=(%.6e,%.6e,%.6e)=%.6e\t|apar_r|=(%.6e,%.6e,%.6e)=%.6e \n",launchIndexTriangle.x,launchIndexTriangle.y,n.x,n.y,n.z,anorm_r.x,anorm_r.y,anorm_r.z,length(anorm_r),apar_r.x,apar_r.y,apar_r.z,length(apar_r));
 	
 	float cosA = fabs(dot(-ray.direction, n));
 
 
-	//rtPrintf("G\t%u\t%u\t%d\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n", launchIndexTriangle.x, launchIndexTriangle.y, rayPayload.reflections, cosA, ray.direction.x, ray.direction.y, ray.direction.z, n.x, n.y, n.z, rayPayload.lrhpd.w);
+	//rtPrintf("RTG\t%u\t%u\t%d\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n", launchIndexTriangle.x, launchIndexTriangle.y, rayPayload.reflections, cosA, ray.direction.x, ray.direction.y, ray.direction.z, n.x, n.y, n.z, rayPayload.lrhpd.w);
 	
 	//Compute the reflection coefficients (only depend on incidence angle and dielectric properties)
 	//Complex arithmetic: sum
@@ -119,18 +120,21 @@ RT_PROGRAM void closestHitTriangle()
 
 	//Hard reflection.  
 	//Parallel reflection coefficient (Electric field in plane of incidence)
-	//float2 num = sca_complex_prod(cosA, make_float2(-EMProperties.dielectricConstant.x, -EMProperties.dielectricConstant.y));
 	float2 num = sca_complex_prod(cosA, EMProperties.dielectricConstant);
 	float2 div=num;
+	num -=root;
+	div +=root;
 
-	//float2 div = sca_complex_prod(cosA, EMProperties.dielectricConstant);
-
+//Rappaport version, depends on how you define the reflected ray geometrically
+//	float2 num = sca_complex_prod(cosA, make_float2(-EMProperties.dielectricConstant.x, -EMProperties.dielectricConstant.y));
+//	float2 div = sca_complex_prod(cosA, EMProperties.dielectricConstant);
 //	num.x += root.x;
 //	num.y += root.y;
 //	div.x += root.x;
 //	div.y += root.y;
-	num -=root;
-	div +=root;
+//	////////////////////////////////////////
+	
+	
 	const float2	Rpar = complex_div(num, div);
 	
 
@@ -149,7 +153,10 @@ RT_PROGRAM void closestHitTriangle()
 	//Geometric part parallel
 	const float2 Eipar=sca_complex_prod(dot(rayPayload.hor_v,apar_i),rayPayload.hor_coeff) + sca_complex_prod(dot(rayPayload.ver_v,apar_i),rayPayload.ver_coeff);
 
-
+//	rtPrintf("T\t%u\t%u\thh=%.6evh=%.6ehv=%.6evv=%.6e\n",launchIndexTriangle.x,launchIndexTriangle.y,dot(rayPayload.hor_v,anorm_i),dot(rayPayload.ver_v,anorm_i),dot(rayPayload.hor_v,apar_i),dot(rayPayload.ver_v,apar_i));
+//	rtPrintf("T\t%u\t%u\tRnorm(%.6e,%.6e)*hh + Rpar(%.6e,%.6e)*vh=Einorm=(%.6e,%.6e)\n",launchIndexTriangle.x,launchIndexTriangle.y,rayPayload.hor_coeff.x,rayPayload.hor_coeff.y,rayPayload.ver_coeff.x,rayPayload.ver_coeff.y,Einorm.x,Einorm.y);
+//	rtPrintf("T\t%u\t%u\tRnorm(%.6e,%.6e)*hv + Rpar(%.6e,%.6e)*vv=Eipar=(%.6e,%.6e)\n",launchIndexTriangle.x,launchIndexTriangle.y,rayPayload.hor_coeff.x,rayPayload.hor_coeff.y,rayPayload.ver_coeff.x,rayPayload.ver_coeff.y,Eipar.x,Eipar.y);
+//
 	if ((usePenetration==1u) && (rayPayload.reflections<max_interactions)) {
 		//Trace a penetration ray as a new ray. Recursive tracing, check stack depth>max_interactions
 		//Quickly check for attenuation in dB, if att has a very low value we do not trace. Also, we do not want to overflow the float in the operations and get a nan.
@@ -205,11 +212,9 @@ RT_PROGRAM void closestHitTriangle()
 	rayPayload.ver_coeff=complex_prod(Eipar,Rpar);
 	
 	
-	
-	//if (launchIndexTriangle.x==1660 && launchIndexTriangle.y==0) { //Use setPrintLaunchIndex for this instead of if
-	rtPrintf("T\t%u\t%u\tRnorm(%.6e,%.6e)=Einorm=(%.6e,%.6e)Rpar=(%.6e,%.6e)Eipar=(%.6e,%.6e)\n",launchIndexTriangle.x,launchIndexTriangle.y,Rnorm.x,Rnorm.y,Einorm.x,Einorm.y,Rpar.x,Rpar.y,Eipar.x,Eipar.y);
-	rtPrintf("T\t%u\t%u\thc=(%.6e,%.6e)hn=%.6evn=%.6evc=(%.6e,%.6e)vp=%.6e ver_v=(%.6e,%.6e,%.6e)\n",launchIndexTriangle.x,launchIndexTriangle.y,rayPayload.hor_coeff.x,rayPayload.hor_coeff.y,dot(rayPayload.hor_v,anorm_i),dot(rayPayload.ver_v,anorm_i),rayPayload.ver_coeff.x,rayPayload.ver_coeff.y,dot(rayPayload.ver_v,apar_i), rayPayload.ver_v.x,rayPayload.ver_v.y,rayPayload.ver_v.z);
-	rtPrintf("T\t%u\t%u\t|anorm_r|=(%.6e,%.6e,%.6e)=%.6e\t|apar_r|=(%.6e,%.6e,%.6e)=%.6e \n",launchIndexTriangle.x,launchIndexTriangle.y,anorm_r.x,anorm_r.y,anorm_r.z,length(anorm_r),apar_r.x,apar_r.y,apar_r.z,length(apar_r));
+	//	rtPrintf("T\t%u\t%u\tRnorm(%.6e,%.6e)  Rpar(%.6e,%.6e)\n hash=%u",launchIndexTriangle.x,launchIndexTriangle.y,rayPayload.hor_coeff.x,rayPayload.hor_coeff.y,rayPayload.ver_coeff.x,rayPayload.ver_coeff.y, rayPayload.refhash);
+	//	
+//	rtPrintf("T\t%u\t%u\t|anorm_r|=(%.6e,%.6e,%.6e)=%.6e\t|apar_r|=(%.6e,%.6e,%.6e)=%.6e \n",launchIndexTriangle.x,launchIndexTriangle.y,anorm_r.x,anorm_r.y,anorm_r.z,length(anorm_r),apar_r.x,apar_r.y,apar_r.z,length(apar_r));
 	//}
 	
 	//Update vectors

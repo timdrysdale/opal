@@ -338,7 +338,9 @@ namespace opal {
 
 		//Utils
 			static void callbackUsageReport(int level, const char* tag, const char* msg, void* cbdata);
-			void computeReceivedPower(optix::float2 E, unsigned int index, int txId, float txPower, optix::float3 origin);
+		//Compute power or any other quantity you need. Add your own
+			void computeReceivedPower(optix::float2 E, unsigned int index, int txId, float txPower, optix::float3 origin, uint raysHit);
+			void computeReceivedPower(optix::float2 Ex, optix::float2 Ey, unsigned int index, int txId, float txPower, optix::float3 origin, uint raysHit);
 	};
 
 

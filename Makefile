@@ -260,6 +260,36 @@ multitransmitter.cpp.s:
 	cd /home/eegea/optix6/SDK && $(MAKE) -f tunnels/CMakeFiles/tunnels_s.dir/build.make tunnels/CMakeFiles/tunnels_s.dir/multitransmitter.cpp.s
 .PHONY : multitransmitter.cpp.s
 
+tests/depolarization.o: tests/depolarization.cpp.o
+
+.PHONY : tests/depolarization.o
+
+# target to build an object file
+tests/depolarization.cpp.o:
+	cd /home/eegea/optix6/SDK && $(MAKE) -f tunnels/CMakeFiles/tunnels.dir/build.make tunnels/CMakeFiles/tunnels.dir/tests/depolarization.cpp.o
+	cd /home/eegea/optix6/SDK && $(MAKE) -f tunnels/CMakeFiles/tunnels_s.dir/build.make tunnels/CMakeFiles/tunnels_s.dir/tests/depolarization.cpp.o
+.PHONY : tests/depolarization.cpp.o
+
+tests/depolarization.i: tests/depolarization.cpp.i
+
+.PHONY : tests/depolarization.i
+
+# target to preprocess a source file
+tests/depolarization.cpp.i:
+	cd /home/eegea/optix6/SDK && $(MAKE) -f tunnels/CMakeFiles/tunnels.dir/build.make tunnels/CMakeFiles/tunnels.dir/tests/depolarization.cpp.i
+	cd /home/eegea/optix6/SDK && $(MAKE) -f tunnels/CMakeFiles/tunnels_s.dir/build.make tunnels/CMakeFiles/tunnels_s.dir/tests/depolarization.cpp.i
+.PHONY : tests/depolarization.cpp.i
+
+tests/depolarization.s: tests/depolarization.cpp.s
+
+.PHONY : tests/depolarization.s
+
+# target to generate assembly for a file
+tests/depolarization.cpp.s:
+	cd /home/eegea/optix6/SDK && $(MAKE) -f tunnels/CMakeFiles/tunnels.dir/build.make tunnels/CMakeFiles/tunnels.dir/tests/depolarization.cpp.s
+	cd /home/eegea/optix6/SDK && $(MAKE) -f tunnels/CMakeFiles/tunnels_s.dir/build.make tunnels/CMakeFiles/tunnels_s.dir/tests/depolarization.cpp.s
+.PHONY : tests/depolarization.cpp.s
+
 tests/tests.o: tests/tests.cpp.o
 
 .PHONY : tests/tests.o
@@ -402,6 +432,9 @@ help:
 	@echo "... multitransmitter.o"
 	@echo "... multitransmitter.i"
 	@echo "... multitransmitter.s"
+	@echo "... tests/depolarization.o"
+	@echo "... tests/depolarization.i"
+	@echo "... tests/depolarization.s"
 	@echo "... tests/tests.o"
 	@echo "... tests/tests.i"
 	@echo "... tests/tests.s"

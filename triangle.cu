@@ -56,6 +56,10 @@ rtDeclareVariable(uint, meshId, , );
 rtDeclareVariable(uint, usePenetration, , );
 rtDeclareVariable(float, attenuationLimit, , );
 
+
+//WARNING: Only to be used with vertical (0,1,0) and horizontal, but just (1,0,0), polarizations. Assuming that the transmitters and receivers have the same polarization. In any other 
+//case, you should use full depolarization
+
 RT_PROGRAM void closestHitTriangle()
 {
 
@@ -99,7 +103,7 @@ RT_PROGRAM void closestHitTriangle()
 	if (fabs(polarization) <= 0.7071f) {
 		//Angle between tx polarization and normal in 45 and 90 degrees
 		//Approximation (no depolarization)
-		//Soft reflection. Electric field is parallel to the wall, ie, perpendicular to the triangle (wall) normal
+		//Soft reflection. Electric field perpendicular to the plane of incidence. Electric field is parallel to the wall, ie, perpendicular to the triangle (wall) normal
 
 		R = complex_div(make_float2(cosA-root.x,-root.y),make_float2(cosA+root.x,root.y));
 
@@ -112,7 +116,7 @@ RT_PROGRAM void closestHitTriangle()
 	else {
 		//Angle between tx and normal in 0 and 45 degrees
 		//Approximation (no depolarization)
-		//Hard reflection. Electric field is perpendicular to the wall, ie, parallel to the normal
+		//Hard reflection. Electric field in the plane of incidence Electric field is perpendicular to the wall, ie, parallel to the normal
 
 		//float2 num = sca_complex_prod(cosA, make_float2(EMProperties.dielectricConstant.x, EMProperties.dielectricConstant.y));
 		float2 num = sca_complex_prod(cosA, EMProperties.dielectricConstant);

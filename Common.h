@@ -12,7 +12,6 @@
 #define OPAL_USE_TRI 
 
 #include <optixu/optixu_math_namespace.h>
-
 //
 // Common definitions shared by host and device code
 //
@@ -27,15 +26,23 @@ struct MaterialEMProperties {
 struct HitInfo {
 	//Packed to fullfill alignment rules, see for instance https://devtalk.nvidia.com/default/topic/1037798/optix/optix-time-for-launch/
 	optix::uint4 thrd; // [txBufferIndex,refhash,rxBufferIndex,distance] 
-	optix::float2 E;   // Complex
+	optix::float2 E;   // Incident electric field or induced voltage on the antenna. Complex 
 	//For debug only
-	//optix::uint3 in; //launchIndex 
-	//optix::float3 lh; //LastHitPoint
-	//optix::uint r; //LastHitPoint
+//	optix::float3 h;
+//	optix::float3 v;
+//	optix::uint3 in; //launchIndex 
+	//optix::float4 lh; //LastHitPoint,d
+	//optix::uint r; //reflections
+//	optix::float2 Ex;   // Complex
+//	optix::float2 Ey;   // Complex
+//	optix::float2 Rn;   // Complex
+//	optix::float2 Rp;   // Complex
 	
-	//Equality operator: hits are equal if the combined has is equal and the transmitter is the same, that is, the have hit the same sequence of faces
+	
+	//Equality operator: used by thrust::unique. Hits are equal if  the transmitter  and the receiver is the same and  the combined hash is equal, that is, they have hit the same sequence of faces. We get
+	//the closest one because we have previously sorted the sequence
 	__forceinline__  __device__ bool operator==(const HitInfo &h) const {
-		return ((thrd.x==h.thrd.x) && (thrd.y == h.thrd.y)  );
+		return ((thrd.x==h.thrd.x)  && (thrd.y == h.thrd.y) && (thrd.z == h.thrd.z)  );
 	};
 	//Sorting. Here we first order by txId (tx buffer index), then check receiver id (receiver buffer index), then hash and finally distance. Hits are ordered by txId, rxid, combined_hash and distance to receiver
 	__forceinline__  __device__ bool operator<(const HitInfo &h) const {

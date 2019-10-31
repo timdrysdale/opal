@@ -125,7 +125,7 @@ std::unique_ptr<OpalSceneManager> cubeTunnel(std::unique_ptr<OpalSceneManager> s
 	float xend=5-0.0001;
 	float xstep=(xend-xinit)/points;
 	for (int i=0;i<points;++i) {
-		posrx=make_float3(xinit+(i*xstep),0.0f,10.0f);
+		posrx=make_float3(xinit+(i*xstep),0.0f,100.0f);
 		sceneManager->addReceiver(i+1, posrx,polarization, 1.0f, printPower);
 	}
 	

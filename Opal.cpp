@@ -110,10 +110,10 @@ void OpalSceneManager::initContext(float f,  bool useExactSpeedOfLight) {
 	outputFile.open("opal_log.txt");
 #endif // OPALDEBUG
 	if (useDepolarization) {
-		this->cudaProgramsDir="opal/polarization";
+		this->cudaProgramsDir += "/polarization";
 	} else {
 		//Show warning to remark the assumptions
-		configInfo<<"\t - You are assuming that: (1)  both transmitters and receivers have the same polarization and (2) the polarization is either purely vertical (0, 1, 0) or horizontal (1,0,0) or (0,0,1). " <<std::endl; 
+		configInfo<<"\t - You are assuming that: (1)  both transmitters and receivers have the same polarization and (2) the polarization is either purely vertical (0, 1, 0) or horizontal (1,0,0), but not (0,0,1). " <<std::endl; 
 		configInfo<<"\t   If this is not the intended behaviour, check the use of depolarization, though it has a performance cost. " <<std::endl; 
 	}
 	configInfo<<"\t - CUDA programs directory: "<<cudaProgramsDir<<std::endl;
@@ -1216,9 +1216,13 @@ void OpalSceneManager::endPartialLaunch() {
 
 void OpalSceneManager::processHits(HitInfo* host_hits, uint hits) {
 	float2 E=make_float2(0.0f,0.0f);
+	//** Debug
+	//float2 Ex=make_float2(0.0f,0.0f);
+	//float2 Ey=make_float2(0.0f,0.0f);
+	//****
+	
 	uint index=0u;
 	uint raysHit=0u;
-
 
 	for (uint i=0; i<hits; i++) {
 		if (i==0) {
@@ -1229,49 +1233,85 @@ void OpalSceneManager::processHits(HitInfo* host_hits, uint hits) {
 			if (host_hits->thrd.z!=index) {
 				if (raysHit!=0u) {
 					//At least one hit, callback
-					computeReceivedPower(E,index,currentTransmitter.externalId,currentTransmitter.txPower,currentTransmitter.origin);
+					computeReceivedPower(E,index,currentTransmitter.externalId,currentTransmitter.txPower,currentTransmitter.origin,raysHit);
+					//computeReceivedPower(Ex,Ey,index,currentTransmitter.externalId,currentTransmitter.txPower,currentTransmitter.origin, raysHit);
 				}
 				//New receiver, start new accumulation
 				index=host_hits->thrd.z;
 				E=make_float2(0.0f,0.0f);
+			//** Debug
+			//	Ex=make_float2(0.0f,0.0f);
+			//	Ey=make_float2(0.0f,0.0f);
+			//****
 				raysHit=0u;
+			
 			}
 		}
 
 		++raysHit;
 		E += host_hits->E;
+	//** Debug
+	//	Ex += host_hits->Ex;
+	//	Ey += host_hits->Ey;
+	//****
+
 
 	// Log hits received
-	//	std::cout<<"E["<<i<<"]="<<(host_hits)->E<<std::endl;
-	//	std::cout<<"\t rxBufferIndex="<<(host_hits)->thrd.z<<std::endl;
-	//	std::cout<<"\t written="<<(host_hits)->thrd.x<<std::endl;
-	//	std::cout<<"\t refhash="<<(host_hits)->thrd.y<<std::endl;
-	//	std::cout<<"\t dist="<<(host_hits)->thrd.w<<std::endl;
-	
-		//Used only for debug. Uncomment in Common.h
-	////	std::cout<<"\t lastHP="<<(host_hits)->lh<<std::endl;
-	////	std::cout<<"\t reflections="<<(host_hits)->r<<std::endl;
-	////	std::cout<<"\t index="<<(host_hits)->in<<std::endl;
-
+		std::cout<<"E["<<i<<"]="<<(host_hits)->E<<std::endl;
+////		std::cout<<"Ex="<<(host_hits)->Ex<<std::endl;
+////		std::cout<<"Ey="<<(host_hits)->Ey<<std::endl;
+//		std::cout<<"\t rxBufferIndex="<<(host_hits)->thrd.z<<std::endl;
+//		std::cout<<"\t written="<<(host_hits)->thrd.x<<std::endl;
+//		std::cout<<"\t refhash="<<(host_hits)->thrd.y<<std::endl;
+//		std::cout<<"\t dist="<<(host_hits)->thrd.w<<std::endl;
+////	
+////		//Used only for debug. Uncomment in Common.h
+//		std::cout<<"\t lastHP="<<(host_hits)->lh<<std::endl;
+////		//std::cout<<"\t reflections="<<(host_hits)->r<<std::endl;
+////		std::cout<<"\t index="<<(host_hits)->in<<std::endl;
+////		std::cout<<"\t Rnorm="<<(host_hits)->Rn<<std::endl;
+////		std::cout<<"\t Rpar="<<(host_hits)->Rp<<std::endl;
+////		std::cout<<"\t h="<<(host_hits)->h<<std::endl;
+////		std::cout<<"\t v="<<(host_hits)->v<<std::endl;
 
 		++host_hits;
 
 	}
 	//Last one
 	if (raysHit!=0u) {
-		computeReceivedPower(E,index,currentTransmitter.externalId,currentTransmitter.txPower,currentTransmitter.origin);
+		computeReceivedPower(E,index,currentTransmitter.externalId,currentTransmitter.txPower,currentTransmitter.origin,raysHit);
+		//computeReceivedPower(Ex,Ey,index,currentTransmitter.externalId,currentTransmitter.txPower,currentTransmitter.origin, raysHit);
 	}	
 	//timer.stop();
 }
+void OpalSceneManager::computeReceivedPower(optix::float2 Ex, optix::float2 Ey, unsigned int index, int txId, float txPower, optix::float3 origin, uint raysHit) {
+	//float power = defaultChannel.eA*((E.x*E.x) + (E.y*E.y))*txPower;
+//	float power = ((E.x*E.x) + (E.y*E.y));
+//	std::cout << "rx["<<receivers[index]->externalId<<"]=" << receivers[index]->position << ".r=" << receivers[index]->radius << "(sphere="<<receivers[index]->geomInstance["sphere"]->getFloat4()<<"); tx["<<txId<<"]=" << origin << " eA=" << defaultChannel.eA << " txPower=" << txPower << " E=(" << E.x << "," << E.y << ")" << " p=" << power <<  " d=" << length(origin - receivers[index]->position) << std::endl;
+//	//Power
+//	std::cout<<"PR\t"<<power<<"\t"<<receivers[index]->externalId<<"\t"<<receivers[index]->position.x<< std::endl;
+//	//Phase
+//	std::cout<<"PH\t"<<atan2f(E.y,E.x)<<"\t"<<receivers[index]->externalId<<"\t"<<receivers[index]->position.x<< std::endl;
+	//receivers[index]->callback(power, txId);
+	//E
+	std::cout<<"ERH\t"<<Ex.x<<"\t"<<Ex.y<<"\t"<<receivers[index]->externalId<<"\t"<<receivers[index]->position.y<<"\t"<<raysHit<< std::endl;
+	std::cout<<"ERV\t"<<Ey.x<<"\t"<<Ey.y<<"\t"<<receivers[index]->externalId<<"\t"<<receivers[index]->position.y<<"\t"<<raysHit<< std::endl;
 
-void OpalSceneManager::computeReceivedPower(optix::float2 E, unsigned int index, int txId, float txPower, optix::float3 origin) {
+}
+
+void OpalSceneManager::computeReceivedPower(optix::float2 E, unsigned int index, int txId, float txPower, optix::float3 origin, uint raysHit) {
 	float power = defaultChannel.eA*((E.x*E.x) + (E.y*E.y))*txPower;
 	std::cout << "rx["<<receivers[index]->externalId<<"]=" << receivers[index]->position << ".r=" << receivers[index]->radius << "(sphere="<<receivers[index]->geomInstance["sphere"]->getFloat4()<<"); tx["<<txId<<"]=" << origin << " eA=" << defaultChannel.eA << " txPower=" << txPower << " E=(" << E.x << "," << E.y << ")" << " p=" << power <<  " d=" << length(origin - receivers[index]->position) << std::endl;
-	//Power
-	std::cout<<"PR\t"<<power<<"\t"<<receivers[index]->externalId<<"\t"<<receivers[index]->position.x<< std::endl;
-	//Phase
-	//std::cout<<"PH\t"<<atan2f(E.y,E.x)<<"\t"<<receivers[index]->externalId<<"\t"<<receivers[index]->position.x<< std::endl;
+	
+	//Call callbacks...add your own
 	receivers[index]->callback(power, txId);
+	//Power
+	std::cout<<"PR\t"<<power<<"\t"<<receivers[index]->externalId<<"\t"<<receivers[index]->position.x<<"\t"<<receivers[index]->position.y <<"\t"<<raysHit<< std::endl;
+	//Phase
+	//std::cout<<"PH\t"<<atan2f(E.y,E.x)<<"\t"<<receivers[index]->externalId<<"\t"<<receivers[index]->position.x<<"\t"<<receivers[index]->position.y <<std::endl;
+	
+	//E
+	std::cout<<"ER\t"<<E.x<<"\t"<<E.y<<"\t"<<receivers[index]->externalId<<"\t"<<receivers[index]->position.x<<"\t"<<receivers[index]->position.y<<"\t"<<raysHit<<  std::endl;
 
 }
 
@@ -1561,8 +1601,8 @@ void opal::OpalSceneManager::setPrintEnabled(int bufferSize)
 	context->setPrintBufferSize(bufferSize);
 	std::cout << "printEnabled" << std::endl;
 	//Set a particular print index. Comment out if necessary
-	context->setPrintLaunchIndex(765,621,0);
-	std::cout<<"Showing launch index [765,621,0]"<<std::endl;
+	//context->setPrintLaunchIndex(550,1050,0);
+	//std::cout<<"Showing launch index [550,1050,0]"<<std::endl;
 
 }
 void OpalSceneManager::setUsageReport()

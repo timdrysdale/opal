@@ -6,15 +6,67 @@ std::unique_ptr<OpalSceneManager> cubeTunnel(std::unique_ptr<OpalSceneManager> s
 
 	Timer timer;
 
-	std::cout << "Simulating crossing streets test" << std::endl;
+	//Tunnel dimensions
+	float width=8.5f;
+	float height=5.0f;
+	//float width=10.0f;
+	//float height=5.0f;
+	//float width=5.0f;
+	//float height=10.0f;
+	
+	
+	//Polarizations 
+	const float3 V=make_float3(0.0f, 1.0f, 0.0f); //Perpendicular to the floor. Assuming as in Unity that forward is z-axis and up is y-axis
+	const float3 H=make_float3(1.0f, 0.0f, 0.0f); //Parallel to the floor. Assuming as in Unity that forward is z-axis and up is y-axis
+	const float3 VH=make_float3(1.0f, 1.0f, 0.0f); 
+	const float3 HZ=make_float3(0.0f, 0.0f, 1.0f); 
+
+	//Receiver polarization
+	optix::float3 polarization = H; 	
+	float sphereRadius=0.04f;	
+	float distance=10.f;	
+	//Transmitter
+	//optix::float3 postx = make_float3(0.0f, 0.0f, 0.0f);
+	optix::float3 postx = make_float3(-3.85f,1.0f, 0.0f);
+	float3 polarizationTx = H; 
+	
+	//Receivers grid
+	uint points=ceil(10*width/sceneManager->getChannelParameters().waveLength);
+	float xinit=-(width/2.0)+0.0001;
+	float xend=(width/2.0)-0.0001;
+	float xstep=(xend-xinit)/points;
+
+	//uint points=ceil(10*height/sceneManager->getChannelParameters().waveLength);
+	//float xinit=-(height/2.0)+0.0001;
+	//float xend=(height/2.0)-0.0001;
+	//float xstep=(xend-xinit)/points;
+	
+	
+	//Sphere scanning
+	float initElevation=0.0f;
+	float initAzimuth=-90.0f;
+	float endElevation=180.0f;
+	float endAzimuth=90.0f;
+	float deltaEl=10.0f;
+	float deltaAz=10.0f;
+	float asEl=0.01f;
+	float asAz=0.01f;
+	float overlap=0.5f;
+	
+	std::cout <<"**** Tunnel ***"<<std::endl;	
+	std::cout << "Simulating tunnel with width=" <<width<<" and height="<<height<< std::endl;
+	std::cout<<"Transmitting at "<<postx<<" with polarization="<<polarizationTx<<std::endl;
+	std::cout<<"Receiving with radius="<<sphereRadius<<" with polarization="<<polarization<<std::endl;
+	std::cout<<"Scanning the sphere with ASElevation="<<asEl<< "and ASAzimuth="<<asAz<<std::endl;
+
 	//Tunnel is a cube with the XY faces removed (entrance and exit). So tunnel runs on Z axis (front, in Unity)
 	std::vector<int> cubeind = loadTrianglesFromFile("meshes/tunnel-i.txt");
 	std::vector<float3> cubevert = loadVerticesFromFile("meshes/tunnel-v.txt");
 	//std::cout << "indices=" << cubeind.size() << "vertices=" << cubevert.size() << std::endl;
 	//Cube(4) NW
 	Matrix4x4 tm;
-	tm.setRow(0, make_float4(10.0f, 0, 0, 0.0f));
-	tm.setRow(1, make_float4(0, 5.0f, 0, 0.0f));
+	tm.setRow(0, make_float4(width, 0, 0, 0.0f));
+	tm.setRow(1, make_float4(0, height, 0, 0.0f));
 	tm.setRow(2, make_float4(0, 0, 1000.0f, 500.0f));
 	tm.setRow(3, make_float4(0, 0, 0, 1));
 	MaterialEMProperties emProp1;
@@ -26,35 +78,28 @@ std::unique_ptr<OpalSceneManager> cubeTunnel(std::unique_ptr<OpalSceneManager> s
 	sceneManager->addStaticMesh(static_cast<int>(cubevert.size()), cubevert.data(), static_cast<int>(cubeind.size()), cubeind.data(), tm, emProp1);
 
 
+	sceneManager->setMinEpsilon(1e-5f);
 
 	
-	//receivers
 
-	optix::float3 posrx = make_float3(0.0f, 0.0f, 10.0f);
-	optix::float3 polarization = make_float3(0.0f, 1.0f, 0.0f); //Perpendicular to the floor. Assuming as in Unity that forward is z-axis and up is y-axis
-
-	sceneManager->setMinEpsilon(1e-4f);
-	int j=1;	
-	//sceneManager->addReceiver(j, posrx,polarization, 0.1f, printPower);
+	//Single receiver
+//	int j=1;	
+//	optix::float3 posrx = make_float3(-0.15f, -1.0f, distance);	
+//	sceneManager->addReceiver(j, posrx,polarization, sphereRadius, printPower);
 
 
 
 	//For very large launches, you should enable exceptions at least once and check that no buffer overflow has occurred
 	//sceneManager->enableExceptions();	
-	uint points=300;
-	float xinit=-5+0.0001;
-	float xend=5-0.0001;
-	float xstep=(xend-xinit)/points;
+//	
+	optix::float3 posrx;	
 	for (int i=0;i<points;++i) {
-		posrx=make_float3(xinit+(i*xstep),0.0f,10.0f);
-		sceneManager->addReceiver(i+1, posrx,polarization, 1.0f, printPower);
+		//posrx=make_float3(0.0f,xinit+(i*xstep),distance);
+		posrx=make_float3(xinit+(i*xstep),-1.0f,distance);
+		sceneManager->addReceiver(i+1, posrx,polarization, sphereRadius, printPower);
+		
 	}
 	
-//	for (float i=-4.9f;i<=4.9f;i=i+0.1f) {
-//		posrx=make_float3(i,0.0f,10.0f);
-//		sceneManager->addReceiver(j, posrx,polarization, 2.0f, printPower);
-//		j++;
-//	}
 
 
 	/** Sequential test */
@@ -65,15 +110,6 @@ std::unique_ptr<OpalSceneManager> cubeTunnel(std::unique_ptr<OpalSceneManager> s
 //		sceneManager->updateReceiver(1, posrx);
 	
 	
-	float initElevation=0.0f;
-	float initAzimuth=-90.0f;
-	float endElevation=180.0f;
-	float endAzimuth=90.0f;
-	float deltaEl=10.0f;
-	float deltaAz=10.0f;
-	float asEl=0.01f;
-	float asAz=0.01f;
-	float overlap=0.5f;
 	//Create first sphere to avoid trouble with the buffers
 	//TODO: we should change this to support late creation of sphere
 	float currentElevation=initElevation;
@@ -86,11 +122,12 @@ std::unique_ptr<OpalSceneManager> cubeTunnel(std::unique_ptr<OpalSceneManager> s
 	}
 	//sceneManager->setUsageReport();
 
-	optix::float3 postx;
 	timer.start();
-	postx = make_float3(0.0f, 0.0f, 0.0f);
+	
+	
+	
 	//First launch
-	sceneManager->transmit(0, 1.0f, postx, polarization, true);
+	sceneManager->transmit(0, 1.0f, postx, polarizationTx, true);
 	
 	//Now loop to fill the solid angle
 	currentAzimuth += deltaAz;
@@ -101,7 +138,7 @@ std::unique_ptr<OpalSceneManager> cubeTunnel(std::unique_ptr<OpalSceneManager> s
 		while(currentAzimuth<endAzimuth) {
 			std::cout<<"Tracing angle (el/az)="<<(currentElevation-overlap)<<","<<(currentElevation+deltaEl+overlap)<<"/"<<(currentAzimuth-overlap)<<","<<(currentAzimuth+deltaAz+overlap)<<std::endl;
 			sceneManager->createRaySphere2D(currentElevation-overlap,asEl,currentElevation+deltaEl+overlap,currentAzimuth-overlap,asAz,currentAzimuth+deltaAz+overlap);
-			sceneManager->transmit(0, 1.0f, postx, polarization, true);
+			sceneManager->transmit(0, 1.0f, postx, polarizationTx, true);
 			currentAzimuth += deltaAz;
 		}
 		currentAzimuth=initAzimuth;
@@ -112,20 +149,7 @@ std::unique_ptr<OpalSceneManager> cubeTunnel(std::unique_ptr<OpalSceneManager> s
 	sceneManager->endPartialLaunch();
 	//* Sequential test */
 	//}
-//	for (uint i = 1; i <= 50; ++i) {
-//
-//		sceneManager->setMaxReflections(i);
-//		sceneManager->transmit(0, 1.0f, postx, polarization);
-//
-//
-//	}
 	
-	
-//	for (float i=-4.9f;i<=4.9f;i=i+.1f) {
-//		posrx=make_float3(i,0.0f,100.0f);
-//		sceneManager->updateReceiver(1, posrx);
-//		sceneManager->transmit(0, 1.0f, postx, polarization);
-//	}
 	timer.stop();
 	std::cout<<"Time="<<timer.getTime()<<std::endl;
 

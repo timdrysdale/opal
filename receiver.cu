@@ -104,11 +104,11 @@ RT_PROGRAM void closestHitReceiver()
 
 		//Take into account radius and angular separation: ignore hit if distance from hit to receiver is > unfolded path distance * angular separation
 
-		float vrsq=d*d*asRadiusConstant*asRadiusConstant/3; //sqr(d*as/sqrt(3));
-		if (drxtohitsq>vrsq) {
-			return;
-		}
-		float dm = drxtohitsq*1000000.0f;  //Multiply by 1000 000 to truncate later take 6 digits
+//		float vrsq=d*d*asRadiusConstant*asRadiusConstant/3; //sqr(d*as/sqrt(3));
+//		if (drxtohitsq>vrsq) {
+//			return;
+//		}
+		float dm = drxtohitsq*10000000000.0f;  //Multiply by 1000 0000000 to truncate later take 10 digits
 		int dmt = __float2int_rz(dm);   //Truncate
 		//HitInfo values
 		dtrx=static_cast<uint>(dmt);
@@ -146,11 +146,19 @@ RT_PROGRAM void closestHitReceiver()
 	HitInfo aHit;
 	aHit.thrd=make_uint4(txBufferIndex,hash,receiverBufferIndex,dtrx);
 	aHit.E=E;
-	//Debug
-	//const float3 lastReflectionHitPoint = make_float3(hitPayload.lrhpd.x,hitPayload.lrhpd.y,hitPayload.lrhpd.z);
-	//aHit.lh=lastReflectionHitPoint;
-	//aHit.r=reflections;
-	//aHit.in=receiverLaunchIndex;
+	
+	
+	//********** Debug ***************
+//	const float3 lastReflectionHitPoint = make_float3(hitPayload.lrhpd.x,hitPayload.lrhpd.y,hitPayload.lrhpd.z);
+//	aHit.lh=lastReflectionHitPoint;
+//	//aHit.r=reflections;
+//	aHit.in=receiverLaunchIndex;
+//	aHit.Ex=E;
+//	aHit.Ey=E;
+//	aHit.Rp=hitPayload.prodReflectionCoefficient;
+//	aHit.Rn=hitPayload.prodReflectionCoefficient;
+	//*********************************
+
 	//Check if global buffer is full
 	uint hitIndex=atomicAdd(&atomicIndex[0u],1u);
 	if (hitIndex>=global_info_buffer_maxsize) {

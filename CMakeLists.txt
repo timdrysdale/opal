@@ -135,6 +135,8 @@ OPTIX_add_sample_executable( opal
   timer.cpp
   tests/tunnels.cpp
   tests/tunnels.h
+  tests/depolarization.h
+  tests/depolarization.cpp
   util.cpp
   util.h
   #To see it properly in Visual Studio we should add the following
@@ -177,6 +179,8 @@ set(sources
   timer.cpp
   tests/tunnels.cpp
   tests/tunnels.h
+  tests/depolarization.h
+  tests/depolarization.cpp
   util.cpp
   util.h
    polarization/generation.cu
@@ -211,6 +215,8 @@ OPTIX_add_sample_library( opal_s
   timer.cpp
   tests/tunnels.cpp
   tests/tunnels.h
+  tests/depolarization.h
+  tests/depolarization.cpp
   util.cpp
   util.h
    polarization/generation.cu
@@ -253,6 +259,10 @@ set(sources
   timer.cpp
   util.cpp
   util.h
+  tests/tunnels.cpp
+  tests/tunnels.h
+  tests/depolarization.h
+  tests/depolarization.cpp
    polarization/generation.cu
   polarization/receiver.cu
   polarization/triangle.cu

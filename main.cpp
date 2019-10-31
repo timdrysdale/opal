@@ -17,6 +17,7 @@ using namespace optix;
 #endif
 
 //Include the file with the tests you want to perform
+#include "tests/depolarization.h"
 #include "tests/tunnels.h"
 //#include "tests/tests.h"
 
@@ -121,6 +122,7 @@ int main(int argc, char** argv)
 		
 		//Finally, run the test
 		sceneManager = cubeTunnel(std::move(sceneManager), printEnabled,subSteps);
+		//sceneManager = polarizationPlaneTest(std::move(sceneManager), printEnabled,subSteps);
 
 
 

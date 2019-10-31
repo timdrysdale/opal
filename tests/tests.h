@@ -34,10 +34,5 @@ std::unique_ptr<OpalSceneManager> penetrationTest(std::unique_ptr<OpalSceneManag
 //Penetration test. Plane 
 std::unique_ptr<OpalSceneManager> penetrationPlane(std::unique_ptr<OpalSceneManager> sceneManager, bool print, bool subSteps) ;
 
-	//Depolarization tests
-	//Polarization test. Horizontal plane test but with arbitrary polarizations. To validate against a two-ray model
-std::unique_ptr<OpalSceneManager> polarizationPlaneTest(std::unique_ptr<OpalSceneManager> sceneManager, bool print, bool subSteps) ;
-	//Street crossing test with arbitray polarizations. Cubes are intended to be buildings and a plane is the floor
-std::unique_ptr<OpalSceneManager> crossingTestDepolarization(std::unique_ptr<OpalSceneManager> sceneManager, bool print, bool subSteps) ;
 #endif
 

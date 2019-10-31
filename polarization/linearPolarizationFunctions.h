@@ -10,7 +10,6 @@
  * ********************************************************/
 #include "../Common.h"
 #include "../Complex.h"
-#include "linearPolarizationFunctions.h"
 #include <optix_world.h>
 #include  <optixu/optixu_matrix_namespace.h>
 
@@ -237,8 +236,9 @@ __forceinline__ __device__  optix::float3 getLinearPolarizationForRaySimple(floa
 		//but we switch to the use of trigonometric functions to be sure 
 		return getLinearPolarizationForRay(pol,ray);
 	}
-	//Return a normalized vector
+	//Do not normalize again
 	return normalize(cross(ray,c));
+	//return cross(ray,c);
 
 }
 
@@ -249,6 +249,8 @@ __forceinline__ __device__  optix::float3 getLinearPolarizationForRaySimple(floa
 __forceinline__ __device__ void getLinearPolarizationInRayBasis(float3 pol,  float3 ray,  float3& hor_o, float3& ver_o) {
 	
 	//Use the simplified version
+	//const float3 Eoa=getLinearPolarizationForRay(pol,ray);
+	//const float3 Eo3=getLinearPolarizationForRay(pol,ray);
 	const float3 Eo3=getLinearPolarizationForRaySimple(pol,ray);
 	//rtPrintf("ray=(%f,%f,%f) pol=(%f,%f,%f) Eoa=(%f,%f,%f) Eo3=(%f,%f,%f)\n",ray.x,ray.y,ray.z,pol.x,pol.y,pol.z,Eoa.x,Eoa.y,Eoa.z,Eo3.x,Eo3.y,Eo3.z);
 
@@ -259,10 +261,12 @@ __forceinline__ __device__ void getLinearPolarizationInRayBasis(float3 pol,  flo
 	const float3 theta_o=-1.0f*make_float3(cosf(elaz.x)*sinf(elaz.y), -1.0f*sinf(elaz.x), cosf(elaz.y)*cosf(elaz.x));
 	//Horizontal vector in world coordinates. Equals unit vector phi in spherical coordinates where phi=angle from Z (forward) to X (right) [0 ..360 [
 	const float3 phi_o=make_float3(cosf(elaz.y), 0.0f,-1.0f*sin(elaz.y));
+	//rtPrintf("theta_o=(%f,%f,%f) phi_o=(%f,%f,%f) el=%f az=%f\n",theta_o.x,theta_o.y,theta_o.z,phi_o.x,phi_o.y,phi_o.z, (57.2958*elaz.x),(57.2958*elaz.y));
 	
-	//Project on vectors to get components of the field on the ray basis in world coordinates
+	//Project on unit vectors to get the components of the field on the ray basis in world coordinates
 	ver_o=dot(theta_o,Eo3)*theta_o;
 	hor_o=dot(phi_o,Eo3)*phi_o;
+	
 
 }
 

@@ -217,6 +217,8 @@ thrust::host_vector<HitInfo> filterHitsAndTransferMultiGPU( optix::Buffer hitBuf
 
 		thrust::device_vector<HitInfo>* vt =state->getDeviceHits();
 		uint previousSize=state->getIndex();
+		
+
 		//Merge with the previously filtered hits
 		
 		//Manage memory, otherwise we run out of memory soon for large launches
@@ -224,20 +226,20 @@ thrust::host_vector<HitInfo> filterHitsAndTransferMultiGPU( optix::Buffer hitBuf
 
 		//If 'low' memory size keep it simple
 		if (totalMem<1000.0f) {	
-			std::cout<<"Simple Memory: previousSize="<<previousSize<<"totalHitsSize="<<totalHitsSize<<"total memory for hits="<<(sizeof(HitInfo)*totalHitsSize/(1024.f*1024.f))<<" MiB"<<std::endl;
+		//	std::cout<<"Simple Memory: previousSize="<<previousSize<<"totalHitsSize="<<totalHitsSize<<"total memory for hits="<<totalMem<<" MiB"<<std::endl;
 
 
 			vt->resize(totalHitsSize+previousSize);
-			std::cout<<"resized"<<std::endl;
+			//std::cout<<"resized"<<std::endl;
 			//Fill the vector with the launch results
 			uint aux=previousSize;
 			for (uint i=0; i<enabledDevices; ++i) {
 				uint c_buf_size=ai_size[i];
-				//std::cout<<"aux="<<aux<<"c_buf_size="<<c_buf_size<<"data="<<&vt<<std::endl;
+			//	std::cout<<"aux="<<aux<<"c_buf_size="<<c_buf_size<<"data="<<&vt<<std::endl;
 				cudaMemcpy(thrust::raw_pointer_cast(vt->data())+aux, raw_ptrs[i],(c_buf_size)*sizeof(HitInfo),cudaMemcpyDeviceToDevice);
 				aux += c_buf_size;
 
-				std::cout<<"copied "<<i<<std::endl;
+			//	std::cout<<i<<" copied "<<c_buf_size<<std::endl;
 				//Init atomic index for next launch
 				thrust::device_ptr<uint> dai=	dev_ai[i];
 				dai[0]=0u;
@@ -247,61 +249,84 @@ thrust::host_vector<HitInfo> filterHitsAndTransferMultiGPU( optix::Buffer hitBuf
 			//std::cout<<"vt.size="<<vt->size()<<std::endl;
 			//Sort the vector
 			thrust::sort(vt->begin(), vt->end());
-			std::cout<<"sorted "<<std::endl;
+			
+			//std::cout<<"sorted "<<std::endl;
+			
 			//Filter the results: keep lower distance hit per sequence
 			thrust::device_vector<HitInfo>::iterator new_end=thrust::unique(vt->begin(), vt->end());
-			std::cout<<"filtered "<<std::endl;
+			//std::cout<<"filtered "<<std::endl;
+			
 			//The device vector has all the hits, but only those up to new_end are properly sorted. They are kept for the next launch to be sorted and filtered again with the new ones
-			std::cout<<"vt.size="<<vt->size()<<"hits="<<(new_end-vt->begin())<<std::endl;
+			//std::cout<<"vt.size="<<vt->size()<<"hits="<<(new_end-vt->begin())<<std::endl;
 			return (new_end-vt->begin());
 		} else {
-			std::cout<<"Large Memory: previousSize="<<previousSize<<"memory="<<(previousSize*sizeof(HitInfo)/(1024.f*1024.f))<<" MiB; totalHitsSize="<<totalHitsSize<<"total memory for hits="<<(sizeof(HitInfo)*totalHitsSize/(1024.f*1024.f))<<" MiB"<<std::endl;
+			//std::cout<<"Large Memory: previousSize="<<previousSize<<"memory="<<(previousSize*sizeof(HitInfo)/(1024.f*1024.f))<<" MiB; totalHitsSize="<<totalHitsSize<<"total memory for hits="<<(sizeof(HitInfo)*totalHitsSize/(1024.f*1024.f))<<" MiB"<<std::endl;
+			
 			//Large number of hits, process in chunks
 			//Create chunks per device
-			uint chunkElements=33554432; //Number of elements for 1GiB of HitInfo assuming sizeof(HitInfo)=32
+			//Have to find a balance between available memory and potential hits you may have. You can use a higher fraction in setGlobalHitInfoBuffer (0.5-0.7) and a lower value for chunkElements here if 
+			//many hits are potential (enought to overflow the globalHitInfoBuffer) or, conversely, a lower fraction there and a higher value here, which means better performance here (fewer iterations)
+			//uint chunkElements=33554432u; //Number of elements for 1GiB of HitInfo assuming sizeof(HitInfo)=32
+			uint chunkElements=16777216u; //Number of elements for 0.5GiB of HitInfo assuming sizeof(HitInfo)=32
+
 			for (uint i=0; i<enabledDevices; ++i) {
 
 				uint chunks=ai_size[i]/chunkElements;
 				uint remainder=ai_size[i]%chunkElements;
-				std::cout<<"Current buffer for device "<<i<<"="<<ai_size[i]<<"; memory="<<(sizeof(HitInfo)*ai_size[i]/(1024.f*1024.f))<<" MiB; chunks="<<chunks<<"previousSize="<<previousSize<<std::endl;
+				//std::cout<<"Current buffer for device "<<i<<"="<<ai_size[i]<<"; memory="<<(sizeof(HitInfo)*ai_size[i]/(1024.f*1024.f))<<" MiB; chunks="<<chunks<<"remainder="<<remainder<<"previousSize="<<previousSize<<std::endl;
 				for (uint j=0; j<chunks;++j) {
 					vt->resize(previousSize+chunkElements);
-					std::cout<<"Chunk filter device "<<i<<":  resized. chunks="<<chunks<<"j="<<j<<"remainder="<<remainder<<std::endl;
+					//std::cout<<"Chunk filter device "<<i<<":  resized. chunk="<<j<<std::endl;
 					//Fill the vector with the launch results
 					//std::cout<<"aux="<<aux<<"c_buf_size="<<c_buf_size<<"data="<<&vt<<std::endl;
+					
 					cudaMemcpy(thrust::raw_pointer_cast(vt->data())+previousSize, raw_ptrs[i],(chunkElements)*sizeof(HitInfo),cudaMemcpyDeviceToDevice);
-					std::cout<<"Chunk filter device "<<i<<":  copied. chunks="<<chunks<<"j="<<j<<"remainder="<<remainder<<std::endl;
+					
+					//std::cout<<"Chunk filter device "<<i<<":  copied. chunk="<<j<<std::endl;
 					//Sort the vector
+					
 					thrust::sort(vt->begin(), vt->end());
-					std::cout<<"Chunk filter device "<<i<<":  sorted. chunks="<<chunks<<"j="<<j<<"remainder="<<remainder<<std::endl;
+					
+					//std::cout<<"Chunk filter device "<<i<<":  sorted. chunk="<<j<<std::endl;
 					//Filter the results: keep lower distance hit per sequence
 					thrust::device_vector<HitInfo>::iterator new_end=thrust::unique(vt->begin(), vt->end());
-					std::cout<<"Chunk filter device "<<i<<":  filtered. chunks="<<chunks<<"j="<<j<<"remainder="<<remainder<<std::endl;
+					
+					//std::cout<<"Chunk filter device "<<i<<":  filtered. chunk="<<j<<std::endl;
 					//Keep the already filtered ones in our vector
 					previousSize =(new_end-vt->begin()); 
-					std::cout<<"Chunk filter device "<<i<<":  filtered. new previousSizes="<<previousSize<<"j="<<j<<"remainder="<<remainder<<std::endl;
+					
+					//std::cout<<"Chunk filter device "<<i<<":  filtered. new previousSizes="<<previousSize<<std::endl;
 				}
 				//Finish the remainding ones
 					vt->resize(previousSize+remainder);
-					std::cout<<"Chunk filter device "<<i<<":  resized. chunks="<<chunks<<"remainder="<<remainder<<std::endl;
+					//std::cout<<"Chunk filter device "<<i<<":  resized. chunks="<<chunks<<"remainder="<<remainder<<std::endl;
+					
+					
 					//Fill the vector with the launch results
 					//std::cout<<"aux="<<aux<<"c_buf_size="<<c_buf_size<<"data="<<&vt<<std::endl;
+					
 					cudaMemcpy(thrust::raw_pointer_cast(vt->data())+previousSize, raw_ptrs[i],(remainder)*sizeof(HitInfo),cudaMemcpyDeviceToDevice);
-					std::cout<<"Chunk filter device "<<i<<":  copied. chunks="<<chunks<<"remainder="<<remainder<<std::endl;
+					
+					
+					//std::cout<<"Chunk filter device "<<i<<":  copied. chunks="<<chunks<<"remainder="<<remainder<<std::endl;
 					//Sort the vector
 					thrust::sort(vt->begin(), vt->end());
-					std::cout<<"Chunk filter device "<<i<<":  sorted. chunks="<<chunks<<"remainder="<<remainder<<std::endl;
+					
+					//std::cout<<"Chunk filter device "<<i<<":  sorted. chunks="<<chunks<<"remainder="<<remainder<<std::endl;
 					//Filter the results: keep lower distance hit per sequence
 					thrust::device_vector<HitInfo>::iterator new_end=thrust::unique(vt->begin(), vt->end());
-					std::cout<<"Chunk filter device "<<i<<":  filtered. chunks="<<chunks<<"remainder="<<remainder<<std::endl;
+					
+					
+					//std::cout<<"Chunk filter device "<<i<<":  filtered. chunks="<<chunks<<"remainder="<<remainder<<std::endl;
 					//Keep the already filtered ones in our vector
 					previousSize =(new_end-vt->begin()); 
-					std::cout<<"Chunk filter device "<<i<<":  filtered. new previousSizes="<<previousSize<<"remainder="<<remainder<<std::endl;
+					
+					//std::cout<<"Chunk filter device "<<i<<":  filtered. new previousSizes="<<previousSize<<"remainder="<<remainder<<std::endl;
 					//Init atomic index for next launch
 					thrust::device_ptr<uint> dai=	dev_ai[i];
 					dai[0]=0u;
 			}
-			std::cout<<"vt.size="<<vt->size()<<"hits="<<previousSize<<std::endl;
+			//std::cout<<"vt.size="<<vt->size()<<"hits="<<previousSize<<std::endl;
 			return previousSize;
 		}
 	}
