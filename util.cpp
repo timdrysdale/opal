@@ -1,6 +1,14 @@
+/***************************************************************/
+//
+//Copyright (c) 2019 Esteban Egea-Lopez http://ait.upct.es/eegea
+//
+/**************************************************************/
+
 #include "util.h"
 #include <iostream>
 #include <fstream>
+
+namespace opal {
 //Callback
 void printPower(float power, int txId ) {
 	std::cout << "PR\t" << power << std::endl;
@@ -62,6 +70,8 @@ std::vector<int>  loadTrianglesFromFile(const char* file) {
 
 
 
+
+} //namespace
 
 
 

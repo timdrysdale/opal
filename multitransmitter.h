@@ -38,7 +38,6 @@ namespace opal {
 
 		protected:
 
-			virtual void checkInternalBuffers() override;
 			void resizeTransmitterBuffer(optix::uint tx);
 
 			virtual void processHits(HitInfo* host_hits, uint hits) override;

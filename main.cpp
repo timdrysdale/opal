@@ -37,14 +37,15 @@ int main(int argc, char** argv)
 		bool useDepolarization=false;
 		bool usePenetration = false;
 		bool useMultiGPU=true;
+		bool useFastMath=true;
 #ifdef _WIN32
 #else 
 
-		std::string usage="Usage: opal [-options] \n  -r Max reflections E \n -p Enable OptiX rtPrintf on device to debug \n -s Use decimal degrees in angular spacing \n -c Use c=3e8 m/s. Default is c=299 792 458 m/s\n -d Enable depolarization \n -a Enable penetration \n -g Disable multiGPU \n -h Show help";
+		std::string usage="Usage: opal [-options] \n  -r Max reflections E \n -p Enable OptiX rtPrintf on device to debug \n -s Use decimal degrees in angular spacing \n -c Use c=3e8 m/s. Default is c=299 792 458 m/s\n -d Enable depolarization \n -a Enable penetration \n -g Disable multiGPU \n -m disable fast_math \n -h Show help";
 
 		int c;
 		int nr;
-		while ((c = getopt (argc, argv, "r:pscdagh")) != -1) {
+		while ((c = getopt (argc, argv, "r:pscdagmh")) != -1) {
 			switch (c) {
 				case 'r':
 					//std::cout<<optarg<<std::endl;
@@ -75,6 +76,9 @@ int main(int argc, char** argv)
 					break;
 				case 'g':
 					useMultiGPU=false;
+					break;
+				case 'm':
+					useFastMath=false;
 					break;
 				case 'h':
 					std::cout<<usage<<std::endl;
@@ -110,6 +114,9 @@ int main(int argc, char** argv)
 		}
 		if (!useMultiGPU) {
 			sceneManager->disableMultiGPU();	
+		}
+		if (!useFastMath) {
+			sceneManager->disableFastMath();
 		}
 		sceneManager->setMaxReflections(maxReflections);
 		

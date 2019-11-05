@@ -193,7 +193,7 @@ void OpalSceneManagerMultiTransmitter::processHits(HitInfo* host_hits,uint hits)
 
 			if (host_hits->thrd.x!=currentTx) {
 				if (raysHit!=0) {
-					computeReceivedPower(E,index,activeTransmitters[currentTx]->externalId,activeTransmitters[currentTx]->transmitPower,activeTransmitters[currentTx]->origin); 			
+					computeReceivedPower(E,index,activeTransmitters[currentTx]->externalId,activeTransmitters[currentTx]->transmitPower,activeTransmitters[currentTx]->origin, raysHit); 			
 				} 				
 				//New transmitter 				
 				currentTx=host_hits->thrd.x; 				
@@ -206,7 +206,7 @@ void OpalSceneManagerMultiTransmitter::processHits(HitInfo* host_hits,uint hits)
 				if (host_hits->thrd.z!=index) { 					
 					if (raysHit!=0u) { 						
 						//At least one hit, callback 						
-						computeReceivedPower(E,index,activeTransmitters[currentTx]->externalId,activeTransmitters[currentTx]->transmitPower,activeTransmitters[currentTx]->origin);
+						computeReceivedPower(E,index,activeTransmitters[currentTx]->externalId,activeTransmitters[currentTx]->transmitPower,activeTransmitters[currentTx]->origin, raysHit);
 					} 			
 					//New receiver, same transmitter, start new accumulation
 					//std::cout<<"New receiver tx="<<currentTx<<";rx="<<index<<std::endl; 					
@@ -235,23 +235,9 @@ void OpalSceneManagerMultiTransmitter::processHits(HitInfo* host_hits,uint hits)
 	}
 	//Last one
 	if (raysHit!=0u) {
-		computeReceivedPower(E,index,activeTransmitters[currentTx]->externalId,activeTransmitters[currentTx]->transmitPower,activeTransmitters[currentTx]->origin); 
+		computeReceivedPower(E,index,activeTransmitters[currentTx]->externalId,activeTransmitters[currentTx]->transmitPower,activeTransmitters[currentTx]->origin, raysHit); 
 	}	
-//	//timer.stop();
-}
-void OpalSceneManagerMultiTransmitter::checkInternalBuffers() {
-	OpalSceneManager::checkInternalBuffers();
-	uint numTransmitters=static_cast<uint>(activeTransmitters.size());
-	if (currentInternalBuffersState.tx==numTransmitters) {
-		return;
-	} else {
-		std::cout<<"Resizing transmitter buffer to "<<numTransmitters<<std::endl;
-		resizeTransmitterBuffer(numTransmitters);
-	}
-
-	//Store current state
-	currentInternalBuffersState.tx=numTransmitters;
-
+	//timer.stop();
 }
 void OpalSceneManagerMultiTransmitter::resizeTransmitterBuffer(uint tx) {
 	uint tra=1u;

@@ -1,3 +1,24 @@
+Opal-0.5 (November 2019)
+-----------
+1. Partial launches support. You can split a launch in multiple steps.  With this feature you can now perform very high angular density sampling, that is, use very low angular separation and scan the sphere by zones: 
+You can launch only for a given solid angle, with the angular separation you decide. Results are correctly filtered with thrust on the GPU and carried over additional launches until the launch is finished. This is useful mainly for electromagnetic characterization, where you need very accurate results. An example of  use is provided 
+in the tunnel test. 
+
+2. Fast math can be disabled. Again, when doing electromagnetic characterization, accurate results require disabling the fast_math option of the NVRTC compiler, to avoid approximations for cos, sin and other math functions. 
+
+3. Memory management has been simplified. Only a global buffer and an atomic buffer is used for all the configurations, including multi-GPU. A large buffer is used to hold all the hits, independently of other scene parameters, 
+such as the number of receivers receivers. Buffers are not resized during the simulation.  All together should improve the performance. 
+
+4. Depolarization has been thoroughly tested and validated. In our tests, full depolarization does not impact appreciably the performance and should be the preferred method.
+
+5. Fixed a bug in the filtering algorith, where the operator== was not implemented correctly. 
+The filtering algorithm has been separated from the transfer to the host device, to facilitate partial launches. In addition, a memory management procedure to handle 
+very large results (due to low AS and partial launches) has been added to the filtering code. 
+
+
+6. Tests have been moved to a separate folder and better organized.  
+
+
 Opal-0.4 (June 2019)
 -----------
 1. Depolarization added. Now, you can use arbitrary and different linear polarizations for transmitters and receivers. It also allows to simulate leaning (non horizontal or vertical) walls. It also has a performance cost, 

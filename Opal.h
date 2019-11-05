@@ -18,6 +18,7 @@
 #include <vector>
 #include <memory>
 #include "Common.h"
+#include "ptxUtil.h"
 
 namespace opal {
 
@@ -153,15 +154,6 @@ namespace opal {
 
 
 			//Internal buffers
-			typedef struct {
-				optix::uint elevation;
-				optix::uint azimuth;
-				optix::uint tx;
-				optix::uint rx;
-				optix::uint reflections; 
-			} InternalBuffersParameters;	 //Internal buffers depend on these parameters, used to keep track of the changes
-
-			InternalBuffersParameters currentInternalBuffersState;
 
 			optix::Buffer globalHitInfoBuffer;
 			optix::Buffer atomicIndexBuffer;
@@ -192,7 +184,9 @@ namespace opal {
 			bool usePenetration;
 			bool useDepolarization;
 			bool useMultiGPU;
+			bool useFastMath;
 			float attenuationLimit;	
+			PtxUtil*  ptxHandler;
 
 			unsigned int maxReflections; //Default 10
 			float minEpsilon; //Default 1.e-3f
@@ -276,6 +270,9 @@ namespace opal {
 			void setAttenuationLimit(float f);
 			void setMaxReflections(unsigned int m);
 			void setMinEpsilon(float f);
+			void enableFastMath();
+			void disableFastMath();
+
 			
 			void endPartialLaunch();
 			
@@ -328,7 +325,6 @@ namespace opal {
 
 		//Internal buffers
 			virtual void setInternalBuffers();
-			virtual void checkInternalBuffers();
 			virtual void clearInternalBuffers();
 
 			virtual optix::Buffer setGlobalHitInfoBuffer(optix::uint ele, optix::uint azi, optix::uint rx, optix::uint reflections);

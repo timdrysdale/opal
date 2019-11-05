@@ -87,7 +87,7 @@ Make sure that you do that for both Debug and Release configurations, or any oth
 
 
 ## Usage
-As a standalone application, you can find an `main` method in `tests.cpp` with some tests. You can do your own, include it in your application, and 
+As a standalone application, you can find an `main` method in `main.cpp` with some tests. Tests are now in the `tests` folder. You can do your own, include it in your application, and 
 so on. Recompile and execute. 
 
 As a library link appropriately and go. 

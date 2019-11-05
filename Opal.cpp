@@ -77,7 +77,7 @@ void OpalSceneManager::initMembers() {
 	this->context=nullptr;
 	this->deg2rad=M_PI/180.f;
 	//Change to your own directory
-	this->cudaProgramsDir="opal";
+	this->cudaProgramsDir="tunnels";
 	this->maxReflections = 10u;
 	this->minEpsilon = 1.e-3f;
 	this->useExactSpeedOfLight=true;
@@ -96,12 +96,15 @@ void OpalSceneManager::initMembers() {
 	this->radioReductionFraction=1.0/sqrt(2); //To avoid transmitters inside reception sphere
 	this->usePenetration=false;
 	this->useDepolarization=false;
+	this->useFastMath = true;
 	this->attenuationLimit = -80.0f;
 
 	this->raySphere.raySphereBuffer = nullptr;
 	this->raySphere.elevationSteps=0u;
 	this->raySphere.azimuthSteps=0u;
 	this->raySphere.rayCount=0u;
+
+	this->ptxHandler=nullptr;
 
 	this->partialLaunchState = new opalthrustutils::PartialLaunchState();
 }
@@ -182,6 +185,25 @@ void OpalSceneManager::createSceneContext()
 
 void opal::OpalSceneManager::setDefaultPrograms()
 {
+
+
+	//Create compiler options here
+    	std::vector<const char *> options;
+      
+      	options.push_back("-arch");
+      	options.push_back("compute_30");
+	if (useFastMath) {
+		options.push_back("-use_fast_math");
+	} else {
+		configInfo<<"\t - fast_math disabled "<<std::endl;
+	}
+      	options.push_back("-lineinfo");
+      	options.push_back("-default-device");
+      	options.push_back("-rdc");
+      	options.push_back("true");
+      	options.push_back("-D__x86_64");
+	
+	ptxHandler = new PtxUtil(options);
 
 
 	//TODO: we could add an intersection program for planes (ideal infinite planes), typically used to represent flat grounds, should be more efficient than a mesh?
@@ -553,7 +575,8 @@ optix::Material OpalSceneManager::createMeshMaterial(unsigned int ray_type_index
 	return mat;
 }
 optix::Program OpalSceneManager::createClosestHitMesh() {
-	optix::Program chmesh = context->createProgramFromPTXString(sutil::getPtxString(cudaProgramsDir.c_str(), "triangle.cu"), "closestHitTriangle");
+	//optix::Program chmesh = context->createProgramFromPTXString(ptxHandler->getPtxString(cudaProgramsDir.c_str(), "triangle.cu"), "closestHitTriangle");
+	optix::Program chmesh = context->createProgramFromPTXString(ptxHandler->getPtxString(cudaProgramsDir.c_str(), "triangle.cu"), "closestHitTriangle");
 	return chmesh;
 
 }
@@ -562,7 +585,7 @@ optix::Program OpalSceneManager::createClosestHitReceiver()
 {
 
 	optix::Program chrx;
-	chrx = context->createProgramFromPTXString(sutil::getPtxString(cudaProgramsDir.c_str(), "receiver.cu"), "closestHitReceiver");
+	chrx = context->createProgramFromPTXString(ptxHandler->getPtxString(cudaProgramsDir.c_str(), "receiver.cu"), "closestHitReceiver");
 
 
 	//Program variables: common value for all receiver instances, since they all share the program. 
@@ -574,20 +597,20 @@ optix::Program OpalSceneManager::createClosestHitReceiver()
 
 optix::Program OpalSceneManager::createBoundingBoxTriangle()
 {
-	return context->createProgramFromPTXString(sutil::getPtxString(cudaProgramsDir.c_str(), "triangle.cu"), "boundsTriangle");
+	return context->createProgramFromPTXString(ptxHandler->getPtxString(cudaProgramsDir.c_str(), "triangle.cu"), "boundsTriangle");
 }
 
 #ifdef OPAL_USE_TRI
 optix::Program OpalSceneManager::createTriangleAttributesProgram()
 {
-	return  context->createProgramFromPTXString(sutil::getPtxString(cudaProgramsDir.c_str(),"optixGeometryTriangles.cu"), "triangle_attributes" ) ;
+	return  context->createProgramFromPTXString(ptxHandler->getPtxString(cudaProgramsDir.c_str(),"optixGeometryTriangles.cu"), "triangle_attributes" ) ;
 
 }
 #endif
 
 optix::Program OpalSceneManager::createIntersectionTriangle()
 {
-	return context->createProgramFromPTXString(sutil::getPtxString(cudaProgramsDir.c_str(), "triangle.cu"), "intersectTriangle");
+	return context->createProgramFromPTXString(ptxHandler->getPtxString(cudaProgramsDir.c_str(), "triangle.cu"), "intersectTriangle");
 
 }
 
@@ -595,7 +618,7 @@ optix::Program OpalSceneManager::createBoundingBoxSphere()
 {
 
 
-	return context->createProgramFromPTXString(sutil::getPtxString(cudaProgramsDir.c_str(), "sphere.cu"), "boundsSphere");
+	return context->createProgramFromPTXString(ptxHandler->getPtxString(cudaProgramsDir.c_str(), "sphere.cu"), "boundsSphere");
 
 }
 
@@ -604,13 +627,13 @@ optix::Program OpalSceneManager::createIntersectionSphere()
 {
 
 
-	return context->createProgramFromPTXString(sutil::getPtxString(cudaProgramsDir.c_str(), "sphere.cu"), "robust_intersectSphere");
+	return context->createProgramFromPTXString(ptxHandler->getPtxString(cudaProgramsDir.c_str(), "sphere.cu"), "robust_intersectSphere");
 
 }
 
 optix::Program OpalSceneManager::createMissProgram() 
 {
-	return context->createProgramFromPTXString(sutil::getPtxString(cudaProgramsDir.c_str(), "receiver.cu"), "miss");
+	return context->createProgramFromPTXString(ptxHandler->getPtxString(cudaProgramsDir.c_str(), "receiver.cu"), "miss");
 
 }
 
@@ -620,7 +643,7 @@ optix::Program  OpalSceneManager::createRayGenerationProgram()
 {
 
 
-	return context->createProgramFromPTXString(sutil::getPtxString(cudaProgramsDir.c_str(), "generation.cu"), "genRayAndReflectionsFromSphereIndex");
+	return context->createProgramFromPTXString(ptxHandler->getPtxString(cudaProgramsDir.c_str(), "generation.cu"), "genRayAndReflectionsFromSphereIndex");
 
 }
 
@@ -1257,7 +1280,7 @@ void OpalSceneManager::processHits(HitInfo* host_hits, uint hits) {
 
 
 	// Log hits received
-		std::cout<<"E["<<i<<"]="<<(host_hits)->E<<std::endl;
+//		std::cout<<"E["<<i<<"]="<<(host_hits)->E<<std::endl;
 ////		std::cout<<"Ex="<<(host_hits)->Ex<<std::endl;
 ////		std::cout<<"Ey="<<(host_hits)->Ey<<std::endl;
 //		std::cout<<"\t rxBufferIndex="<<(host_hits)->thrd.z<<std::endl;
@@ -1327,9 +1350,6 @@ void OpalSceneManager::clearInternalBuffers() {
 	}
 
 
-	currentInternalBuffersState.tx=0u;
-	currentInternalBuffersState.rx=0u;
-	currentInternalBuffersState.reflections=0u;
 
 
 }
@@ -1342,12 +1362,6 @@ void OpalSceneManager::setInternalBuffers() {
 	optix::uint elevationSize=raySphere.elevationSteps;
 	optix::uint azimuthSize=raySphere.azimuthSteps;
 
-	//Store current state
-	currentInternalBuffersState.tx=1u;
-	currentInternalBuffersState.rx=rxSize;
-	currentInternalBuffersState.reflections=reflectionsSize;
-	currentInternalBuffersState.elevation=elevationSize;
-	currentInternalBuffersState.azimuth=azimuthSize;
 
 //Since we now use a fixed global hit Info buffer we do not need this
 //	if (elevationSize==0 || azimuthSize==0) {
@@ -1361,31 +1375,6 @@ void OpalSceneManager::setInternalBuffers() {
 }
 
 
-void OpalSceneManager::checkInternalBuffers() {
-	//Check for changes in internal buffers size
-	optix::uint rxSize=static_cast<uint>(receivers.size());
-	optix::uint reflectionsSize=maxReflections;
-	optix::uint elevationSize=raySphere.elevationSteps;
-	optix::uint azimuthSize=raySphere.azimuthSteps;
-	if (	currentInternalBuffersState.rx==rxSize && currentInternalBuffersState.reflections==reflectionsSize &&  currentInternalBuffersState.elevation==elevationSize &&	currentInternalBuffersState.azimuth==azimuthSize)
-	{
-		return;
-	} else {
-		//Re create internal buffers
-		//std::cout<<"Reconfiguring internal buffers: "<<std::endl;
-
-		//It seems that resizing a buffer does not free memory. We have to destroy and recreate the buffer
-		globalHitInfoBuffer->destroy();
-		globalHitInfoBuffer=setGlobalHitInfoBuffer(elevationSize,azimuthSize,rxSize,reflectionsSize);
-		//resizeGlobalHitInfoBuffer(elevationSize, azimuthSize, rxSize, reflectionsSize);
-	}
-	//Store current state
-	currentInternalBuffersState.rx=rxSize;
-	currentInternalBuffersState.reflections=reflectionsSize;
-	currentInternalBuffersState.elevation=elevationSize;
-	currentInternalBuffersState.azimuth=azimuthSize;
-	//std::cout<<printInternalBuffersState()<<std::endl;
-}
 
 
 
@@ -1671,6 +1660,24 @@ void OpalSceneManager::buildSceneGraph()
 void OpalSceneManager::callbackUsageReport(int level, const char* tag, const char* msg, void* cbdata)
 {
 	std::cout << "[" << level << "][" << std::left << std::setw(12) << tag << "] " << msg;
+}
+
+void OpalSceneManager::disableFastMath() {
+	if (context) {
+		//We would need to rebuild the whole scene and context. It is possible but for now, we consider it an error
+		throw  opal::Exception("Do not  disable FAST MATH after creating the context");
+		return;
+	}
+	this->useFastMath=false;
+}
+
+void OpalSceneManager::enableFastMath() {
+	if (context) {
+		//We would need to rebuild the whole scene and context. It is possible but for now, we consider it an error
+		throw  opal::Exception("Do not enable  FAST MATH after creating the context");
+		return;
+	}
+	this->useFastMath=true;
 }
 
 void OpalSceneManager::enableMultiGPU() {
