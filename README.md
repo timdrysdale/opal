@@ -15,15 +15,20 @@ dynamical scene,
 which is built from meshes loaded from files or from another application, such 
 as a game engine.
 
-At the moment, only reflections are computed. In future releases we will add difraction.
+At the moment, it supports (see CHANGELOG):
+* Arbitrary number of reflections.
+* Penetration (transmission).
+* Depolarization (arbitray linear polarizations, and with a little change circular/eliptic polarizations)
+* Very high angular sampling, with millions of rays per solid-angle. 
+* Simultaneous transmissions from multiple transmitters to multiple receivers.
+ 
+ In future releases we will add difraction.
 
-It supports simultaneous transmissions from multiple transmitters to multiple receivers.
-
-
-It can be used as a standalone application or as a Unity plugin. If used as
+It can be used as a standalone application, as a OMNET++ module or as a Unity plugin. If used as
 a Unity plugin, a Unity program will send the meshes and update the transforms 
 of the elements of the scene. The Unity related code can be found in 
 our   [Veneris repository](https://gitlab.com/esteban.egea/veneris).
+The OMNET++ related code can be found in our [OMNET++ repository](https://gitlab.com/esteban.egea/veneris-omnet)
 
 For more information visit the [Veneris project website](http://pcacribia.upct.es/veneris).
 
@@ -100,6 +105,7 @@ Any other change made in the .cu files is ignored unless copied to that location
 When building an executable with Unity, you have either to use a specific script to create the cudaDir and copy the .cu and .h files to it, or just create and copy manually after the build is done. In the end, along with the Unity executable and files you need to have this specific folder and files 
 
 ### Usage remarks
+* Sometimes the simulation enters in an infinite tracing loop due to precision errors in the intersections. Changing the value of the minEpsilon parameter usually solve this issue.
 * Avoid placing receivers so that the radius of the receiver sphere overlaps walls or other interacting elements. Depending on the particular case, the result may be incorrect. This is specially important if you use penetration. In general, if the radius do not overlap, the 
 result will be correct. 
 * If you do not enable depolarization, the results are correct for horizontal and vertical elements (or just slightly leaning) in the scene, because we are assuming it for the polarization and reflections. In addition, we assume that transmitter and receiver have the same polarization.
