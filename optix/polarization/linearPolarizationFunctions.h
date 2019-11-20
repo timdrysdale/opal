@@ -8,8 +8,8 @@
  * Functions for LINEAR polarization operations. . 
  * 
  * ********************************************************/
-#include "../Common.h"
-#include "../Complex.h"
+#include "../../Common.h"
+#include "../../Complex.h"
 #include <optix_world.h>
 #include  <optixu/optixu_matrix_namespace.h>
 
@@ -240,6 +240,13 @@ __forceinline__ __device__  optix::float3 getLinearPolarizationForRaySimple(floa
 	return normalize(cross(ray,c));
 	//return cross(ray,c);
 
+}
+// Far field for a dipole. Includes the radiation diagram effect (sin(theta)...) Returns the sin(theta) term
+__forceinline__ __device__ float dipolePolarizationPattern(float3 pol,  float3 ray) {
+	//The elevation angle corresponds always to the angle between the ray an the antenna orientation (polarization)
+	const float3 polarization=normalize(pol);
+	//Assume ray is normalized as always
+	return length(cross(ray,polarization));
 }
 
 //Get the linear polarization vector for a given ray direction in a ray centered basis.

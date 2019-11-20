@@ -15,36 +15,31 @@ dynamical scene,
 which is built from meshes loaded from files or from another application, such 
 as a game engine.
 
-At the moment, it supports (see CHANGELOG):
-* Arbitrary number of reflections.
-* Penetration (transmission).
-* Depolarization (arbitray linear polarizations, and with a little change circular/eliptic polarizations)
-* Very high angular sampling, with millions of rays per solid-angle. 
-* Simultaneous transmissions from multiple transmitters to multiple receivers.
- 
- In future releases we will add difraction.
+At the moment, only reflections are computed. In future releases we will add difraction.
 
-It can be used as a standalone application, as a OMNET++ module or as a Unity plugin. If used as
+It supports simultaneous transmissions from multiple transmitters to multiple receivers.
+
+
+It can be used as a standalone application or as a Unity plugin. If used as
 a Unity plugin, a Unity program will send the meshes and update the transforms 
 of the elements of the scene. The Unity related code can be found in 
 our   [Veneris repository](https://gitlab.com/esteban.egea/veneris).
-The OMNET++ related code can be found in our [OMNET++ repository](https://gitlab.com/esteban.egea/veneris-omnet)
 
 For more information visit the [Veneris project website](http://pcacribia.upct.es/veneris).
 
 ## Installation
 
 ### Requirements
-You need a modern NVIDIA GPU and updated driver.  CUDA 9.0 or later. Optix 6.0 or 5.1. gcc or Visual Studio.
+You need a modern NVIDIA GPU and updated driver.  CUDA 9.0 or later. Optix 6.5 or 5.1. gcc or Visual Studio.
 CMake 3.10
 
 ### Install Optix
 Download Optix from the [NVIDIA site](https://developer.nvidia.com/optix) and 
 follow instructions to install it.
 
-**Updated to Optix 6.0**
-It has been tested with the last Optix version, 6.0, and **the performance on the same hardware has improved remarkably**, even without using RTX cores. With Optix 6.0 
- use CUDA 10.0 and requires a NVIDIA driver at least 418.30. Follow exactly the same steps as below, but with Optix 6.0 and CUDA 10.0.
+**Updated to Optix 6.5**
+It has been tested with the last Optix version, 6.5, and **the performance on the same hardware has improved remarkably**, even without using RTX cores. With Optix 6.5 
+ use CUDA 10.0 or 10.1 and it requires a NVIDIA driver at least R435.80 driver or newer. Follow exactly the same steps as below, but with Optix 6.0 and CUDA 10.0.
 
 With Optix 5.1.
 Basically you need to install CUDA first, which for Optix 5.1 should be 9.0 
@@ -74,10 +69,11 @@ Then, you can compile it with VS.
 ### Build Opal
 
 If Optix works, then you can add Opal:
-1. Create a subdirectory called `opal` (or whatever you prefer) inside the Optix `SDK` directory.
+1. Use always the latest release in this repository. Otherwise we cannot guarantee that this instruccions are up to date.
+1. Create a subdirectory called `opal` (or whatever you prefer) inside the Optix `SDK` directory. **If you change the name of the subdirectory modify accordingly the value of baseDir in Opal.cpp in initMembers()**.
 2. Copy to that subdirectory the files in this repository.
 3. Go to the Optix `SDK` and edit the `CMakeList.txt` to add your directory in the list of samples `add_subdirectory(opal)` (use the name of your directory).
-3. If you use Optix 5.1 comment out the ``#define OPAL_USE_TRI`` in ``Common.h``. Otherwise, use GeometryTriangles only supported by Optix 6.0
+3. If you use Optix 5.1 comment out the ``#define OPAL_USE_TRI`` in ``Common.h``. Otherwise, use GeometryTriangles only supported by Optix 6.5
 4. Configure and generate again with cmake as above.
 5. make (or compile with VS).
 
@@ -92,20 +88,24 @@ Make sure that you do that for both Debug and Release configurations, or any oth
 
 
 ## Usage
-As a standalone application, you can find an `main` method in `main.cpp` with some tests. Tests are now in the `tests` folder. You can do your own, include it in your application, and 
+As a standalone application, you can find an `main` method in `tests.cpp` with some tests. You can do your own, include it in your application, and 
 so on. Recompile and execute. 
 
 As a library link appropriately and go. 
 
-As a Unity plugin, drop the generated .dll in the Plugins folder and create an opal subdirectory with the .cu and Common.h (see below). If the target platform is Linux, do the same but with the .so.
+As a Unity plugin, drop the generated .dll in the Plugins folder and create an `Opal` subdirectory. If the target platform is Linux, do the same but with the .so. Put in that folder  
+the `optix` folder (see below). You have to copy the `Common.h`, `Complex.h` and  `traceFunctions.h` also in the `Opal` folder. 
 
-Note that CUDA programs are compiled in execution time with NVRTC. They are read from the `OPTIX_SAMPLES_SDK_DIR` location as set in the code. See also `sutil.cpp` in the Optix SDK, lines 848 and 335.
-In the chosen directory you should put all the .cu files and the `Common.h` file. They can be changed without recompiling all the code.
-Any other change made in the .cu files is ignored unless copied to that location.
+Note that CUDA programs are compiled at runtime with NVRTC. They are inside the `optix` folder.  
+They are read with the `baseDir` variable and `optixPrograms` variables or  from the `OPTIX_SAMPLES_SDK_DIR` location if sutil is used.  See also `sutil.cpp` in the Optix SDK, lines 848 and 335.
+They can be changed without recompiling all the code.
+With Unity, even recompiling, any  change made in the .cu files is ignored unless copied to the plugin location.
 When building an executable with Unity, you have either to use a specific script to create the cudaDir and copy the .cu and .h files to it, or just create and copy manually after the build is done. In the end, along with the Unity executable and files you need to have this specific folder and files 
 
 ### Usage remarks
-* Sometimes the simulation enters in an infinite tracing loop due to precision errors in the intersections. Changing the value of the minEpsilon parameter usually solve this issue.
+* Sometimes the simulation enters in an infinite tracing loop due to precision errors in the intersections. Changing the value of the minEpsilon parameter usually solve this issue. We have added a 
+preprocessor tag in `Common.h` to use a technique for avoiding self-intersections. But this is going to introduce some small precision errors in the computed electric field, since the ray lengths are modified due to a displacement.
+If you do not need very high accuracy (which is the usual case) you can  uncomment it. Otherwise keep it, but then you have to tune minEpsilon, which is not scale-invariant. If your simulation gets stuck in a launch, try uncommenting it.  If it is no longer stuck but you need high precision, comment it again an tune minEpsilon until it is removed.
 * Avoid placing receivers so that the radius of the receiver sphere overlaps walls or other interacting elements. Depending on the particular case, the result may be incorrect. This is specially important if you use penetration. In general, if the radius do not overlap, the 
 result will be correct. 
 * If you do not enable depolarization, the results are correct for horizontal and vertical elements (or just slightly leaning) in the scene, because we are assuming it for the polarization and reflections. In addition, we assume that transmitter and receiver have the same polarization.

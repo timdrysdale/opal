@@ -35,8 +35,8 @@ namespace opal {
 	static const int OPAL_NO_MULTI_TRANSMITTER_MANAGER = 4;
 	static const char* logFile = "unity_opal.txt";
 
-	//Location of Optix Programs
-	static const char* cudaDir = "./Assets/Plugins/Opal";
+	//Location of Optix Programs in the Unity plugins folder
+	static const char* pluginDir = "./Assets/Plugins/Opal";
 
 
 	// -------------------------------------------------------------------------------------

@@ -77,7 +77,11 @@ void OpalSceneManager::initMembers() {
 	this->context=nullptr;
 	this->deg2rad=M_PI/180.f;
 	//Change to your own directory
-	this->cudaProgramsDir="tunnels";
+	this->baseDir="opal";
+	//***
+	
+	this->optixProgramsDir="optix";
+	this->cudaProgramsDir="";
 	this->maxReflections = 10u;
 	this->minEpsilon = 1.e-3f;
 	this->useExactSpeedOfLight=true;
@@ -86,6 +90,7 @@ void OpalSceneManager::initMembers() {
 	this->numberOfFaces = 0u; 
 	this->sceneGraphCreated = false;
 	this->sceneFinished = false;
+	this->contextInitialized = false;
 
 	this->globalHitInfoBuffer = nullptr;
 	this->txOriginBuffer = nullptr;
@@ -113,7 +118,7 @@ void OpalSceneManager::initContext(float f,  bool useExactSpeedOfLight) {
 	outputFile.open("opal_log.txt");
 #endif // OPALDEBUG
 	if (useDepolarization) {
-		this->cudaProgramsDir += "/polarization";
+		configInfo<< "\t - Using depolarization. Transmitter and receiver can have any linear polarizations (linear antenna may be oriented in any direction) and can be different. "<<std::endl;
 	} else {
 		//Show warning to remark the assumptions
 		configInfo<<"\t - You are assuming that: (1)  both transmitters and receivers have the same polarization and (2) the polarization is either purely vertical (0, 1, 0) or horizontal (1,0,0), but not (0,0,1). " <<std::endl; 
@@ -124,10 +129,24 @@ void OpalSceneManager::initContext(float f,  bool useExactSpeedOfLight) {
 	setFrequency(f);
 	createSceneContext();
 	setDefaultPrograms();
+	contextInitialized=true;	
+	#ifdef OPAL_LOG_TRACE
+	setPrintEnabled(1024*1024*1024); //1 GB
+	#endif
 }	
+void OpalSceneManager::setBaseDir(std::string b) {
+	if (contextInitialized) {
+		throw  opal::Exception("setBaseDir(): Context already initialized with another base directory. Call it before initializing context");
+	} else {
+		this->baseDir=b;
+	}
+}
 
 void OpalSceneManager::setFrequency(float f)
 {
+	if (contextInitialized) {
+		throw  opal::Exception("setFrequency(): Context already initialized with another frequency. Call it before initializing context");
+	} else {
 	this->defaultChannel.frequency = f;
 	configInfo<<"\t - Frequency (Hz) ="<<f<<std::endl;
 	if (useExactSpeedOfLight) {
@@ -141,7 +160,7 @@ void OpalSceneManager::setFrequency(float f)
 	this->defaultChannel.k = 2 * 3.14159265358979323846f / this->defaultChannel.waveLength; //wavenumber (2*pi/lambda)
 	this->defaultChannel.eA = 1.0f / ((2 * this->defaultChannel.k)*(2 * this->defaultChannel.k)); //Effective Area of the antenna (lambda/4*pi)^2
 
-
+	}
 }
 void OpalSceneManager::setMaxReflections(unsigned int m)
 {
@@ -178,9 +197,13 @@ void OpalSceneManager::createSceneContext()
 #endif
 	context = optix::Context::create();
 	setEnabledDevices();
-	context->setRayTypeCount(1); //Normal  ray
-	context->setEntryPointCount(1); //1 program: ray generation 
-
+#ifdef OPAL_LOG_TRACE
+	context->setRayTypeCount(2u); //Normal, log  ray
+	context->setEntryPointCount(2u); //2 program: ray,log  generation 
+#else 
+	context->setRayTypeCount(1u); //Normal  ray
+	context->setEntryPointCount(1u); //1 program: ray generation 
+#endif
 }
 
 void opal::OpalSceneManager::setDefaultPrograms()
@@ -207,25 +230,45 @@ void opal::OpalSceneManager::setDefaultPrograms()
 
 
 	//TODO: we could add an intersection program for planes (ideal infinite planes), typically used to represent flat grounds, should be more efficient than a mesh?
-	defaultPrograms.insert(std::pair<std::string, optix::Program>("meshClosestHit", createClosestHitMesh()));
+
+	//Intersection programs
+	
+	//Common dir for all of them
+	this->cudaProgramsDir=(baseDir+"/"+optixProgramsDir+"/intersect");
 #ifdef OPAL_USE_TRI
 	defaultPrograms.insert(std::pair<std::string, optix::Program>("triangleAttributes", createTriangleAttributesProgram()));
 #else
 	defaultPrograms.insert(std::pair<std::string, optix::Program>("meshIntersection", createIntersectionTriangle()));
 	defaultPrograms.insert(std::pair<std::string, optix::Program>("meshBounds", createBoundingBoxTriangle()));
 #endif
+	defaultPrograms.insert(std::pair<std::string, optix::Program>("receiverIntersection", createIntersectionSphere()));
+	defaultPrograms.insert(std::pair<std::string, optix::Program>("receiverBounds", createBoundingBoxSphere()));
 
+	
+	//Closest Hit Programs
+	if (useDepolarization) {
+		this->cudaProgramsDir=(baseDir+"/"+optixProgramsDir+"/polarization");
+	} else {
+		this->cudaProgramsDir=(baseDir+"/"+optixProgramsDir+"/basic");
+	}
+	
+	defaultPrograms.insert(std::pair<std::string, optix::Program>("meshClosestHit", createClosestHitMesh()));
 	defaultPrograms.insert(std::pair<std::string, optix::Program>("receiverClosestHit", createClosestHitReceiver()));
 
 
-	defaultPrograms.insert(std::pair<std::string, optix::Program>("receiverIntersection", createIntersectionSphere()));
-	defaultPrograms.insert(std::pair<std::string, optix::Program>("receiverBounds", createBoundingBoxSphere()));
 	defaultPrograms.insert(std::pair<std::string, optix::Program>("miss", createMissProgram()));
 	defaultPrograms.insert(std::pair<std::string, optix::Program>("rayGeneration", createRayGenerationProgram()));
 
 
 
-	defaultMeshMaterial = createMeshMaterial(0u,defaultPrograms.at("meshClosestHit")); //For normal rays
+
+	defaultMeshMaterial = createDefaultMeshMaterial(OPAL_RAY_REFLECTION,defaultPrograms.at("meshClosestHit")); //For normal rays
+//For visualization
+#ifdef OPAL_LOG_TRACE
+	createLogTracePrograms();
+	defaultMeshMaterial->setClosestHitProgram(OPAL_RAY_LOG_TRACE_RAY,defaultPrograms.at("closestHitTriangleLogTrace"));
+#endif
+
 
 #ifdef OPALDEBUG
 	outputFile << "defaultPrograms size=" << defaultPrograms.size() << std::endl;
@@ -233,6 +276,8 @@ void opal::OpalSceneManager::setDefaultPrograms()
 
 
 }
+
+
 
 void OpalSceneManager::addMeshToGroup(int id, int meshVertexCount, optix::float3* meshVertices, int meshTriangleCount, int* meshTriangles, MaterialEMProperties emProp) {
 	OpalDynamicMeshGroup* dmg;
@@ -544,12 +589,35 @@ OpalMesh OpalSceneManager::createMesh(int meshVertexCount, optix::float3* meshVe
 
 	std::vector<optix::Material> optix_materials;
 	optix_materials.push_back(material);
+
+#ifdef OPAL_LOG_TRACE
+	
+//	optix::Material mat= context->createMaterial();
+//	mat->setClosestHitProgram(OPAL_RAY_LOG_TRACE_RAY, defaultPrograms.at("closestHitTriangleLogTrace"));
+//	mat->validate();
+//	optix_materials.push_back(mat);
+#endif
+
+
 #ifdef OPAL_USE_TRI 
+//	#ifdef OPAL_LOG_TRACE
+//	optix::Buffer m_index_buffer = context->createBuffer(RT_BUFFER_INPUT, RT_FORMAT_UNSIGNED_INT, numTriangles);
+//	uint* m_index = reinterpret_cast<uint*>  (m_index_buffer->map());
+//	for (size_t i = 0; i < numTriangles; i++) {
+//		m_index[i] =optix_materials.size()-1u;
+//	}
+//        m_index_buffer->unmap();
+//	geom_tri->setMaterialIndices(m_index_buffer,0u,sizeof(uint),RT_FORMAT_UNSIGNED_INT);	
+//	#endif
 	mesh.geom_instance = context->createGeometryInstance(geom_tri,material); //If called with iterator does not compile, but it appears in the documentation 
+//	geom_tri->setMaterialCount(optix_materials.size());
+//	mesh.geom_instance = context->createGeometryInstance(geom_tri,optix_materials.begin(), optix_materials.end()); //If called with iterator does not compile, but it appears in the documentation 
+//	mesh.geom_instance->validate();
 #else
 
 	mesh.geom_instance = context->createGeometryInstance(geometry, optix_materials.begin(), optix_materials.end());
 #endif
+
 
 	return mesh;
 
@@ -568,7 +636,7 @@ void OpalSceneManager::setMeshEMProperties(optix::GeometryInstance geom_instance
 
 //Default programs
 
-optix::Material OpalSceneManager::createMeshMaterial(unsigned int ray_type_index, optix::Program closestHitProgram) {
+optix::Material OpalSceneManager::createDefaultMeshMaterial(unsigned int ray_type_index, optix::Program closestHitProgram) {
 	optix::Material mat= context->createMaterial();
 	mat->setClosestHitProgram(ray_type_index, closestHitProgram);
 
@@ -580,7 +648,107 @@ optix::Program OpalSceneManager::createClosestHitMesh() {
 	return chmesh;
 
 }
+#ifdef OPAL_LOG_TRACE
+void OpalSceneManager::createLogTracePrograms() {
+	std::string logDir=(baseDir+"/"+optixProgramsDir+ "/log");
+	std::cout<<"Creating log trace programs from " <<logDir <<std::endl;
+	optix::Program prog = context->createProgramFromPTXString(ptxHandler->getPtxString(logDir.c_str(), "triangle.cu"), "closestHitTriangleLogTrace");
+	if (prog->get()==nullptr) {
+		std::cout<<"null program at  " <<logDir <<std::endl;
 
+	} else {
+		prog->validate();
+	}
+	defaultPrograms.insert(std::pair<std::string, optix::Program>("closestHitTriangleLogTrace",prog) );
+	prog = context->createProgramFromPTXString(ptxHandler->getPtxString(logDir.c_str(), "receiver.cu"), "closestHitReceiverLogTrace");
+	if (prog->get()==nullptr) {
+		std::cout<<"null program at  " <<logDir <<std::endl;
+
+	} else {
+		prog->validate();
+	}
+	defaultPrograms.insert(std::pair<std::string, optix::Program>("closestHitReceiverLogTrace", prog));
+	prog = context->createProgramFromPTXString(ptxHandler->getPtxString(logDir.c_str(), "receiver.cu"), "missLogTrace");
+	if (prog->get()==nullptr) {
+		std::cout<<"null program at  " <<logDir <<std::endl;
+
+	} else {
+		prog->validate();
+	}
+	defaultPrograms.insert(std::pair<std::string, optix::Program>("missLogTrace", prog));
+	prog = context->createProgramFromPTXString(ptxHandler->getPtxString(logDir.c_str(), "generation.cu"), "genRayTracesFromHits");
+	if (prog->get()==nullptr) {
+		std::cout<<"null program at  " <<logDir <<std::endl;
+
+	} else {
+		prog->validate();
+	}
+	defaultPrograms.insert(std::pair<std::string, optix::Program>("rayGenerationLogTrace", prog));
+
+}
+void OpalSceneManager::executeLogRayTrace(HitInfo* host_hits, uint hits, uint numTransmitters) {
+	//This launch generates traces for the rays that hit after being filtered to remove duplicates
+	std::cout<<"Executing Log Ray Trace for "<<hits<<" hits"<<std::endl;
+	
+	std::cout<<"PL****"<<std::endl;
+		//Fill ray direction buffer
+		hitRays->setSize(hits);
+		optix::float3* rays_host = reinterpret_cast<optix::float3*>  (hitRays->map());
+
+		for (size_t i=0; i<hits; ++i) 
+		{
+				rays_host[i]=host_hits[i].rayDir;
+				std::cout<<i<<"\t"<<host_hits[i].rayDir<<std::endl;
+		}
+		hitRays->unmap();
+
+		//Launch
+		context->launch(OPAL_RAY_LOG_TRACE_RAY,hits,numTransmitters); //Launch 2D (hits, transmitters);
+
+		//If the printBuffer is overwritten by different threads, we can try to print in chunks, but then, we have to add the index of the hit to the launch index
+//uint hitpart=10u;
+//	uint cr=0u;
+//	uint chunks=hits/hitpart;
+//	uint remainder=hits%hitpart;
+//	for (size_t j=0; j<chunks; ++j) {
+//	std::cout<<"PL\t"<<j<<std::endl; //To get the index of the hit to be added
+//
+//		//Fill ray direction buffer
+//		hitRays->setSize(hitpart);
+//		optix::float3* rays_host = reinterpret_cast<optix::float3*>  (hitRays->map());
+//
+//		for (size_t i=0; i<hitpart; ++i) 
+//		{
+//				uint k=(j*hitpart)+i;
+//				rays_host[i]=host_hits[k].rayDir;
+//				std::cout<<k<<"\t"<<host_hits[k].rayDir<<std::endl;
+//		}
+//		hitRays->unmap();
+//
+//		//Launch
+//		context->launch(OPAL_RAY_LOG_TRACE_RAY,hits,numTransmitters); //Launch 2D (hits, transmitters);
+//	}
+//	//Remainder
+//	hitRays->setSize(remainder);
+//	optix::float3* rays_host = reinterpret_cast<optix::float3*>  (hitRays->map());
+//
+//		for (size_t i=0; i<remainder; ++i) 
+//		{
+//				uint k=(chunks*hitpart)+i;
+//				rays_host[i]=host_hits[k].rayDir;
+//				std::cout<<k<<"\t"<<host_hits[k].rayDir<<std::endl;
+//		}
+//		hitRays->unmap();
+//	std::cout<<"PL\t"<<chunks<<std::endl; //To get the index of the hit to be added
+//
+//		//Launch
+//		context->launch(OPAL_RAY_LOG_TRACE_RAY,hits,numTransmitters); //Launch 2D (hits, transmitters);
+//
+	std::cout<<"PL****"<<std::endl;
+	//Remove buffer
+	//hitRays->destroy();
+}
+#endif
 optix::Program OpalSceneManager::createClosestHitReceiver()
 {
 
@@ -597,7 +765,7 @@ optix::Program OpalSceneManager::createClosestHitReceiver()
 
 optix::Program OpalSceneManager::createBoundingBoxTriangle()
 {
-	return context->createProgramFromPTXString(ptxHandler->getPtxString(cudaProgramsDir.c_str(), "triangle.cu"), "boundsTriangle");
+	return context->createProgramFromPTXString(ptxHandler->getPtxString(cudaProgramsDir.c_str(), "optixTriangle.cu"), "boundsTriangle");
 }
 
 #ifdef OPAL_USE_TRI
@@ -610,7 +778,7 @@ optix::Program OpalSceneManager::createTriangleAttributesProgram()
 
 optix::Program OpalSceneManager::createIntersectionTriangle()
 {
-	return context->createProgramFromPTXString(ptxHandler->getPtxString(cudaProgramsDir.c_str(), "triangle.cu"), "intersectTriangle");
+	return context->createProgramFromPTXString(ptxHandler->getPtxString(cudaProgramsDir.c_str(), "optixTriangle.cu"), "intersectTriangle");
 
 }
 
@@ -627,7 +795,8 @@ optix::Program OpalSceneManager::createIntersectionSphere()
 {
 
 
-	return context->createProgramFromPTXString(ptxHandler->getPtxString(cudaProgramsDir.c_str(), "sphere.cu"), "robust_intersectSphere");
+	return context->createProgramFromPTXString(ptxHandler->getPtxString(cudaProgramsDir.c_str(), "sphere.cu"), "rtgem_intersectSphere");
+	//return context->createProgramFromPTXString(ptxHandler->getPtxString(cudaProgramsDir.c_str(), "sphere.cu"), "robust_intersectSphere");
 
 }
 
@@ -988,12 +1157,16 @@ void OpalSceneManager::addReceiver(int id, float3  position, float3 polarization
 
 
 	optix::Material mat = context->createMaterial();
-	mat->setClosestHitProgram(0u, chrx);
-	optix_materials.push_back(mat);
+	mat->setClosestHitProgram(OPAL_RAY_REFLECTION, chrx);
 
+#ifdef OPAL_LOG_TRACE
+	mat->setClosestHitProgram(OPAL_RAY_LOG_TRACE_RAY, defaultPrograms.at("closestHitReceiverLogTrace"));
+#endif
+	optix_materials.push_back(mat);
 
 	optix::GeometryInstance geom_instance = context->createGeometryInstance(geometry, optix_materials.begin(), optix_materials.end());
 
+	geom_instance->validate();
 	//We use a common program for all the receivers: individual variables must be set per geometry instance
 
 	//Add id and position to instace
@@ -1132,7 +1305,8 @@ void OpalSceneManager::updateReceiver(int id, float3 position, float radius) {
 
 
 void OpalSceneManager::transmit(int txId, float txPower,  float3 origin, float3 polarization, bool partial) {
-	
+
+	std::cout<<"Transmitting["<<txId<<"]["<<txPower<<"] at "<<origin<<std::endl;	
 	if (raySphere.rayCount <= 0) {
 		throw  opal::Exception("Scene not created. Ray count=0. Create Ray sphere before transmitting");
 	}
@@ -1191,10 +1365,9 @@ void OpalSceneManager::transmit(int txId, float txPower,  float3 origin, float3 
 void OpalSceneManager::executeTransmitLaunch(uint numTransmitters,bool partial) {
 
 	//Transmission launch
-	//std::cout<<"Transmitting["<<txId<<"]["<<txPower<<"]"<<origin<<std::endl;	
 	Timer timer;
 	timer.start();
-	context->launch(0, raySphere.elevationSteps, raySphere.azimuthSteps,numTransmitters); //Launch 3D (elevation, azimuth, transmitters);
+	context->launch(OPAL_RAY_REFLECTION, raySphere.elevationSteps, raySphere.azimuthSteps,numTransmitters); //Launch 3D (elevation, azimuth, transmitters);
 	timer.stop();
 	const double launchTime=timer.getTime();
 	transmissionLaunches++;
@@ -1228,20 +1401,84 @@ void OpalSceneManager::executeTransmitLaunch(uint numTransmitters,bool partial) 
 
 
 		processHits(host_hits.data(), host_hits.size());
+#ifdef OPAL_LOG_TRACE
+		executeLogRayTrace(host_hits.data(), host_hits.size(),numTransmitters);
+#endif
 	}
 
 }
+optix::float2 OpalSceneManager::getAngles(float3 const ray  ) {
 
-void OpalSceneManager::endPartialLaunch() {
-		processHits(partialLaunchState->getHits().data(),partialLaunchState->getHits().size());
+	const float EPSILON=1.0e-6f;
+	//Get angles from ray r=[sin(e)sin(a) cos(e) cos(a)sin(e)]
+	//Since elevation is between 0 and 180 degrees we always get the right value
+	float el=acosf(ray.y); //In radians
+	float az;
+	if ((fabs(1.0f-ray.y)<EPSILON) || (fabs(-1.0f-ray.y)<EPSILON)) {
+		//Vertical ray (elevation=0 or 180). All the azimuth angles result in the same vectors, just use 0
+
+		az=0.0f;
+	} else {
+
+		//We need to get the right quadrant
+		az=atan2f(ray.x/sinf(el),ray.z/sinf(el));//In radians	
+	}
+	return make_float2(el,az);
+}
+#ifdef OPAL_LOG_TRACE
+//Try to refine the results by launching with high sampling density in a small solid angle around previous hits (very slow and not a remarkable improvement)
+void OpalSceneManager::executePrecisionLaunch( HitInfo* host_hits, uint hits) {
+	std::vector<float3> rays;
+	//Solid angle
+	float deltaEl=0.1f;
+	float deltaAz=0.1f;
+	float asEl=0.0001f;
+	float asAz=0.0001f;
+	for (size_t i = 0; i <  hits; i++)
+	{
+		float3 ray=host_hits[i].rayDir;
+		float2 angles=getAngles(ray);
+		float eldeg=(angles.x/deg2rad);
+		float azdeg=(angles.y/deg2rad);
+		//TODO::Running per-ray launch, optimize
+		float currentElevation=eldeg-deltaEl;	
+		float currentAzimuth = azdeg-deltaAz;
+		float endElevation=eldeg +deltaEl;
+		float endAzimuth = azdeg+deltaAz;
+		float initAzimuth=currentAzimuth;
+		//Trace all elevations
+		while (currentElevation<endElevation) {
+			while(currentAzimuth<endAzimuth) {
+				std::cout<<i<<"\t"<<host_hits[i].rayDir<<". Precision launch from "<<eldeg<<","<<azdeg<<std::endl;
+				createRaySphere2D(eldeg-deltaEl,asEl,eldeg+deltaEl,azdeg-deltaAz,asAz,azdeg+deltaAz);
+				//createRaySphere2D(eldeg-deltaEl,asEl,eldeg+deltaEl,azdeg-deltaAz,asAz,azdeg+deltaAz);
+				createRaySphere2D(currentElevation,asEl,currentElevation+deltaEl,currentAzimuth,asAz,currentAzimuth+deltaAz);
+				executeTransmitLaunch(1u,true);
+				currentAzimuth +=(deltaAz/10.0f);
+			}
+			currentAzimuth=initAzimuth;
+			currentElevation += (deltaEl/10.0f);
+		}
+
+	}
+}
+#endif
+
+void OpalSceneManager::endPartialLaunch(uint numTransmitters) {
+		//executePrecisionLaunch(partialLaunchState->getHits().data(),partialLaunchState->getHits().size());
+		processHitsDebug(partialLaunchState->getHits().data(),partialLaunchState->getHits().size());
+		//processHits(partialLaunchState->getHits().data(),partialLaunchState->getHits().size());
+#ifdef OPAL_LOG_TRACE
+		executeLogRayTrace(partialLaunchState->getHits().data(),partialLaunchState->getHits().size(),numTransmitters);
+#endif
 		partialLaunchState->reset();
 }
+void OpalSceneManager::processHitsDebug(HitInfo* host_hits, uint hits) {
 
-void OpalSceneManager::processHits(HitInfo* host_hits, uint hits) {
-	float2 E=make_float2(0.0f,0.0f);
 	//** Debug
-	//float2 Ex=make_float2(0.0f,0.0f);
-	//float2 Ey=make_float2(0.0f,0.0f);
+	float2 Ex=make_float2(0.0f,0.0f);
+	float2 Ey=make_float2(0.0f,0.0f);
+	float2 Ez=make_float2(0.0f,0.0f);
 	//****
 	
 	uint index=0u;
@@ -1256,15 +1493,14 @@ void OpalSceneManager::processHits(HitInfo* host_hits, uint hits) {
 			if (host_hits->thrd.z!=index) {
 				if (raysHit!=0u) {
 					//At least one hit, callback
-					computeReceivedPower(E,index,currentTransmitter.externalId,currentTransmitter.txPower,currentTransmitter.origin,raysHit);
-					//computeReceivedPower(Ex,Ey,index,currentTransmitter.externalId,currentTransmitter.txPower,currentTransmitter.origin, raysHit);
+					computeReceivedPower(Ex,Ey,Ez,index,currentTransmitter.externalId,currentTransmitter.txPower,currentTransmitter.origin, raysHit);
 				}
 				//New receiver, start new accumulation
 				index=host_hits->thrd.z;
-				E=make_float2(0.0f,0.0f);
 			//** Debug
-			//	Ex=make_float2(0.0f,0.0f);
-			//	Ey=make_float2(0.0f,0.0f);
+				Ex=make_float2(0.0f,0.0f);
+				Ey=make_float2(0.0f,0.0f);
+				Ez=make_float2(0.0f,0.0f);
 			//****
 				raysHit=0u;
 			
@@ -1272,19 +1508,19 @@ void OpalSceneManager::processHits(HitInfo* host_hits, uint hits) {
 		}
 
 		++raysHit;
-		E += host_hits->E;
 	//** Debug
-	//	Ex += host_hits->Ex;
-	//	Ey += host_hits->Ey;
+		Ex += host_hits->Ex;
+		Ey += host_hits->Ey;
+		Ez += host_hits->Ez;
 	//****
 
 
 	// Log hits received
 //		std::cout<<"E["<<i<<"]="<<(host_hits)->E<<std::endl;
-////		std::cout<<"Ex="<<(host_hits)->Ex<<std::endl;
-////		std::cout<<"Ey="<<(host_hits)->Ey<<std::endl;
-//		std::cout<<"\t rxBufferIndex="<<(host_hits)->thrd.z<<std::endl;
-//		std::cout<<"\t written="<<(host_hits)->thrd.x<<std::endl;
+//		std::cout<<"Ex="<<(host_hits)->Ex<<std::endl;
+//		std::cout<<"Ey="<<(host_hits)->Ey<<std::endl;
+//		//std::cout<<"\t rxBufferIndex="<<(host_hits)->thrd.z<<std::endl;
+//		//std::cout<<"\t txBufferIndex="<<(host_hits)->thrd.x<<std::endl;
 //		std::cout<<"\t refhash="<<(host_hits)->thrd.y<<std::endl;
 //		std::cout<<"\t dist="<<(host_hits)->thrd.w<<std::endl;
 ////	
@@ -1302,12 +1538,58 @@ void OpalSceneManager::processHits(HitInfo* host_hits, uint hits) {
 	}
 	//Last one
 	if (raysHit!=0u) {
-		computeReceivedPower(E,index,currentTransmitter.externalId,currentTransmitter.txPower,currentTransmitter.origin,raysHit);
-		//computeReceivedPower(Ex,Ey,index,currentTransmitter.externalId,currentTransmitter.txPower,currentTransmitter.origin, raysHit);
+		computeReceivedPower(Ex,Ey,Ez,index,currentTransmitter.externalId,currentTransmitter.txPower,currentTransmitter.origin, raysHit);
 	}	
 	//timer.stop();
 }
-void OpalSceneManager::computeReceivedPower(optix::float2 Ex, optix::float2 Ey, unsigned int index, int txId, float txPower, optix::float3 origin, uint raysHit) {
+
+void OpalSceneManager::processHits(HitInfo* host_hits, uint hits) {
+
+	float2 E=make_float2(0.0f,0.0f);
+	
+	uint index=0u;
+	uint raysHit=0u;
+
+	for (uint i=0; i<hits; i++) {
+		if (i==0) {
+			//Get first receiver
+			index=host_hits->thrd.z;
+
+		} else {
+			if (host_hits->thrd.z!=index) {
+				if (raysHit!=0u) {
+					//At least one hit, callback
+					computeReceivedPower(E,index,currentTransmitter.externalId,currentTransmitter.txPower,currentTransmitter.origin,raysHit);
+				}
+				//New receiver, start new accumulation
+				index=host_hits->thrd.z;
+				E=make_float2(0.0f,0.0f);
+				raysHit=0u;
+			
+			}
+		}
+
+		++raysHit;
+		E += host_hits->E;
+
+
+	// Log hits received
+//		std::cout<<"E["<<i<<"]="<<(host_hits)->E<<std::endl;
+//		std::cout<<"\t rxBufferIndex="<<(host_hits)->thrd.z<<std::endl;
+//		std::cout<<"\t transmitter="<<(host_hits)->thrd.x<<std::endl;
+//		std::cout<<"\t refhash="<<(host_hits)->thrd.y<<std::endl;
+//		std::cout<<"\t dist="<<(host_hits)->thrd.w<<std::endl;
+
+		++host_hits;
+
+	}
+	//Last one
+	if (raysHit!=0u) {
+		computeReceivedPower(E,index,currentTransmitter.externalId,currentTransmitter.txPower,currentTransmitter.origin,raysHit);
+	}	
+}
+//Mainly for debug
+void OpalSceneManager::computeReceivedPower(optix::float2 Ex, optix::float2 Ey, optix::float2 Ez, unsigned int index, int txId, float txPower, optix::float3 origin, uint raysHit) {
 	//float power = defaultChannel.eA*((E.x*E.x) + (E.y*E.y))*txPower;
 //	float power = ((E.x*E.x) + (E.y*E.y));
 //	std::cout << "rx["<<receivers[index]->externalId<<"]=" << receivers[index]->position << ".r=" << receivers[index]->radius << "(sphere="<<receivers[index]->geomInstance["sphere"]->getFloat4()<<"); tx["<<txId<<"]=" << origin << " eA=" << defaultChannel.eA << " txPower=" << txPower << " E=(" << E.x << "," << E.y << ")" << " p=" << power <<  " d=" << length(origin - receivers[index]->position) << std::endl;
@@ -1317,8 +1599,9 @@ void OpalSceneManager::computeReceivedPower(optix::float2 Ex, optix::float2 Ey, 
 //	std::cout<<"PH\t"<<atan2f(E.y,E.x)<<"\t"<<receivers[index]->externalId<<"\t"<<receivers[index]->position.x<< std::endl;
 	//receivers[index]->callback(power, txId);
 	//E
-	std::cout<<"ERH\t"<<Ex.x<<"\t"<<Ex.y<<"\t"<<receivers[index]->externalId<<"\t"<<receivers[index]->position.y<<"\t"<<raysHit<< std::endl;
-	std::cout<<"ERV\t"<<Ey.x<<"\t"<<Ey.y<<"\t"<<receivers[index]->externalId<<"\t"<<receivers[index]->position.y<<"\t"<<raysHit<< std::endl;
+	std::cout<<"ERX\t"<<Ex.x<<"\t"<<Ex.y<<"\t"<<receivers[index]->externalId<<"\t"<<receivers[index]->position.x<<"\t"<<receivers[index]->position.y<<"\t"<<receivers[index]->position.z<<"\t"<<raysHit<< std::endl;
+	std::cout<<"ERY\t"<<Ey.x<<"\t"<<Ey.y<<"\t"<<receivers[index]->externalId<<"\t"<<receivers[index]->position.x<<"\t"<<receivers[index]->position.y<<"\t"<<receivers[index]->position.z<<"\t"<<raysHit<< std::endl;
+	std::cout<<"ERZ\t"<<Ez.x<<"\t"<<Ez.y<<"\t"<<receivers[index]->externalId<<"\t"<<receivers[index]->position.x<<"\t"<<receivers[index]->position.y<<"\t"<<receivers[index]->position.z<<"\t"<<raysHit<< std::endl;
 
 }
 
@@ -1329,12 +1612,10 @@ void OpalSceneManager::computeReceivedPower(optix::float2 E, unsigned int index,
 	//Call callbacks...add your own
 	receivers[index]->callback(power, txId);
 	//Power
-	std::cout<<"PR\t"<<power<<"\t"<<receivers[index]->externalId<<"\t"<<receivers[index]->position.x<<"\t"<<receivers[index]->position.y <<"\t"<<raysHit<< std::endl;
-	//Phase
-	//std::cout<<"PH\t"<<atan2f(E.y,E.x)<<"\t"<<receivers[index]->externalId<<"\t"<<receivers[index]->position.x<<"\t"<<receivers[index]->position.y <<std::endl;
+	std::cout<<"PR\t"<<power<<"\t"<<receivers[index]->externalId<<"\t"<<receivers[index]->position.x<<"\t"<<receivers[index]->position.y <<"\t"<<receivers[index]->position.z<<"\t"<<raysHit<< std::endl;
 	
 	//E
-	std::cout<<"ER\t"<<E.x<<"\t"<<E.y<<"\t"<<receivers[index]->externalId<<"\t"<<receivers[index]->position.x<<"\t"<<receivers[index]->position.y<<"\t"<<raysHit<<  std::endl;
+	std::cout<<"ER\t"<<E.x<<"\t"<<E.y<<"\t"<<receivers[index]->externalId<<"\t"<<receivers[index]->position.x<<"\t"<<receivers[index]->position.y<<"\t"<<receivers[index]->position.z<<"\t"<<raysHit<<  std::endl;
 
 }
 
@@ -1372,6 +1653,11 @@ void OpalSceneManager::setInternalBuffers() {
 	globalHitInfoBuffer = setGlobalHitInfoBuffer(elevationSize, azimuthSize, rxSize, reflectionsSize);
 	atomicIndexBuffer=setAtomicIndexBuffer();
 	txOriginBuffer=setTransmitterBuffer(1u);	
+#ifdef OPAL_LOG_TRACE
+	//Create ray direction buffer. Set it to one at the moment because we do not know the number of hits: resized later
+	hitRays = context->createBuffer(RT_BUFFER_INPUT, RT_FORMAT_FLOAT3, 1u);
+	context["hitRays"]->set(hitRays);
+#endif
 }
 
 
@@ -1425,6 +1711,7 @@ optix::Buffer OpalSceneManager::setGlobalHitInfoBuffer(optix::uint ele, optix::u
 //	//We use a fraction of the available memory. Assuming here that all the devices have the same memory...
 	uint bsize=floor(fractionMemGlobalBufferSize*bytes/(sizeof(HitInfo)*enabledDevices.size()));
 	std::cout<<"-- Creating global buffer: available "<<enabledDevices.size()<<" devices with total device memory   "<<(bytes/(1024*1024))<<" MiB. globalHitBuffer  size (MiB)="<<((bsize*sizeof(HitInfo))/(1024*1024))<<std::endl;
+	std::cout<<"-- Global buffer: size of HitInfo= "<<sizeof(HitInfo)<<". Maximum number of hits per buffer=   "<<bsize<< std::endl;
 	optix::Buffer b;
 	b = context->createBuffer(RT_BUFFER_INPUT_OUTPUT | RT_BUFFER_GPU_LOCAL, RT_FORMAT_USER, bsize );
 	b->setElementSize(sizeof(HitInfo));
@@ -1525,11 +1812,20 @@ void OpalSceneManager::finishSceneContext() {
 		context["usePenetration"]->setUint(0u);
 	}
 	context["attenuationLimit"]->setFloat(attenuationLimit);
+		
 
-	context->setRayGenerationProgram(0, defaultPrograms.at("rayGeneration")); //Generation
-	context->setMissProgram(0, defaultPrograms.at("miss"));
+	context->setRayGenerationProgram(OPAL_RAY_REFLECTION, defaultPrograms.at("rayGeneration")); //Generation
+	context->setMissProgram(OPAL_RAY_REFLECTION, defaultPrograms.at("miss"));
+	
+	#ifdef OPAL_LOG_TRACE
+	context->setRayGenerationProgram(OPAL_RAY_LOG_TRACE_RAY, defaultPrograms.at("rayGenerationLogTrace")); //Generation
+	context->setMissProgram(OPAL_RAY_LOG_TRACE_RAY, defaultPrograms.at("missLogTrace"));
+
+	#endif
+
+
+	std::cout<<"Validating the context ..."<< std::endl;
 	context->validate();
-	context->setExceptionEnabled(RT_EXCEPTION_ALL, true);
 	sceneFinished = true;
 	std::cout<<"--- Check your configuration and assumptions --"<<std::endl;
 	configInfo<<printSceneReport();
@@ -1586,12 +1882,16 @@ std::string opal::OpalSceneManager::printSceneReport()  {
 void opal::OpalSceneManager::setPrintEnabled(int bufferSize)
 {
 
-	context->setPrintEnabled(true);
-	context->setPrintBufferSize(bufferSize);
-	std::cout << "printEnabled" << std::endl;
-	//Set a particular print index. Comment out if necessary
-	//context->setPrintLaunchIndex(550,1050,0);
-	//std::cout<<"Showing launch index [550,1050,0]"<<std::endl;
+	if (context) {
+		context->setPrintEnabled(true);
+		context->setPrintBufferSize(bufferSize);
+		std::cout << "printEnabled" << std::endl;
+		//Set a particular print index. Comment out if necessary
+		//context->setPrintLaunchIndex(550,1050,0);
+		//std::cout<<"Showing launch index [550,1050,0]"<<std::endl;
+	} else {
+		throw  opal::Exception("Called printEnabled() before creating contex");
+	}
 
 }
 void OpalSceneManager::setUsageReport()

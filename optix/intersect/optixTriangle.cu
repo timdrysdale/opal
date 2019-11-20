@@ -4,11 +4,9 @@
 //
 /**************************************************************/
 
-
-//Adapted from OptiX samples
-
+//License from NVIDIA parts
 /*
- * Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2016, NVIDIA CORPORATION. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -35,14 +33,15 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-
+#include "../../Common.h"
 #include <optix.h>
 #include <optixu/optixu_math_namespace.h>
-#include "../Common.h"
+#include <optixu/optixu_aabb_namespace.h>
+
+//#include <cmath>
 using namespace optix;
 
-rtDeclareVariable(optix::Ray, ray, rtCurrentRay, );
-
+//For Optix 5.x
 //Mesh buffers
 rtBuffer<float3> vertex_buffer;
 rtBuffer<int3>   index_buffer;
@@ -50,34 +49,45 @@ rtBuffer<uint> faceId_buffer;
 
 rtDeclareVariable(TriangleHit, int_triangle_data, attribute triangle_hit_data, );
 
-
-RT_PROGRAM void triangle_attributes()
+RT_PROGRAM void intersectTriangle(int primIdx)
 {
-	const unsigned int primIdx = rtGetPrimitiveIndex();
-	const int3   v_idx = index_buffer[primIdx];
-	const float3 p0    = vertex_buffer[v_idx.x];
-	const float3 p1    = vertex_buffer[v_idx.y];
-	const float3 p2    = vertex_buffer[v_idx.z];
-	const float3 e0 = p1 - p0;
-	const float3 e1 = p0 - p2;
-	const float3 n  = cross( e1, e0 );
+	const int3 v_idx = index_buffer[primIdx];
 
-	const float3 e2 = ( 1.0f / dot( n, ray.direction ) ) * ( p0 - ray.origin );
-	//const float3 i  = cross( ray.direction, e2 );
+	const float3 p0 = vertex_buffer[v_idx.x];
+	const float3 p1 = vertex_buffer[v_idx.y];
+	const float3 p2 = vertex_buffer[v_idx.z];
 
-	//beta  = dot( i, e1 );
-	//gamma = dot( i, e0 );
-	TriangleHit h;
-	//h.t = dot(n,e2);
-	h.triId = primIdx;
+	// Intersect ray with triangle
+	float3 normal;
+	float  t, beta, gamma;
 
-	h.geom_normal_t=make_float4(n.x,n.y,n.z,dot(n,e2));
-	//h.geom_normal=n;
-
-	h.faceId = faceId_buffer[primIdx];
+	//rtPrintf("PreIntersection idx=%d ray=(%f,%f,%f)", primIdx, ray.direction.x, ray.direction.y, ray.direction.z);
+	if (intersect_triangle(ray, p0, p1, p2, normal, t, beta, gamma))
+	{
+		if (rtPotentialIntersection(t))
+		{
+			TriangleHit h;
+			h.triId = primIdx;
+			h.geom_normal_t = make_float4(normal.x,normal.y,normal.z,t);
+			h.faceId = faceId_buffer[primIdx];
 
 
-	int_triangle_data = h;
+			int_triangle_data = h;
+			//rtPrintf("Intersection idx=%d ray=(%f,%f,%f)", primIdx, ray.direction.x, ray.direction.y, ray.direction.z);
+			rtReportIntersection( /*material index*/ 0);
+		}
+	}
+}
+RT_PROGRAM void boundsTriangle(int primIdx, float result[6])
+{
+	const int3 v_idx = index_buffer[primIdx];
 
+	const float3 p0 = vertex_buffer[v_idx.x];
+	const float3 p1 = vertex_buffer[v_idx.y];
+	const float3 p2 = vertex_buffer[v_idx.z];
+
+	optix::Aabb* aabb = (optix::Aabb*)result;
+	aabb->m_min = fminf(fminf(p0, p1), p2);
+	aabb->m_max = fmaxf(fmaxf(p0, p1), p2);
 }
 

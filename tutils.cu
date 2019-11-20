@@ -204,6 +204,7 @@ thrust::host_vector<HitInfo> filterHitsAndTransferMultiGPU( optix::Buffer hitBuf
 			//Get device pointer to global buffer (per GPU)
 			raw_ptrs[i]=static_cast<HitInfo*>( hitBuffer->getDevicePointer(devices[i]));
 			dev_ptrs[i]=thrust::device_pointer_cast(raw_ptrs[i]);
+			std::cout<<"filterHitsMultiGPU(): s="<<s<<std::endl;
 			if (s>=maxGlobalBufferSize) {
 				throw opalthrustutils::Exception("filterHitsMultiGPU(): globalHitBuffer overflow");
 			
@@ -260,7 +261,7 @@ thrust::host_vector<HitInfo> filterHitsAndTransferMultiGPU( optix::Buffer hitBuf
 			//std::cout<<"vt.size="<<vt->size()<<"hits="<<(new_end-vt->begin())<<std::endl;
 			return (new_end-vt->begin());
 		} else {
-			//std::cout<<"Large Memory: previousSize="<<previousSize<<"memory="<<(previousSize*sizeof(HitInfo)/(1024.f*1024.f))<<" MiB; totalHitsSize="<<totalHitsSize<<"total memory for hits="<<(sizeof(HitInfo)*totalHitsSize/(1024.f*1024.f))<<" MiB"<<std::endl;
+			std::cout<<"Large Memory: previousSize="<<previousSize<<"memory="<<(previousSize*sizeof(HitInfo)/(1024.f*1024.f))<<" MiB; totalHitsSize="<<totalHitsSize<<"total memory for hits="<<(sizeof(HitInfo)*totalHitsSize/(1024.f*1024.f))<<" MiB"<<std::endl;
 			
 			//Large number of hits, process in chunks
 			//Create chunks per device

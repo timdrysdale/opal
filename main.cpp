@@ -27,7 +27,7 @@ int main(int argc, char** argv)
 	try {
 
 		//std::cout << "Initializing " << std::endl;
-		float freq = 900e6f;
+		float freq = 5.9e9f;
 
 		//Defaults	
 		uint maxReflections=10u;
@@ -45,7 +45,7 @@ int main(int argc, char** argv)
 
 		int c;
 		int nr;
-		while ((c = getopt (argc, argv, "r:pscdagmh")) != -1) {
+		while ((c = getopt (argc, argv, "r:pscdagmu:h")) != -1) {
 			switch (c) {
 				case 'r':
 					//std::cout<<optarg<<std::endl;
@@ -124,11 +124,16 @@ int main(int argc, char** argv)
 		//Finally, init context
 		sceneManager->initContext(freq,useExactSpeedOfLight);
 		
+		
 		//Now, set additional utilities
 		//sceneManager->setUsageReport();
+		if (printEnabled) {
+			sceneManager->setPrintEnabled(1024 * 1024 * 1024);	
+		}
+
 		
-		//Finally, run the test
-		sceneManager = cubeTunnel(std::move(sceneManager), printEnabled,subSteps);
+		//Finally, run the one test
+		sceneManager = cubeTunnel(std::move(sceneManager));
 		//sceneManager = polarizationPlaneTest(std::move(sceneManager), printEnabled,subSteps);
 
 

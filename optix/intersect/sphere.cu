@@ -35,7 +35,7 @@
 * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include "../Common.h"
+#include "../../Common.h"
 #include <optixu/optixu_math_namespace.h>
 #include <optixu/optixu_aabb_namespace.h>
 using namespace optix;
@@ -132,6 +132,55 @@ RT_PROGRAM void intersectSphere(int primIdx)
 RT_PROGRAM void robust_intersectSphere(int primIdx)
 {
 	intersect_sphere<true>();
+}
+RT_PROGRAM void rtgem_intersectSphere(int primIdx) {
+	float3 center = make_float3(sphere);
+	float3 f = ray.origin - center;
+	float3 d = ray.direction; 
+	float radius = sphere.w;
+	//float a=dot(d,d); Removed because we assume the ray direction is already normalized
+
+	float b=-1.0f*dot(f,d);
+	float3 aux=f+(b*d);
+	float rsq=radius*radius;
+	float disc=rsq - dot(aux,aux);
+	if (disc > 0.0f) { //A tangential hit is not considered a hit
+		float c=dot(f,f)-rsq;
+		float s=((b > 0) ? 1.0f : -1.0f); 
+		float q=b+(s*sqrt(disc));
+		float t=c/q;
+		bool check_second = true;
+		if (rtPotentialIntersection(t)) {
+			//rtPrintf("s=%f,q=%f,t=%f\n",s,q,t);
+			//shading_normal = geometric_normal = (O + (root1 + root11)*D) / radius;
+			SphereHit h;
+//			h.t = t;
+//			h.geom_normal = (O + (root1 + root11)*D) / radius;
+			float3 gn = (f + (t*d)) / radius;		
+			//packed version
+			h.geom_normal_t=make_float4(gn.x,gn.y,gn.z,t);
+
+			hit_attr = h;
+			//Only one material. Change here if more materials used
+			if (rtReportIntersection(0)) {
+				check_second = false;
+			}
+		}
+		if (check_second) {
+			t=q;	
+			if (rtPotentialIntersection(t)) {
+				SphereHit h;
+				//rtPrintf("2s=%f,q=%f,t=%f\n",s,q,t);
+				float3 gn2 = (f + (t*d)) / radius;		
+				//Packed version
+				h.geom_normal_t=make_float4(gn2.x,gn2.y,gn2.z,t);
+				hit_attr = h;
+				//Only one material. Change here if more materials used
+				rtReportIntersection(0);
+			}
+		}
+	}
+
 }
 
 

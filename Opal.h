@@ -148,6 +148,8 @@ namespace opal {
 	class OpalSceneManager {
 		protected:
 			//Source directory in SDK, used by sutil to find .cu programs
+			std::string baseDir;
+			std::string optixProgramsDir;
 			std::string cudaProgramsDir;
 			
 			optix::Context context;
@@ -174,6 +176,7 @@ namespace opal {
 		
 			bool sceneGraphCreated;
 			bool sceneFinished;
+			bool contextInitialized;
 			int transmissionLaunches;
 			RaySphere raySphere;
 			ChannelParameters defaultChannel;
@@ -272,9 +275,10 @@ namespace opal {
 			void setMinEpsilon(float f);
 			void enableFastMath();
 			void disableFastMath();
-
 			
-			void endPartialLaunch();
+			void setBaseDir(std::string b);
+			
+			void endPartialLaunch(uint numTransmitters);
 			
 			void enableExceptions();
 		//Log
@@ -295,7 +299,7 @@ namespace opal {
 
 		//Default programs
 			void setDefaultPrograms();
-			optix::Material createMeshMaterial(unsigned int ray_type_index, optix::Program closestHitProgram);
+			optix::Material createDefaultMeshMaterial(unsigned int ray_type_index, optix::Program closestHitProgram);
 
 			optix::Program createClosestHitMesh();
 
@@ -316,12 +320,20 @@ namespace opal {
 			virtual optix::Program createMissProgram();
 
 			virtual optix::Program createRayGenerationProgram();
-
+		#ifdef OPAL_LOG_TRACE
+			void createLogTracePrograms();
+			//This launch generates traces for the rays that hit after being filtered to remove duplicates
+			void executeLogRayTrace(HitInfo* host_hits, uint hits, uint numTransmitters);
+			optix::Buffer hitRays;
+			void executePrecisionLaunch( HitInfo* host_hits, uint hits) ;
+		#endif
 
 		//Launches 
 			void executeTransmitLaunch(uint numTransmitters, bool partial);
+
 		//Hits processing
 			virtual void  processHits(HitInfo* host_hits, uint hits);
+			virtual void  processHitsDebug(HitInfo* host_hits, uint hits);
 
 		//Internal buffers
 			virtual void setInternalBuffers();
@@ -333,10 +345,11 @@ namespace opal {
 			optix::Buffer setTransmitterBuffer(optix::uint tx);
 
 		//Utils
+			optix::float2 getAngles(float3 const ray);
 			static void callbackUsageReport(int level, const char* tag, const char* msg, void* cbdata);
 		//Compute power or any other quantity you need. Add your own
 			void computeReceivedPower(optix::float2 E, unsigned int index, int txId, float txPower, optix::float3 origin, uint raysHit);
-			void computeReceivedPower(optix::float2 Ex, optix::float2 Ey, unsigned int index, int txId, float txPower, optix::float3 origin, uint raysHit);
+			void computeReceivedPower(optix::float2 Ex, optix::float2 Ey, optix::float2 Ez, unsigned int index, int txId, float txPower, optix::float3 origin, uint raysHit);
 	};
 
 

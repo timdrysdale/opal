@@ -38,7 +38,7 @@
 
 #include <optix.h>
 #include <optixu/optixu_math_namespace.h>
-#include "Common.h"
+#include "../../Common.h"
 using namespace optix;
 
 rtDeclareVariable(optix::Ray, ray, rtCurrentRay, );
@@ -76,6 +76,10 @@ RT_PROGRAM void triangle_attributes()
 
 	h.faceId = faceId_buffer[primIdx];
 
+	//Get hitpoint from barycentrics
+	const float2 bar=rtGetTriangleBarycentrics();
+	const float3 hp=(1.0f -bar.x -bar.y)*p0 + bar.x*p1 + bar.y*p2;
+	h.hp=hp;
 
 	int_triangle_data = h;
 

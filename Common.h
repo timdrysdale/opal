@@ -3,20 +3,45 @@
 //Copyright (c) 2019 Esteban Egea-Lopez http://ait.upct.es/eegea
 //
 /**************************************************************/
+//
+// Common definitions shared by host and device code
+//
 
 #ifndef COMMON_H
 #define COMMON_H
 
 #define GLOBALHITBUFFEROVERFLOW RT_EXCEPTION_USER + 0
-//Comment out if using Optix 5.1
+
+//ONLY Comment out if using Optix 5.1
 #define OPAL_USE_TRI 
 
-#include <optixu/optixu_math_namespace.h>
-//
-// Common definitions shared by host and device code
-//
+//Use to generate traces of the rays that make the incident electric field (rays that have hit, after filtering)
+//Need an external script to process the traces
+//#define OPAL_LOG_TRACE
 
-// Use our own complex arithmetic
+
+//Use it to avoid self intersections
+//See https://www.realtimerendering.com/raytracinggems/ 6.1
+//But this is going to introduce some small precision errors in the computed electric field, since the ray lengths are modified due to the displacement
+//If you do not need very high accuracy (which is the usual) you can  uncomment it
+//Otherwise keep it, but then you have to tune minEpsilon, which is not scale-invariant. If your simulation gets stuck in a launch, try uncommenting it.
+//If it is no longer stuck but you need high precision, comment it again an tune minEpsilon until it is removed.
+
+//#define OPAL_AVOID_SI
+
+
+
+
+//Flags and variables
+#define FLAG_NONE 0
+#define FLAG_END 1
+
+#define OPAL_RAY_REFLECTION 0u
+#define OPAL_RAY_LOG_TRACE_RAY 1u 
+
+
+#include <optixu/optixu_math_namespace.h>
+
 
 struct MaterialEMProperties {
 	optix::float2 dielectricConstant; // Complex
@@ -28,17 +53,20 @@ struct HitInfo {
 	optix::uint4 thrd; // [txBufferIndex,refhash,rxBufferIndex,distance] 
 	optix::float2 E;   // Incident electric field or induced voltage on the antenna. Complex 
 	//For debug only
-//	optix::float3 h;
-//	optix::float3 v;
-//	optix::uint3 in; //launchIndex 
+	//	optix::float3 h;
+	//	optix::float3 v;
+	//	optix::uint3 in; //launchIndex 
 	//optix::float4 lh; //LastHitPoint,d
 	//optix::uint r; //reflections
-//	optix::float2 Ex;   // Complex
-//	optix::float2 Ey;   // Complex
-//	optix::float2 Rn;   // Complex
-//	optix::float2 Rp;   // Complex
-	
-	
+	optix::float2 Ex;   // Complex
+	optix::float2 Ey;   // Complex
+	optix::float2 Ez;   // Complex
+	//	optix::float2 Rn;   // Complex
+	//	optix::float2 Rp;   // Complex
+
+#ifdef OPAL_LOG_TRACE
+	optix::float3 rayDir; //Used for visualization
+#endif 	
 	//Equality operator: used by thrust::unique. Hits are equal if  the transmitter  and the receiver is the same and  the combined hash is equal, that is, they have hit the same sequence of faces. We get
 	//the closest one because we have previously sorted the sequence
 	__forceinline__  __device__ bool operator==(const HitInfo &h) const {
@@ -64,56 +92,43 @@ struct HitInfo {
 
 
 
-//TODO:Pack these structures as suggested in documentation
+
+
+
 
 
 //Ray payloads
 
+struct BaseReflectionPayload {
+	optix::float4 ndtd; //Packed next direction and total distance [nextDirection.x,nextDirection.y,nextDirection.z,totalDistance]
+	optix::float4 lrhpd; //Packed lastReflectionHitPoint and totalDistanceTillLastReflection [lastReflectionHitPoint.x,lastReflectionHitPoint.y,lastReflectionHitPoint.z, totalDistanceTillLastReflection]
+	optix::float4 hitPointAtt; //Packed hitPoint and attenuation [hitPoint.x,hitPoint.y,hitPoint.z,att]
+	optix::uint4 rhfr; //Packed [reflections,hits,flags,refhash]
+#ifdef OPAL_AVOID_SI
+	optix::float3 lastNormal;
+#endif
+#ifdef OPAL_LOG_TRACE
+	optix::float3 initialRayDir;
+#endif
+};
 
-
-
-#define FLAG_NONE 0
-#define FLAG_END 1
 
 //Used for pure Horizontally or Vertically polarized waves. polarization should only be horizontal or vertical with respect to the environment
 //Order matters: using CUDA vector alignment rules: https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#vector-types__alignment-requirements-in-device-code
-struct HVWavePayload {
-	optix::float4 ndtd; //Packed next direction and total distance [nextDirection.x,nextDirection.y,nextDirection.z,totalDistance]
-	//Unpacked version
-	//optix::float3 nextDirection;
-	//float totalDistance;
-	optix::float4 lrhpd; //Packed lastReflectionHitPoint and totalDistanceTillLastReflection [lastReflectionHitPoint.x,lastReflectionHitPoint.y,lastReflectionHitPoint.z, totalDistanceTillLastReflection]
-	//Unpacked version
-	//optix::float3 lastReflectionHitPoint;
-	//float totalDistanceTillLastReflection;
+struct HVWavePayload :  BaseReflectionPayload {
 	optix::float2 prodReflectionCoefficient; // Accumulated product of reflection coefficients. Complex
-	optix::float3 hitPoint;
+	//TODO: pack the fields below
 	optix::float3 polarization;
-	float accumulatedAttenuation; //For penenetration, in dB (Power)
 	float electricFieldAmplitude; //Can be removed if antenna gain not used
-	int reflections;
-	int hits;
-	int flags; //Better to use int with flags (bool is system dependent), 
-	unsigned int refhash; //Combined hash to filter duplicates
 };
 
 //Used for arbitrary linear polarizations (LP) (given by a float3)
-//Order matters: using CUDA vector alignment rules: https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#vector-types__alignment-requirements-in-device-code
-struct LPWavePayload {
-	//Copy common fields. I do not see the need for inheritance here yet
-	optix::float4 ndtd; //Packed next direction and total distance [nextDirection.x,nextDirection.y,nextDirection.z,totalDistance]
-	optix::float4 lrhpd; //Packed lastReflectionHitPoint and totalDistanceTillLastReflection [lastReflectionHitPoint.x,lastReflectionHitPoint.y,lastReflectionHitPoint.z, totalDistanceTillLastReflection]
+struct LPWavePayload : BaseReflectionPayload {
 	optix::float2 hor_coeff; //Complex 
 	optix::float2 ver_coeff; //Complex 
-	optix::float3 hor_v;
-	optix::float3 ver_v; 
-	optix::float3 hitPoint;
+	optix::float3 hor_v; //'Vertical' vector of the electric field
+	optix::float3 ver_v; //'Horizontal' vector of the electric field 
 	float electricFieldAmplitude; //Can be removed if antenna gain not used
-	float accumulatedAttenuation; //For penentration, in dB (Power)
-	int hits;
-	int reflections;
-	int flags;
-	unsigned int refhash; //Combined hash to filter duplicates
 };
 
 struct Transmitter {
@@ -125,13 +140,14 @@ struct Transmitter {
 };
 
 struct TriangleHit {
-	optix::float4 geom_normal_t; //Pack normal and t [geom_normal.x,geom_normal.y,geom_normal.z,t] 
+	optix::float4 geom_normal_t; //Packed normal and t [geom_normal.x,geom_normal.y,geom_normal.z,t] 
+	optix::float3 hp;
 	int triId;
 	unsigned int faceId;
 };
 
 struct SphereHit {
-	optix::float4 geom_normal_t; //Pack normal and t [geom_normal.x,geom_normal.y,geom_normal.z,t] 
+	optix::float4 geom_normal_t; //Packed normal and t [geom_normal.x,geom_normal.y,geom_normal.z,t] 
 };
 
 //Directly copied from boost
@@ -141,5 +157,30 @@ inline void hash_combine_impl(SizeT &seed, SizeT value) {
 }
 
 
+#ifdef OPAL_AVOID_SI
+
+	//To avoid self-intersection, shift the ray along the geometric normal of the last intersection
+	//This should be enough to get rid of minEpsilon, which is not scale-invariant
+	//See https://www.realtimerendering.com/raytracinggems/ 6.1
+	
+	// constexpr __device__  float origin()      { return 1.0f / 32.0f; } 
+	// constexpr __device__  float float_scale() { return 1.0f / 65536.0f; } 
+	// constexpr __device__  float int_scale()   { return 256.0f; }    
+	
+	#define ORIGIN 1.0f/32.0f
+	#define FLOAT_SCALE 1.0f/65536.0f
+	#define INT_SCALE 256.0f
+	// Normal points outward for rays exiting the surface, else is flipped. 
+	
+	__forceinline__ __device__ float3 offset_ray(const float3 p, const float3 n)  {   
+		int3 of_i=make_int3(INT_SCALE * n.x, INT_SCALE * n.y, INT_SCALE * n.z); 
+		float3 p_i=make_float3(optix::int_as_float(optix::float_as_int(p.x)+((p.x < 0) ? -of_i.x : of_i.x)), 
+				optix::int_as_float(optix::float_as_int(p.y)+((p.y < 0) ? -of_i.y : of_i.y)), 
+				optix::int_as_float(optix::float_as_int(p.z)+((p.z < 0) ? -of_i.z : of_i.z))); 
+		return make_float3(fabsf(p.x) < ORIGIN ? p.x+FLOAT_SCALE*n.x : p_i.x, fabsf(p.y) < ORIGIN ? p.y+FLOAT_SCALE*n.y : p_i.y, fabsf(p.z) < ORIGIN ? p.z+FLOAT_SCALE*n.z : p_i.z); 
+	}
+	
 #endif
+
+#endif //COMMON_H
 

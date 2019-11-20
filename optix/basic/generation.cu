@@ -5,8 +5,8 @@
 /**************************************************************/
 
 
-#include "Common.h"
-#include "traceFunctions.h"
+#include "../../Common.h"
+#include "../../traceFunctions.h"
 #include <optix_world.h>
 #include <optixu/optixu_math_namespace.h>
 #include <optixu/optixu_aabb_namespace.h>
@@ -57,22 +57,28 @@ RT_PROGRAM void genRayAndReflectionsFromSphereIndex()
 	rayPayload.ndtd = optix::make_float4(0.0f);
 	//rayPayload.nextDirection = optix::make_float3(0, 0, 0);
 	//rayPayload.totalDistance = 0.0f;
-	rayPayload.hitPoint = origin;
+	rayPayload.hitPointAtt =make_float4(origin);
+	rayPayload.hitPointAtt.w=0.0f;
+	//rayPayload.hitPoint = origin;
 	rayPayload.polarization = tx.polarization;
 	rayPayload.lrhpd = make_float4(origin);
 	rayPayload.lrhpd.w = 0.0f; //totalDistanceTillLastReflection
 	rayPayload.electricFieldAmplitude = 1.0f; //Normalized Eo=1. Antenna Gain = 1. TODO: Implement antenna gain with buffer dependent on the ray direction and txId : initialEFAmplitude[txId] * antennaGain[txId]);
-	rayPayload.accumulatedAttenuation=0.0f;
-	rayPayload.reflections = 0;
-	rayPayload.hits = 0;
-	rayPayload.flags = FLAG_NONE;	
+	//rayPayload.accumulatedAttenuation=0.0f;
+	//rayPayload.reflections = 0;
+	//rayPayload.hits = 0;
+	//rayPayload.flags = FLAG_NONE;	
 	rayPayload.prodReflectionCoefficient = make_float2(1.0f, 0.0f);
-	rayPayload.refhash=0;
+	//rayPayload.refhash=0;
+	rayPayload.rhfr=make_uint4(0u,0u,FLAG_NONE,0u);
+#ifdef OPAL_LOG_TRACE
+	rayPayload.initialRayDir=ray_direction;
+#endif
 	
 	//Print all rays generated
 	//rtPrintf("A\t%u\t%u\t%f\t%f\t%f\n", launchIndex.x, launchIndex.y, ray_direction.x, ray_direction.y, ray_direction.z);
 
-	traceReflection(rayPayload, origin, ray_direction);
+	traceReflection<HVWavePayload>(rayPayload,OPAL_RAY_REFLECTION, origin, ray_direction, launchIndex.x,launchIndex.y);
 
 }
 

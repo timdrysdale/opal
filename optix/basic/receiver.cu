@@ -5,8 +5,8 @@
 /**************************************************************/
 
 
-#include "Common.h"
-#include "Complex.h"
+#include "../../Common.h"
+#include "../../Complex.h"
 #include <optix_world.h>
 #include <optixu/optixu_math_namespace.h>
 #include <optixu/optixu_aabb_namespace.h>
@@ -53,13 +53,23 @@ RT_PROGRAM void closestHitReceiver()
 
 	//Update ray data
 	const float rayLength = hit_attr.geom_normal_t.w;
-	hitPayload.hitPoint = ray_receiver.origin + rayLength*ray_receiver.direction;
+	const float3 hitPoint = ray_receiver.origin + rayLength*ray_receiver.direction;
+	//hitPayload.hitPoint=hitPoint;
+	hitPayload.hitPointAtt.x=hitPoint.x;
+	hitPayload.hitPointAtt.y=hitPoint.y;
+	hitPayload.hitPointAtt.z=hitPoint.z;
 	const float aux= hitPayload.ndtd.w; //Previous total distance
 	hitPayload.ndtd = make_float4(ray_receiver.direction); //Next direction only
 	hitPayload.ndtd.w = aux+ rayLength; //totalDistance 
 
 	const uint txBufferIndex=receiverLaunchIndex.z;
 	const Transmitter current_tx=txBuffer[txBufferIndex];
+	float3 prx = make_float3(sphere.x, sphere.y, sphere.z);
+#ifdef OPAL_AVOID_SI
+
+	hitPayload.lastNormal=make_float3(hit_attr.geom_normal_t.x,hit_attr.geom_normal_t.y,hit_attr.geom_normal_t.z);
+	//hitPayload.lastNormal=normalize(hitPoint-prx);
+#endif
 
 	//Check if ray is hitting his own tx (transmitter are also receivers usually) A transmitter cannot receive while it is transmitting, unless other channel is used.
 	if (externalId == current_tx.externalId) {
@@ -69,14 +79,14 @@ RT_PROGRAM void closestHitReceiver()
 	}
 
 
-	int reflections = hitPayload.reflections;
-	float3 prx = make_float3(sphere.x, sphere.y, sphere.z);
-
+//	int reflections = hitPayload.reflections;
+	uint reflections = hitPayload.rhfr.x;
+	uint hits=hitPayload.rhfr.y;
 	//HitInfo values
 	float d;
 	uint hash=0u;
 	uint dtrx=0u;
-	if (reflections == 0 && hitPayload.hits==0) {
+	if (reflections == 0 && hits==0) {
 		//This is a purely direct ray
 		//Compute electric field. For direct rays, the distance is always between tx and rx
 		float3 ptx = current_tx.origin;
@@ -87,9 +97,11 @@ RT_PROGRAM void closestHitReceiver()
 
 		//Distance from ray line to receiver position. To keep only the closest hit later
 		//Line is defined by ray
-		float3 pd = prx - hitPayload.hitPoint;
+		//float3 pd = prx - hitPayload.hitPoint;
+		float3 pd = prx - hitPoint;
 		float u = dot(pd, ray_receiver.direction);
-		float3 p3 = hitPayload.hitPoint + u*ray_receiver.direction;
+		float3 p3 = hitPoint + u*ray_receiver.direction;
+		//float3 p3 = hitPayload.hitPoint + u*ray_receiver.direction;
 
 
 		float3 rxtoh=prx-p3;
@@ -112,7 +124,8 @@ RT_PROGRAM void closestHitReceiver()
 		int dmt = __float2int_rz(dm);   //Truncate
 		//HitInfo values
 		dtrx=static_cast<uint>(dmt);
-		hash=hitPayload.refhash;
+		//hash=hitPayload.refhash;
+		hash=hitPayload.rhfr.w;
 	}
 
 
@@ -131,7 +144,8 @@ RT_PROGRAM void closestHitReceiver()
 	float attE=0.0f;
 	if (usePenetration==1u) {
 		//Switch to linear
-		attE=hitPayload.accumulatedAttenuation*0.05f;
+		//attE=hitPayload.accumulatedAttenuation*0.05f;
+		attE=hitPayload.hitPointAtt.w*0.05f;
 		//Check to avoid float overflows
 		if (attE>-15.f) {
 			attE=exp10f(attE);
@@ -146,6 +160,9 @@ RT_PROGRAM void closestHitReceiver()
 	HitInfo aHit;
 	aHit.thrd=make_uint4(txBufferIndex,hash,receiverBufferIndex,dtrx);
 	aHit.E=E;
+#ifdef OPAL_LOG_TRACE
+	aHit.rayDir=hitPayload.initialRayDir;
+#endif 	
 	
 	
 	//********** Debug ***************
@@ -169,7 +186,7 @@ RT_PROGRAM void closestHitReceiver()
 	//Store hit in global buffer
 	globalHitInfoBuffer[hitIndex]=aHit;
 	//Log hit
-	rtPrintf("H\t%u\t%u\t%u\t%u\t%f\t%f\t%f\t%f\t%u\t%u\t%u\t%d\n", receiverLaunchIndex.x, receiverLaunchIndex.y,receiverBufferIndex, hitPayload.reflections, attE,  E.x, E.y,d, aHit.thrd.x,aHit.thrd.y,aHit.thrd.w,externalId);
+	//rtPrintf("H\t%u\t%u\t%u\t%u\t%f\t%f\t%f\t%f\t%u\t%u\t%u\t%d\n", receiverLaunchIndex.x, receiverLaunchIndex.y,receiverBufferIndex, hitPayload.reflections, attE,  E.x, E.y,d, aHit.thrd.x,aHit.thrd.y,aHit.thrd.w,externalId);
 }
 
 
@@ -184,6 +201,7 @@ rtDeclareVariable(HVWavePayload, missPayload, rtPayload, );
 RT_PROGRAM void miss()
 {
 	//rtPrintf("miss i.x=%u. iy=%u \n", receiverLaunchIndex.x, receiverLaunchIndex.y);
-	missPayload.flags = FLAG_END;
+	//missPayload.flags = FLAG_END;
+	missPayload.rhfr.z = FLAG_END;
 }
 

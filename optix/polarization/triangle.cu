@@ -33,9 +33,9 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "../Common.h"
-#include "../Complex.h"
-#include "tracePolarizationFunctions.h"
+#include "../../Common.h"
+#include "../../Complex.h"
+#include "../../traceFunctions.h"
 #include <optix.h>
 #include <optixu/optixu_math_namespace.h>
 #include <optixu/optixu_aabb_namespace.h>
@@ -60,20 +60,42 @@ RT_PROGRAM void closestHitTriangle()
 {
 
 	//Update payload
-	const float rayLength = ch_triangle_data.geom_normal_t.w;
-	const float3 hp= ray.origin + rayLength * ray.direction ;
-	rayPayload.hitPoint =hp;
+	//const float rayLength = ch_triangle_data.geom_normal_t.w;
+	//const float3 hp= ray.origin + rayLength * ray.direction ;
+	//rayPayload.hitPoint =hp;
+	//Get the hitpoint from the barycentric coordinates computed in the triangle hit. This should get us a point always on the surface and help avoid self-intersection
+	//See https://www.realtimerendering.com/raytracinggems/ 6.1
+	//const float rayLength=length(ch_triangle_data.hp-rayPayload.hitPoint);
+	//rayPayload.hitPoint =ch_triangle_data.hp;
+	const float3 lastHP=make_float3(rayPayload.hitPointAtt.x,rayPayload.hitPointAtt.y,rayPayload.hitPointAtt.z);
+	//we could use t of ray, but if we shift the ray over the normal to avoid self-intersection we introduce an error in the electric field
+	const float rayLength=length(ch_triangle_data.hp-lastHP);
+	rayPayload.hitPointAtt.x =ch_triangle_data.hp.x;
+	rayPayload.hitPointAtt.y =ch_triangle_data.hp.y;
+	rayPayload.hitPointAtt.z =ch_triangle_data.hp.z;
+	//rtPrintf("THP\t%u\t%u\th=(%.6e,%.6e,%.6e)bary=(%.6e,%.6e,%.6e)\n",launchIndexTriangle.x,launchIndexTriangle.y,hp.x,hp.y,hp.z,ch_triangle_data.hp.x,ch_triangle_data.hp.y,ch_triangle_data.hp.z);
 	const float3 gn=make_float3(ch_triangle_data.geom_normal_t.x,ch_triangle_data.geom_normal_t.y,ch_triangle_data.geom_normal_t.z);	
 	const float3 n = normalize(rtTransformNormal(RT_OBJECT_TO_WORLD,gn )); //Plane normal
+	
+#ifdef OPAL_AVOID_SI
+	rayPayload.lastNormal=n;
+#endif	
 	const float3 reflection_dir=reflect(ray.direction, n);
 	const float aux=rayPayload.ndtd.w;
 	rayPayload.ndtd = make_float4(reflection_dir); //initialized with float3, w is set to 0. and updated below
 	//hash_combine_impl<uint>(rayPayload.refhash,ch_triangle_data.faceId);
 	//rtPrintf("HASH \t%u\t%u\t%u\t%u\n",ch_triangle_date.faceId,rayPayload.reflections,rayPayload.hits,rayPayload.refhash);
+	
+	
 	//Use reflections and hits to create hash
-	hash_combine_impl<uint>(rayPayload.refhash,ch_triangle_data.faceId+rayPayload.reflections+rayPayload.hits);
+	
+	uint reflections=rayPayload.rhfr.x;
+	uint hits=rayPayload.rhfr.y;
+	uint hash=rayPayload.rhfr.w;
+	hash_combine_impl<uint>(hash,ch_triangle_data.faceId+reflections+hits);
+	//hash_combine_impl<uint>(rayPayload.refhash,ch_triangle_data.faceId+rayPayload.reflections+rayPayload.hits);
 	rayPayload.ndtd.w = aux+ rayLength;
-	rayPayload.lrhpd =make_float4(hp); //lastReflectionHitPoint;
+	rayPayload.lrhpd =make_float4(ch_triangle_data.hp); //lastReflectionHitPoint;
 	rayPayload.lrhpd.w = rayPayload.ndtd.w; //totalDistanceTillLastReflection;
 	
 	
@@ -157,7 +179,7 @@ RT_PROGRAM void closestHitTriangle()
 //	rtPrintf("T\t%u\t%u\tRnorm(%.6e,%.6e)*hh + Rpar(%.6e,%.6e)*vh=Einorm=(%.6e,%.6e)\n",launchIndexTriangle.x,launchIndexTriangle.y,rayPayload.hor_coeff.x,rayPayload.hor_coeff.y,rayPayload.ver_coeff.x,rayPayload.ver_coeff.y,Einorm.x,Einorm.y);
 //	rtPrintf("T\t%u\t%u\tRnorm(%.6e,%.6e)*hv + Rpar(%.6e,%.6e)*vv=Eipar=(%.6e,%.6e)\n",launchIndexTriangle.x,launchIndexTriangle.y,rayPayload.hor_coeff.x,rayPayload.hor_coeff.y,rayPayload.ver_coeff.x,rayPayload.ver_coeff.y,Eipar.x,Eipar.y);
 //
-	if ((usePenetration==1u) && (rayPayload.reflections<max_interactions)) {
+	if ((usePenetration==1u) && (reflections<max_interactions)) {
 		//Trace a penetration ray as a new ray. Recursive tracing, check stack depth>max_interactions
 		//Quickly check for attenuation in dB, if att has a very low value we do not trace. Also, we do not want to overflow the float in the operations and get a nan.
 		//Apply material attenuation. Again, we assume the material is not bending the ray in any direction
@@ -169,13 +191,15 @@ RT_PROGRAM void closestHitTriangle()
 		
 		//Considering that material has been travelled in perpendicular
 		//float dbAtt=(EMProperties.tattenuation.x)*(EMProperties.tattenuation.y);
-		float tAtt=rayPayload.accumulatedAttenuation + dbAtt; //Accumulate in log scale to avoid overflows
+		//float tAtt=rayPayload.accumulatedAttenuation + dbAtt; //Accumulate in log scale to avoid overflows
+		float tAtt=rayPayload.hitPointAtt.w + dbAtt; //Accumulate in log scale to avoid overflows
 		if (tAtt>attenuationLimit) {
 			//Copy payload
 			LPWavePayload penPayload=rayPayload;
 			penPayload.ndtd  = optix::make_float4(0, 0, 0, rayPayload.ndtd.w);
-			penPayload.hits=rayPayload.hits+1;
-			penPayload.flags = FLAG_NONE;
+			//penPayload.hits=rayPayload.hits+1;
+			//penPayload.flags = FLAG_NONE;
+			rayPayload.rhfr=make_uint4(reflections,hits+1u,FLAG_NONE,hash);
 			//Assuming the media on both sides of the plane are the same (air, most likely), then the incidence angle is equal to the transmission angle, so the ray does not change trajectory
 			//Otherwise, we have to rotate the ray by the transmission angle, where a_t (angle_transmission) and theta= 90-a_t, with respect to the vector ortoghonal to the normal and ray,
 			//that is the normal vector of the plane defined by ray and mesh face normal.
@@ -199,18 +223,21 @@ RT_PROGRAM void closestHitTriangle()
 
 			//penPayload.prodReflectionCoefficient = complex_prod(rayPayload.prodReflectionCoefficient,make_float2(1.0f+R.x, R.y)); 
 			//Attenuation
-			penPayload.accumulatedAttenuation = tAtt;
+			penPayload.hitPointAtt.w = tAtt;
+			//penPayload.accumulatedAttenuation = tAtt;
 			//rtPrintf("AT cosA=%f\tatt=%f\ttAtt=%f\nr=(%f,%f,%f)\tn=(%f,%f,%f)\n",cosA,dbAtt,tAtt,ray.direction.x,ray.direction.y,ray.direction.z,n.x,n.y,n.z);
-			traceLPReflection(penPayload, rayPayload.hitPoint, ray.direction,launchIndexTriangle.x,launchIndexTriangle.y);
+			traceReflection<LPWavePayload>(penPayload, OPAL_RAY_REFLECTION, ch_triangle_data.hp, ray.direction,launchIndexTriangle.x,launchIndexTriangle.y);
 		}
 	}
 	//Update here reflection coefficient, otherwise we multiply reflection and transmission in the transmission above
 
 	//New horizontal (normal)  coefficient
+	//rtPrintf("TT\t%u\t%u\tRnorm(%.6e,%.6e)  Rpar(%.6e,%.6e) hash=%u\n",launchIndexTriangle.x,launchIndexTriangle.y,rayPayload.hor_coeff.x,rayPayload.hor_coeff.y,rayPayload.ver_coeff.x,rayPayload.ver_coeff.y, rayPayload.rhfr.w);
 	rayPayload.hor_coeff=complex_prod(Einorm,Rnorm);
 	//New vertical (parallel)  coefficient
 	rayPayload.ver_coeff=complex_prod(Eipar,Rpar);
 	
+	//rtPrintf("T\t%u\t%u\tRnorm(%.6e,%.6e)  Rpar(%.6e,%.6e) hash=%u\n",launchIndexTriangle.x,launchIndexTriangle.y,rayPayload.hor_coeff.x,rayPayload.hor_coeff.y,rayPayload.ver_coeff.x,rayPayload.ver_coeff.y, rayPayload.rhfr.w);
 	
 	//	rtPrintf("T\t%u\t%u\tRnorm(%.6e,%.6e)  Rpar(%.6e,%.6e)\n hash=%u",launchIndexTriangle.x,launchIndexTriangle.y,rayPayload.hor_coeff.x,rayPayload.hor_coeff.y,rayPayload.ver_coeff.x,rayPayload.ver_coeff.y, rayPayload.refhash);
 	//	
@@ -220,58 +247,11 @@ RT_PROGRAM void closestHitTriangle()
 	//Update vectors
 	rayPayload.ver_v=apar_r;
 	rayPayload.hor_v=anorm_r;
-	++rayPayload.reflections;
+	//++rayPayload.reflections;
+	++reflections;
+	rayPayload.rhfr=make_uint4(reflections,hits,rayPayload.rhfr.z,hash);
 
 }
 
 
 
-//For Optix 5.x
-//Mesh buffers
-rtBuffer<float3> vertex_buffer;
-rtBuffer<int3>   index_buffer;
-rtBuffer<uint> faceId_buffer;
-
-rtDeclareVariable(TriangleHit, int_triangle_data, attribute triangle_hit_data, );
-
-RT_PROGRAM void intersectTriangle(int primIdx)
-{
-	const int3 v_idx = index_buffer[primIdx];
-
-	const float3 p0 = vertex_buffer[v_idx.x];
-	const float3 p1 = vertex_buffer[v_idx.y];
-	const float3 p2 = vertex_buffer[v_idx.z];
-
-	// Intersect ray with triangle
-	float3 normal;
-	float  t, beta, gamma;
-
-	//rtPrintf("PreIntersection idx=%d ray=(%f,%f,%f)", primIdx, ray.direction.x, ray.direction.y, ray.direction.z);
-	if (intersect_triangle(ray, p0, p1, p2, normal, t, beta, gamma))
-	{
-		if (rtPotentialIntersection(t))
-		{
-			TriangleHit h;
-			h.triId = primIdx;
-			h.geom_normal_t = make_float4(normal.x,normal.y,normal.z,t);
-			h.faceId = faceId_buffer[primIdx];
-
-
-			int_triangle_data = h;
-			//rtPrintf("Intersection idx=%d ray=(%f,%f,%f)", primIdx, ray.direction.x, ray.direction.y, ray.direction.z);
-			rtReportIntersection( /*material index*/ 0);
-		}
-	}
-}
-RT_PROGRAM void boundsTriangle(int primIdx, float result[6])
-{
-	const int3 v_idx = index_buffer[primIdx];
-
-	const float3 p0 = vertex_buffer[v_idx.x];
-	const float3 p1 = vertex_buffer[v_idx.y];
-	const float3 p2 = vertex_buffer[v_idx.z];
-
-	optix::Aabb* aabb = (optix::Aabb*)result;
-	aabb->m_min = fminf(fminf(p0, p1), p2);
-	aabb->m_max = fmaxf(fmaxf(p0, p1), p2);
-}

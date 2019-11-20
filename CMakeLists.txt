@@ -119,20 +119,15 @@ OPTIX_add_sample_executable( opal
   Unity.h
   Unity.cpp
   main.cpp
-  tests/tests.h
-  tests/tests.cpp
   traceFunctions.h
   multitransmitter.h
   multitransmitter.cpp
-  generation.cu
-  receiver.cu
-  optixGeometryTriangles.cu
-  triangle.cu
-  sphere.cu
   tutils.cu
   tutils.h
   timer.h
   timer.cpp
+  tests/tests.h
+  tests/tests.cpp
   tests/tunnels.cpp
   tests/tunnels.h
   tests/depolarization.h
@@ -141,13 +136,20 @@ OPTIX_add_sample_executable( opal
   util.h
   ptxUtil.h
   ptxUtil.cpp
-  #To see it properly in Visual Studio we should add the following
-   polarization/generation.cu
-  polarization/receiver.cu
-  polarization/triangle.cu
-  polarization/tracePolarizationFunctions.h
-  polarization/sphere.cu
-  polarization/optixGeometryTriangles.cu
+  #To see it properly in Visual Studio we should add the following. 
+  optix/intersect/sphere.cu
+  optix/intersect/optixGeometryTriangles.cu
+  optix/intersect/optixTriangle.cu
+  optix/basic/generation.cu
+  optix/basic/triangle.cu
+  optix/basic/receiver.cu
+  optix/polarization/generation.cu
+  optix/polarization/receiver.cu
+  optix/polarization/triangle.cu
+  optix/polarization/linearPolarizationFunctions.h
+  optix/log/generation.cu
+  optix/log/triangle.cu
+  optix/log/receiver.cu
 
   )
 
@@ -165,34 +167,37 @@ set(sources
   Unity.h
   Unity.cpp
   main.cpp
-  tests/tests.h
-  tests/tests.cpp
+  traceFunctions.h
   multitransmitter.h
   multitransmitter.cpp
-  traceFunctions.h
-  generation.cu
-  receiver.cu
-  optixGeometryTriangles.cu
-  triangle.cu
-  sphere.cu
   tutils.cu
   tutils.h
   timer.h
   timer.cpp
-  ptxUtil.h
-  ptxUtil.cpp
+  tests/tests.h
+  tests/tests.cpp
   tests/tunnels.cpp
   tests/tunnels.h
   tests/depolarization.h
   tests/depolarization.cpp
   util.cpp
   util.h
-   polarization/generation.cu
-  polarization/receiver.cu
-  polarization/triangle.cu
-  polarization/tracePolarizationFunctions.h
-  polarization/sphere.cu
-  polarization/optixGeometryTriangles.cu
+  ptxUtil.h
+  ptxUtil.cpp
+  #To see it properly in Visual Studio we should add the following. 
+  optix/intersect/sphere.cu
+  optix/intersect/optixGeometryTriangles.cu
+  optix/intersect/optixTriangle.cu
+  optix/basic/generation.cu
+  optix/basic/triangle.cu
+  optix/basic/receiver.cu
+  optix/polarization/generation.cu
+  optix/polarization/receiver.cu
+  optix/polarization/triangle.cu
+  optix/polarization/linearPolarizationFunctions.h
+  optix/log/generation.cu
+  optix/log/triangle.cu
+  optix/log/receiver.cu
 
 )
 OPTIX_add_sample_library( opal_s 
@@ -203,34 +208,37 @@ OPTIX_add_sample_library( opal_s
   Unity.h
   Unity.cpp
   main.cpp
-  tests/tests.h
-  tests/tests.cpp
+  traceFunctions.h
   multitransmitter.h
   multitransmitter.cpp
-  traceFunctions.h
-  generation.cu
-  receiver.cu
-  optixGeometryTriangles.cu
-  triangle.cu
-  sphere.cu
   tutils.cu
   tutils.h
   timer.h
   timer.cpp
-  ptxUtil.h
-  ptxUtil.cpp
+  tests/tests.h
+  tests/tests.cpp
   tests/tunnels.cpp
   tests/tunnels.h
   tests/depolarization.h
   tests/depolarization.cpp
   util.cpp
   util.h
-   polarization/generation.cu
-  polarization/receiver.cu
-  polarization/triangle.cu
-  polarization/tracePolarizationFunctions.h
-  polarization/sphere.cu
-  polarization/optixGeometryTriangles.cu
+  ptxUtil.h
+  ptxUtil.cpp
+  #To see it properly in Visual Studio we should add the following. 
+  optix/intersect/sphere.cu
+  optix/intersect/optixGeometryTriangles.cu
+  optix/intersect/optixTriangle.cu
+  optix/basic/generation.cu
+  optix/basic/triangle.cu
+  optix/basic/receiver.cu
+  optix/polarization/generation.cu
+  optix/polarization/receiver.cu
+  optix/polarization/triangle.cu
+  optix/polarization/linearPolarizationFunctions.h
+  optix/log/generation.cu
+  optix/log/triangle.cu
+  optix/log/receiver.cu
 
   )
 
@@ -247,35 +255,37 @@ set(sources
   Complex.h
   Unity.h
   Unity.cpp
+  main.cpp
+  traceFunctions.h
+  multitransmitter.h
+  multitransmitter.cpp
+  tutils.cu
+  tutils.h
+  timer.h
+  timer.cpp
   tests/tests.h
   tests/tests.cpp
   tests/tunnels.cpp
   tests/tunnels.h
-  multitransmitter.h
-  multitransmitter.cpp
-  traceFunctions.h
-  generation.cu
-  receiver.cu
-  optixGeometryTriangles.cu
-  triangle.cu
-  sphere.cu
-  tutils.cu
-  tutils.h
-  ptxUtil.h
-  ptxUtil.cpp
-  timer.h
-  timer.cpp
-  util.cpp
-  util.h
-  tests/tunnels.cpp
-  tests/tunnels.h
   tests/depolarization.h
   tests/depolarization.cpp
-   polarization/generation.cu
-  polarization/receiver.cu
-  polarization/triangle.cu
-  polarization/tracePolarizationFunctions.h
-  polarization/sphere.cu
-  polarization/optixGeometryTriangles.cu
+  util.cpp
+  util.h
+  ptxUtil.h
+  ptxUtil.cpp
+  #To see it properly in Visual Studio we should add the following. 
+  optix/intersect/sphere.cu
+  optix/intersect/optixGeometryTriangles.cu
+  optix/intersect/optixTriangle.cu
+  optix/basic/generation.cu
+  optix/basic/triangle.cu
+  optix/basic/receiver.cu
+  optix/polarization/generation.cu
+  optix/polarization/receiver.cu
+  optix/polarization/triangle.cu
+  optix/polarization/linearPolarizationFunctions.h
+  optix/log/generation.cu
+  optix/log/triangle.cu
+  optix/log/receiver.cu
 
 )

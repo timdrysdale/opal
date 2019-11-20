@@ -75,13 +75,13 @@ namespace opal {
 	OPAL_API int Init(float frequency, bool useExactSpeedOfLight,bool multiTransmitter)
 	{
 		try {
-			//First, set the environment to read the CUDA program files from our Plugins directory.
+			//First, set the environment to read the CUDA program files from our Plugins directory, in case we use sutil. This is actually not necessary for our programs since we use the ptxHandler
 
 #ifdef _WIN32
-			_putenv_s("OPTIX_SAMPLES_SDK_DIR", cudaDir);
+			_putenv_s("OPTIX_SAMPLES_SDK_DIR", pluginDir);
 
 #else
-			setenv("OPTIX_SAMPLES_SDK_DIR", cudaDir, 1);
+			setenv("OPTIX_SAMPLES_SDK_DIR", pluginDir, 1);
 #endif // _WIN32
 
 
@@ -89,14 +89,15 @@ namespace opal {
 				//Return exception until corrected
 				//throw optix::Exception("Not implemented yet");
 				MultiTransmitter=true;
-				sceneManager = new OpalSceneManagerMultiTransmitter(frequency,useExactSpeedOfLight);
+				sceneManager = new OpalSceneManagerMultiTransmitter();
+				
 			} else {
 
 				sceneManager = new OpalSceneManager();
-				//TODO: add features here
-				
-				sceneManager->initContext(frequency,  useExactSpeedOfLight);
 			}
+			//TODO: add features here
+			sceneManager->setBaseDir(pluginDir);	
+			sceneManager->initContext(frequency,  useExactSpeedOfLight);
 
 
 
