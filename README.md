@@ -93,8 +93,8 @@ so on. Recompile and execute.
 
 As a library link appropriately and go. 
 
-As a Unity plugin, drop the generated .dll in the Plugins folder and create an `Opal` subdirectory. If the target platform is Linux, do the same but with the .so. Put in that folder  
-the `optix` folder (see below). You have to copy the `Common.h`, `Complex.h` and  `traceFunctions.h` also in the `Opal` folder. 
+**As a Unity plugin**, drop the generated .dlls  in your Unity project Plugins folder (make sure to use the corresponding Unity version, as described in [Veneris repository](https://gitlab.com/esteban.egea/veneris), for other versions the process may be different). You should drop both the `opal_s.dll` and all the optix dlls, such as `optixu.dll` and so on. If the target platform is Linux, do the same but with the .so. Create an `Opal` subdirectory and copy in that folder  
+the `optix` folder and all the subdirectories within (see below). You have to copy, from the main folder, the `Common.h`, `Complex.h` and  `traceFunctions.h` also in the `Opal` folder. 
 
 Note that CUDA programs are compiled at runtime with NVRTC. They are inside the `optix` folder.  
 They are read with the `baseDir` variable and `optixPrograms` variables or  from the `OPTIX_SAMPLES_SDK_DIR` location if sutil is used.  See also `sutil.cpp` in the Optix SDK, lines 848 and 335.
