@@ -80,11 +80,11 @@ If Optix works, then you can add Opal:
 In Linux, that should be all, now you should find your `opal` executable and `libopal_s` shared library in the corresponding folders.
 
 
-In Windows, you will probably need to add a preprocessor definition to compile. In VS, in the Explorer Solution window, right click on the `opal` project, Properties and then go to C/C++ > Preprocessor and edit the preprocessor defintions to add `OPAL_EXPORTS`.
+In Windows, you will probably need to add a preprocessor definition to compile. In VS, in the Explorer Solution window, right click on the `opal` project, Properties and then go to C/C++ > Preprocessor and edit the preprocessor defintions to add `OPAL_EXPORTS`. 
 
 Do this also for `opal_s` but in this case you should add `opal_s_EXPORTS`. 
 
-Make sure that you do that for both Debug and Release configurations, or any other configurations you use.
+**Make sure that you add the preprocessor defintions  for both Debug and Release configurations, or any other configurations you use.**
 
 
 ## Usage

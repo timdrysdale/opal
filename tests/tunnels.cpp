@@ -88,8 +88,8 @@ std::unique_ptr<OpalSceneManager> cubeTunnel(std::unique_ptr<OpalSceneManager> s
 	std::cout<<"Scanning the sphere with ASElevation="<<asEl<< " and ASAzimuth="<<asAz<<std::endl;
 
 	//Tunnel is a cube with the XY faces removed (entrance and exit). So tunnel runs on Z axis (front, in Unity)
-	std::vector<int> cubeind = loadTrianglesFromFile("meshes/tunnel-i.txt");
-	std::vector<float3> cubevert = loadVerticesFromFile("meshes/tunnel-v.txt");
+	std::vector<int> cubeind = Util::loadTrianglesFromFile("meshes/tunnel-i.txt");
+	std::vector<float3> cubevert = Util::loadVerticesFromFile("meshes/tunnel-v.txt");
 	//std::cout << "indices=" << cubeind.size() << "vertices=" << cubevert.size() << std::endl;
 	//Cube(4) NW
 	Matrix4x4 tm;

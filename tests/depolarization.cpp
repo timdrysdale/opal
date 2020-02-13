@@ -6,6 +6,7 @@
 #include "depolarization.h"
 #include "../timer.h"
 #include "../Opal.h"
+#include "opal/util.h"
 #include <memory>
 using namespace opal;
 using namespace optix;
@@ -17,7 +18,7 @@ std::unique_ptr<OpalSceneManager> polarizationPlaneTest(std::unique_ptr<OpalScen
 	optix::float3 quadh[4] = { make_float3(-0.5f,0.0f,-0.5f),make_float3(0.5f,0.f,0.5f) ,make_float3(0.5f,0.f,-0.5f) ,make_float3(-0.5f,0.0f,0.5f) };
 
 	//Scale to 200x200
-	Matrix4x4 tm;
+	optix::Matrix4x4 tm;
 	tm.setRow(0, make_float4(200, 0, 0, 0.f));
 	tm.setRow(1, make_float4(0, 1, 0, 0.f));
 	tm.setRow(2, make_float4(0, 0, 200, 0.f));
@@ -90,11 +91,11 @@ std::unique_ptr<OpalSceneManager> crossingTestDepolarization(std::unique_ptr<Opa
 
 	std::cout << "Simulating crossing streets test" << std::endl;
 	//Cubes
-	std::vector<int> cubeind = loadTrianglesFromFile("meshes/tricube.txt");
-	std::vector<float3> cubevert = loadVerticesFromFile("meshes/vertcube.txt");
+	std::vector<int> cubeind = Util::loadTrianglesFromFile("meshes/tricube.txt");
+	std::vector<optix::float3> cubevert = Util::loadVerticesFromFile("meshes/vertcube.txt");
 	//std::cout << "indices=" << cubeind.size() << "vertices=" << cubevert.size() << std::endl;
 	//Cube(4) NW
-	Matrix4x4 tm;
+	optix::Matrix4x4 tm;
 	tm.setRow(0, make_float4(40.0f, 0, 0, -30.0f));
 	tm.setRow(1, make_float4(0, 40.0f, 0, 20.0f));
 	tm.setRow(2, make_float4(0, 0, 40.0f, 80.0f));
@@ -133,7 +134,7 @@ std::unique_ptr<OpalSceneManager> crossingTestDepolarization(std::unique_ptr<Opa
 	sceneManager->addStaticMesh(static_cast<int>(cubevert.size()), cubevert.data(), static_cast<int>(cubeind.size()), cubeind.data(), tm, emProp1);
 
 	//Horizontal plane
-//	std::vector<int> planeind = loadTrianglesFromFile("meshes/tri.txt");
+//	std::vector<int> planeind = Util::Util::loadTrianglesFromFile("meshes/tri.txt");
 //	std::vector<float3> planever = loadVerticesFromFile("meshes/vert.txt");
 //	//std::cout << "indices=" << planeind.size() << "vertices=" << planever.size() << std::endl;
 //

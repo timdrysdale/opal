@@ -7,7 +7,7 @@
 #ifndef DEPOLARIZATION_H
 #define DEPOLARIZATION_H
 #include "../Opal.h"
-#include "../util.h"
+
 using namespace opal;
 	//Depolarization tests
 	//Polarization test. Horizontal plane test but with arbitrary polarizations. To validate against a two-ray model

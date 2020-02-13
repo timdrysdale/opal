@@ -19,7 +19,7 @@ using namespace optix;
 //Include the file with the tests you want to perform
 #include "tests/depolarization.h"
 #include "tests/tunnels.h"
-//#include "tests/tests.h"
+#include "tests/tests.h"
 
 
 int main(int argc, char** argv)

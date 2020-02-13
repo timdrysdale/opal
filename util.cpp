@@ -7,18 +7,20 @@
 #include "util.h"
 #include <iostream>
 #include <fstream>
-
+#include <optix.h>
+#include <optix_world.h>
+using namespace optix;
 namespace opal {
 //Callback
 void printPower(float power, int txId ) {
 	std::cout << "PR\t" << power << std::endl;
 }
 
-std::vector<float3>  loadVerticesFromFile(const char* file) {
+/*std::vector<optix::float3>  Util::loadVerticesFromFile(const char* file) {
 	std::ifstream infile(file);
 	float x, y, z;
 	//char c;
-	std::vector<float3> vertices;
+	std::vector<optix::float3> vertices;
 	std::string line;
 
 
@@ -47,14 +49,15 @@ std::vector<float3>  loadVerticesFromFile(const char* file) {
 			p++;
 		} while (next != std::string::npos);
 
-		vertices.push_back(make_float3(x, y, z));
+		vertices.push_back(optix::make_float3(x, y, z));
 	}
 	std::cout << "Loaded " << vertices.size() << " vertices from " << file << std::endl;
 	infile.close();
 
 	return vertices;
 }
-std::vector<int>  loadTrianglesFromFile(const char* file) {
+*/
+std::vector<int>  Util::loadTrianglesFromFile(const char* file) {
 	std::ifstream infile(file);
 	int i;
 	std::vector<int> triangles;
