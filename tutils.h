@@ -22,7 +22,7 @@
 #include "Common.h"
 #include <vector>
 //Functions to filter duplicate hits on device with the Thrust library
-using namespace optix; //Required in Windows
+using namespace optix; //TODO: should not do this, but fixes quickly VS issues. Change later
 namespace opalthrustutils {
 	class Exception : public std::exception {
 		public:
