@@ -80,11 +80,11 @@ If Optix works, then you can add Opal:
 In Linux, that should be all, now you should find your `opal` executable and `libopal_s` shared library in the corresponding folders.
 
 
-In Windows, you will probably need to add a preprocessor definition to compile. In VS, in the Explorer Solution window, right click on the `opal` project, Properties and then go to C/C++ > Preprocessor and edit the preprocessor defintions to add `OPAL_EXPORTS`. 
+**In Windows**, you will probably need to add a preprocessor definition to compile. In VS, in the Explorer Solution window, right click on the `opal` project, Properties and then go to C/C++ > Preprocessor and edit the preprocessor defintions to add `OPAL_EXPORTS`. 
 
 Do this also for `opal_s` but in this case you should add `opal_s_EXPORTS`. 
 
-**Make sure that you add the preprocessor defintions  for both Debug and Release configurations, or any other configurations you use.**
+**Make sure that you add the preprocessor definitions  for both Debug and Release configurations, or any other configurations you use.**
 
 
 ## Usage
@@ -95,6 +95,7 @@ As a library link appropriately and go.
 
 **As a Unity plugin**, drop the generated .dlls  in your Unity project Plugins folder (make sure to use the corresponding Unity version, as described in [Veneris repository](https://gitlab.com/esteban.egea/veneris), for other versions the process may be different). You should drop both the `opal_s.dll` and all the optix dlls, such as `optixu.dll` and so on. If the target platform is Linux, do the same but with the .so. Create an `Opal` subdirectory and copy in that folder  
 the `optix` folder and all the subdirectories within (see below). You have to copy, from the main folder, the `Common.h`, `Complex.h` and  `traceFunctions.h` also in the `Opal` folder. 
+**Make sure that you compile opal_s for the Release configuration**. Otherwise, you may see a DLL not found exception in Unity. For some reason, Unity does not find DLLs compiled for Debug.
 
 Note that CUDA programs are compiled at runtime with NVRTC. They are inside the `optix` folder.  
 They are read with the `baseDir` variable and `optixPrograms` variables or  from the `OPTIX_SAMPLES_SDK_DIR` location if sutil is used.  See also `sutil.cpp` in the Optix SDK, lines 848 and 335.

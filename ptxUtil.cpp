@@ -94,6 +94,7 @@ namespace opal {
 		std::string base_dir = std::string( sutil::samplesDir() );
 
 		// Potential source locations (in priority order)
+		 source_locations.push_back(std::string(sample_name) + "/"  + std::string(filename) );
 		if( sample_name )
 			source_locations.push_back( base_dir + "/" + sample_name + "/" + filename );
 		source_locations.push_back( base_dir + "/cuda/" + filename );

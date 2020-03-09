@@ -454,11 +454,12 @@ namespace opal {
 		}
 	}
 
-	OPAL_API int AddReceiverFromUnity(int id, float3  position, float3 polarization, float radius, receiverCallback callback)
+	OPAL_API int AddReceiverFromUnity(int id, float3  position,  float radius, receiverCallback callback)
 	{
 		CHM();
 		try {
-			sceneManager->addReceiver(id, position, polarization, radius, callback);
+			 //TODO: at this release we do not allow to change polarization from Unity. Only basic simulation. In future releases we will fix this
+			sceneManager->addReceiver(id, position, make_float3(0.0f,1.0f,0.0f), radius, callback);
 			return 0;
 		}
 		catch (opal::Exception& e) {
