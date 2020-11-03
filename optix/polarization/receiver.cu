@@ -144,18 +144,18 @@ RT_PROGRAM void closestHitReceiver()
 	float2 Eih = sca_complex_prod((hitPayload.electricFieldAmplitude / d), Rzexph);
 	float2 Eiv = sca_complex_prod((hitPayload.electricFieldAmplitude / d), Rzexpv);
 
-	//**************+ Tests and debug: Project on x and y **************
-	float3 xu=make_float3(1.0f,0.0f,0.0f);
-	float3 yu=make_float3(0.0f,1.0f,0.0f);
-	float3 zu=make_float3(0.0f,0.0f,1.0f);
-	const float2 Einorm=sca_complex_prod(dot(hitPayload.hor_v,xu),Eih) + sca_complex_prod(dot(hitPayload.ver_v,xu),Eiv);
-	const float2 Eipar=sca_complex_prod(dot(hitPayload.hor_v,yu),Eih) + sca_complex_prod(dot(hitPayload.ver_v,yu),Eiv);
-	const float2 Eirad=sca_complex_prod(dot(hitPayload.hor_v,zu),Eih) + sca_complex_prod(dot(hitPayload.ver_v,zu),Eiv);
-	HitInfo aHit;
-	aHit.thrd=make_uint4(txBufferIndex,hash,receiverBufferIndex,dtrx);
-	aHit.Ex=Einorm;
-	aHit.Ey=Eipar;
-	aHit.Ez=Eirad;
+//	//**************+ Tests and debug: Project on x and y **************
+//	float3 xu=make_float3(1.0f,0.0f,0.0f);
+//	float3 yu=make_float3(0.0f,1.0f,0.0f);
+//	float3 zu=make_float3(0.0f,0.0f,1.0f);
+//	const float2 Einorm=sca_complex_prod(dot(hitPayload.hor_v,xu),Eih) + sca_complex_prod(dot(hitPayload.ver_v,xu),Eiv);
+//	const float2 Eipar=sca_complex_prod(dot(hitPayload.hor_v,yu),Eih) + sca_complex_prod(dot(hitPayload.ver_v,yu),Eiv);
+//	const float2 Eirad=sca_complex_prod(dot(hitPayload.hor_v,zu),Eih) + sca_complex_prod(dot(hitPayload.ver_v,zu),Eiv);
+//	HitInfo aHit;
+//	aHit.thrd=make_uint4(txBufferIndex,hash,receiverBufferIndex,dtrx);
+//	aHit.Ex=Einorm;
+//	aHit.Ey=Eipar;
+//	aHit.Ez=Eirad;
 #ifdef OPAL_LOG_TRACE
 	aHit.rayDir=hitPayload.initialRayDir;
 #endif 	
@@ -179,24 +179,24 @@ RT_PROGRAM void closestHitReceiver()
 	//Now we have the incident field separated in vertical and horizontal components. We should decide what we want to do with it. To get the induced voltage, we need to 
 	//apply the dot product with the effective lenght of the received antenna. 
 	//Transform the receiver polarization according to the incident ray direction (-ray.direction) to get the vertical and horizontal components of the receiver polarization
-//
-//	     float3 ver_o; //Receiver vertical field vector
-//	     float3 hor_o; //Receiver horizontal field vector
-//	
-//	     //Reverse direction	
-//	     const float3 ray=-ray_receiver.direction;	
-//	
-//	     //Get polarization for receiver for this reversed ray: 
-//	     getLinearPolarizationInRayBasis(receiverPolarization, ray,  hor_o,ver_o);
-//	
-//	     //This would be equivalent to a dot product with the effective length (not the conjugated beacuse we already reversed and it is a linear polarization anyway)
-//	     //Get the  components of received field for the normal and parallel field vectors (geometric projection on receiver polarization vectors times reflection coefficients)
-//	     const float2 Einorm=sca_complex_prod(dot(hitPayload.hor_v,hor_o),Eih) + sca_complex_prod(dot(hitPayload.ver_v,hor_o),Eiv);
-//	     const float2 Eipar=sca_complex_prod(dot(hitPayload.hor_v,ver_o),Eih) + sca_complex_prod(dot(hitPayload.ver_v,ver_o),Eiv);
-//	
-//	     
-//	     //This is actually the induced voltage on the antenna. From it we can compute the received power
-//	     float2 E=Einorm+Eipar;
+
+	     float3 ver_o; //Receiver vertical field vector
+	     float3 hor_o; //Receiver horizontal field vector
+	
+	     //Reverse direction	
+	     const float3 ray=-ray_receiver.direction;	
+	
+	     //Get polarization for receiver for this reversed ray: 
+	     getLinearPolarizationInRayBasis(receiverPolarization, ray,  hor_o,ver_o);
+	
+	     //This would be equivalent to a dot product with the effective length (not the conjugated beacuse we already reversed and it is a linear polarization anyway)
+	     //Get the  components of received field for the normal and parallel field vectors (geometric projection on receiver polarization vectors times reflection coefficients)
+	     const float2 Einorm=sca_complex_prod(dot(hitPayload.hor_v,hor_o),Eih) + sca_complex_prod(dot(hitPayload.ver_v,hor_o),Eiv);
+	     const float2 Eipar=sca_complex_prod(dot(hitPayload.hor_v,ver_o),Eih) + sca_complex_prod(dot(hitPayload.ver_v,ver_o),Eiv);
+	
+	     
+	     //This is actually the induced voltage on the antenna. From it we can compute the received power
+	     float2 E=Einorm+Eipar;
 
 	
 	
@@ -223,9 +223,9 @@ RT_PROGRAM void closestHitReceiver()
 	//
 	//
 	//Non-debug hit
-//		HitInfo aHit;
-//		aHit.thrd=make_uint4(txBufferIndex,hash,receiverBufferIndex,dtrx);
-//		aHit.E=E;
+		HitInfo aHit;
+		aHit.thrd=make_uint4(txBufferIndex,hash,receiverBufferIndex,dtrx);
+		aHit.E=E;
 
 	//Check if global buffer is full
 	uint hitIndex=atomicAdd(&atomicIndex[0u],1u);

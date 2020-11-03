@@ -1466,8 +1466,8 @@ void OpalSceneManager::executePrecisionLaunch( HitInfo* host_hits, uint hits) {
 
 void OpalSceneManager::endPartialLaunch(uint numTransmitters) {
 		//executePrecisionLaunch(partialLaunchState->getHits().data(),partialLaunchState->getHits().size());
-		processHitsDebug(partialLaunchState->getHits().data(),partialLaunchState->getHits().size());
-		//processHits(partialLaunchState->getHits().data(),partialLaunchState->getHits().size());
+		//processHitsDebug(partialLaunchState->getHits().data(),partialLaunchState->getHits().size());
+		processHits(partialLaunchState->getHits().data(),partialLaunchState->getHits().size());
 #ifdef OPAL_LOG_TRACE
 		executeLogRayTrace(partialLaunchState->getHits().data(),partialLaunchState->getHits().size(),numTransmitters);
 #endif
