@@ -1,12 +1,12 @@
 /***************************************************************/
 //
-//Copyright (c) 2019 Esteban Egea-Lopez http://ait.upct.es/eegea
+//Copyright (c) 2019 Esteban Egea-Lopez http://girtel.upct.es/~eegea
 //
 /**************************************************************/
 
 
 #include "../../Common.h"
-#include "../../traceFunctions.h"
+#include "../traceFunctions.h"
 #include <optix_world.h>
 #include <optixu/optixu_math_namespace.h>
 #include <optixu/optixu_aabb_namespace.h>
@@ -25,6 +25,7 @@ rtBuffer<Transmitter, 1> txBuffer;
 //Launch variables
 rtDeclareVariable(uint3, launchIndex, rtLaunchIndex, );
 
+rtDeclareVariable(uint, rayTypeIndex, , );
 
 
 //Configuration variables
@@ -39,7 +40,7 @@ RT_PROGRAM void genRayTracesFromHits()
 
 	const Transmitter tx = txBuffer[launchIndex.y];
 	
-	float3 origin = tx.origin;
+	float3 origin = make_float3(tx.origin_p);
 	
 	float3 ray_direction = hitRays[launchIndex.x];
 
@@ -51,7 +52,7 @@ RT_PROGRAM void genRayTracesFromHits()
 	//Print all rays generated
 	//rtPrintf("A\t%u\t%u\t%f\t%f\t%f\n", launchIndex.x, launchIndex.y, ray_direction.x, ray_direction.y, ray_direction.z);
 
-	traceReflection<BaseReflectionPayload>(rayPayload, OPAL_RAY_LOG_TRACE_RAY, origin, ray_direction, launchIndex.x,launchIndex.y);
+	traceReflection<BaseReflectionPayload>(rayPayload, rayTypeIndex, origin, ray_direction, launchIndex.x,launchIndex.y, true);
 
 
 }

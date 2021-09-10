@@ -1,0 +1,3 @@
+-- Make a uniform API for transmitters and receivers. Use Receiver buffer with position and so on. Problem, the sphere receiver still needs the sphere position and radius for sphere intersection. A buffer can be used but at 
+least a variable with the receiverIndex for the buffer has to be added to the intersection program. Alternatively a transform can be attached to the geometry instance and used to update the receiver position (and supposedly the
+bounding box and so on...

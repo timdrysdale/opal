@@ -1,6 +1,6 @@
 /***************************************************************/
 //
-//Copyright (c) 2019 Esteban Egea-Lopez http://ait.upct.es/eegea
+//Copyright (c) 2019 Esteban Egea-Lopez http://girtel.upct.es/~eegea
 //
 /**************************************************************/
 
@@ -36,8 +36,9 @@
  */
 
 
-#include <optix.h>
-#include <optixu/optixu_math_namespace.h>
+//#include <optix_world.h>
+//#include <optix.h>
+//#include <optixu/optixu_math_namespace.h>
 #include "../../Common.h"
 using namespace optix;
 
@@ -49,6 +50,7 @@ rtBuffer<int3>   index_buffer;
 rtBuffer<uint> faceId_buffer;
 
 rtDeclareVariable(TriangleHit, int_triangle_data, attribute triangle_hit_data, );
+rtDeclareVariable(float, t,rtIntersectionDistance, );
 
 
 RT_PROGRAM void triangle_attributes()
@@ -62,7 +64,7 @@ RT_PROGRAM void triangle_attributes()
 	const float3 e1 = p0 - p2;
 	const float3 n  = cross( e1, e0 );
 
-	const float3 e2 = ( 1.0f / dot( n, ray.direction ) ) * ( p0 - ray.origin );
+	//const float3 e2 = ( 1.0f / dot( n, ray.direction ) ) * ( p0 - ray.origin );
 	//const float3 i  = cross( ray.direction, e2 );
 
 	//beta  = dot( i, e1 );
@@ -71,7 +73,8 @@ RT_PROGRAM void triangle_attributes()
 	//h.t = dot(n,e2);
 	h.triId = primIdx;
 
-	h.geom_normal_t=make_float4(n.x,n.y,n.z,dot(n,e2));
+	//h.geom_normal_t=make_float4(n.x,n.y,n.z,dot(n,e2));
+	h.geom_normal_t=make_float4(n.x,n.y,n.z,t);
 	//h.geom_normal=n;
 
 	h.faceId = faceId_buffer[primIdx];

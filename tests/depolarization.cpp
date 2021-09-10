@@ -1,24 +1,30 @@
 /***************************************************************/
 //
-//Copyright (c) 2019 Esteban Egea-Lopez http://ait.upct.es/eegea
+//Copyright (c) 2019 Esteban Egea-Lopez http://girtel.upct.es/~eegea
 //
 /**************************************************************/
 #include "depolarization.h"
 #include "../timer.h"
 #include "../Opal.h"
-#include "opal/util.h"
 #include <memory>
+#include "../flatSimulation.h"
 using namespace opal;
 using namespace optix;
 //Polarization test. Horizontal plane test but with arbitrary polarizations. To validate against a two-ray model
 std::unique_ptr<OpalSceneManager> polarizationPlaneTest(std::unique_ptr<OpalSceneManager> sceneManager, bool print, bool subSteps) {
+	float freq=5.9e9f;
+	LPFlatMeshReflectionSimulation* sim=new LPFlatMeshReflectionSimulation(sceneManager.get());
+	sceneManager->setSimulation(sim);	
+	sceneManager->initContext(freq);
+	
+	
 	std::cout << "Running polarizationPlaneTest" << std::endl;
 	//Horizontal plane as quad at origin. Better to use this plane, since precision problems occur when rays are aligned with triangles and some intersections with the plane may be missed
 	int quadind[6] = { 0,1,2,1,0,3 };
 	optix::float3 quadh[4] = { make_float3(-0.5f,0.0f,-0.5f),make_float3(0.5f,0.f,0.5f) ,make_float3(0.5f,0.f,-0.5f) ,make_float3(-0.5f,0.0f,0.5f) };
 
 	//Scale to 200x200
-	optix::Matrix4x4 tm;
+	Matrix4x4 tm;
 	tm.setRow(0, make_float4(200, 0, 0, 0.f));
 	tm.setRow(1, make_float4(0, 1, 0, 0.f));
 	tm.setRow(2, make_float4(0, 0, 200, 0.f));
@@ -49,11 +55,11 @@ std::unique_ptr<OpalSceneManager> polarizationPlaneTest(std::unique_ptr<OpalScen
 	optix::float3 postx = make_float3(0.0f, 10.0f, 0.0f);
 
 
-	//sceneManager->addReceiver(1, posrx, polarization, 1.0f, printPower);
+	//sceneManager->addReceiver(1, posrx, polarization, 1.0f, sceneManager->printPower);
 	
 	//With different polarization for the receiver
 	optix::float3 posrx = make_float3(0.0f, 2.0f,10.0f*tanf(M_PI/3.0)+ 2.0/tanf(M_PI/6.0));
-	sceneManager->addReceiver(1, posrx, make_float3(1.0f,0.0f,0.0f), 1.0f, printPower);
+	sceneManager->addReceiver(1, posrx, make_float3(1.0f,0.0f,0.0f), 1.0f, sceneManager->printPower);
 
 
 	sceneManager->finishSceneContext();
@@ -88,14 +94,18 @@ std::unique_ptr<OpalSceneManager> polarizationPlaneTest(std::unique_ptr<OpalScen
 std::unique_ptr<OpalSceneManager> crossingTestDepolarization(std::unique_ptr<OpalSceneManager> sceneManager, bool print, bool subSteps) {
 
 	Timer timer;
+	float freq=5.9e9f;
+	LPFlatMeshReflectionSimulation* sim=new LPFlatMeshReflectionSimulation(sceneManager.get());
+	sceneManager->setSimulation(sim);	
+	sceneManager->initContext(freq);
 
 	std::cout << "Simulating crossing streets test" << std::endl;
 	//Cubes
-	std::vector<int> cubeind = Util::loadTrianglesFromFile("meshes/tricube.txt");
-	std::vector<optix::float3> cubevert = Util::loadVerticesFromFile("meshes/vertcube.txt");
+	std::vector<int> cubeind = sceneManager->loadTrianglesFromFile("meshes/tricube.txt");
+	std::vector<float3> cubevert = sceneManager->loadVerticesFromFile("meshes/vertcube.txt");
 	//std::cout << "indices=" << cubeind.size() << "vertices=" << cubevert.size() << std::endl;
 	//Cube(4) NW
-	optix::Matrix4x4 tm;
+	Matrix4x4 tm;
 	tm.setRow(0, make_float4(40.0f, 0, 0, -30.0f));
 	tm.setRow(1, make_float4(0, 40.0f, 0, 20.0f));
 	tm.setRow(2, make_float4(0, 0, 40.0f, 80.0f));
@@ -134,8 +144,8 @@ std::unique_ptr<OpalSceneManager> crossingTestDepolarization(std::unique_ptr<Opa
 	sceneManager->addStaticMesh(static_cast<int>(cubevert.size()), cubevert.data(), static_cast<int>(cubeind.size()), cubeind.data(), tm, emProp1);
 
 	//Horizontal plane
-//	std::vector<int> planeind = Util::Util::loadTrianglesFromFile("meshes/tri.txt");
-//	std::vector<float3> planever = loadVerticesFromFile("meshes/vert.txt");
+//	std::vector<int> planeind = sceneManager->loadTrianglesFromFile("meshes/tri.txt");
+//	std::vector<float3> planever = sceneManager->loadVerticesFromFile("meshes/vert.txt");
 //	//std::cout << "indices=" << planeind.size() << "vertices=" << planever.size() << std::endl;
 //
 //	tm.setRow(0, make_float4(10.0f, 0, 0, 0.0f));
@@ -169,7 +179,7 @@ std::unique_ptr<OpalSceneManager> crossingTestDepolarization(std::unique_ptr<Opa
 
 	optix::float3 posrx = make_float3(0.0f, 10.0f, 100.0f);
 	optix::float3 polarization = make_float3(0.0f, 1.0f, 0.0f); //Perpendicular to the floor. Assuming as in Unity that forward is z-axis and up is y-axis
-	sceneManager->addReceiver(1, posrx,polarization, 5.0f, printPower);
+	sceneManager->addReceiver(1, posrx,polarization, 5.0f, sceneManager->printPower);
 
 
 	//sceneManager->setMaxReflections(3u);

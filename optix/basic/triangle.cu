@@ -1,6 +1,6 @@
 /***************************************************************/
 //
-//Copyright (c) 2019 Esteban Egea-Lopez http://ait.upct.es/eegea
+//Copyright (c) 2019 Esteban Egea-Lopez http://girtel.upct.es/~eegea
 //
 /**************************************************************/
 
@@ -34,8 +34,9 @@
  */
 
 #include "../../Common.h"
-#include "../../Complex.h"
-#include "../../traceFunctions.h"
+#include "../Complex.h"
+#include "../traceFunctions.h"
+#include "../reflectionFunctions.h"
 #include <optix.h>
 #include <optixu/optixu_math_namespace.h>
 #include <optixu/optixu_aabb_namespace.h>
@@ -52,10 +53,6 @@ rtDeclareVariable(TriangleHit, ch_triangle_data, attribute triangle_hit_data, );
 rtDeclareVariable(MaterialEMProperties, EMProperties, , );
 rtDeclareVariable(uint, meshId, , );
 
-//Penetration configuration
-rtDeclareVariable(uint, usePenetration, , );
-rtDeclareVariable(float, attenuationLimit, , );
-
 
 //WARNING: Only to be used with vertical (0,1,0) and horizontal, but just (1,0,0), polarizations. Assuming that the transmitters and receivers have the same polarization. In any other 
 //case, you should use full depolarization
@@ -66,7 +63,7 @@ RT_PROGRAM void closestHitTriangle()
 	//Update payload
 	const float3 gn=make_float3(ch_triangle_data.geom_normal_t.x,ch_triangle_data.geom_normal_t.y,ch_triangle_data.geom_normal_t.z);	
 	const float3 n = normalize(rtTransformNormal(RT_OBJECT_TO_WORLD,gn ));
-	const float3 reflection_dir=reflect(ray.direction, n);
+	const float3 reflection_dir=normalize(reflect(ray.direction, n));
 	const float aux=rayPayload.ndtd.w;
 	//const float rayLength = ch_triangle_data.geom_normal_t.w;
 	//const float3 hp= ray.origin + rayLength * ray.direction ;
@@ -110,15 +107,15 @@ RT_PROGRAM void closestHitTriangle()
 	//it happens: a ray is not detected as hitting a face and gets inside the mesh, hitting an internal face later.
 	//With penetration we can hit internal faces in closed meshes. This way, we also get the correct incidence angle again.
 	float cosA = fabs(dot(-ray.direction, n));
-
+	float2 dielectricConstant = getDielectricConstant<HVWavePayload>(rayPayload,EMProperties);
 
 	//rtPrintf("G\t%u\t%u\t%d\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n", launchIndexTriangle.x, launchIndexTriangle.y, rayPayload.reflections, cosA, ray.direction.x, ray.direction.y, ray.direction.z, n.x, n.y, n.z, rayPayload.lrhpd.w);
 
 	//Complex arithmetic: sum
-	float2 argument = make_float2(EMProperties.dielectricConstant.x + (cosA*cosA) - 1.0f, EMProperties.dielectricConstant.y);
+	float2 argument = make_float2(dielectricConstant.x + (cosA*cosA) - 1.0f, dielectricConstant.y);
 	float2 root = complex_sqrt(argument);
 	float2 R;
-	float polarization = dot(rayPayload.polarization, n); //Assuming polarization is normalized, we get the cos(angle(rayPayload.polarization, n))
+	float polarization = dot(make_float3(rayPayload.polarization_k), n); //Assuming polarization is normalized, we get the cos(angle(rayPayload.polarization, n))
 	if (fabs(polarization) <= 0.7071f) {
 		//Angle between tx polarization and normal in 45 and 90 degrees
 		//Approximation (no depolarization)
@@ -128,7 +125,7 @@ RT_PROGRAM void closestHitTriangle()
 
 
 		//Reflection info log (to be used in external programs)
-		//rtPrintf("S\t%u\t%u\t%u\t%f\t%f\t%f\t%f\t%.6e\t%.6e\n", launchIndexTriangle.x, launchIndexTriangle.y, reflections,  argument.x, argument.y, root.x, root.y, R.x, R.y);
+		//rtPrintf("S\t%u\t%u\t%u\t%f\t%f\t%f\t%f\t%f\t%.6e\t%.6e\n", launchIndexTriangle.x, launchIndexTriangle.y, reflections,(acosf(cosA)*180.0f/3.1415),  argument.x, argument.y, root.x, root.y, R.x, R.y);
 		
 
 	}
@@ -138,21 +135,24 @@ RT_PROGRAM void closestHitTriangle()
 		//Hard reflection. Electric field in the plane of incidence Electric field is perpendicular to the wall, ie, parallel to the normal
 
 		//float2 num = sca_complex_prod(cosA, make_float2(EMProperties.dielectricConstant.x, EMProperties.dielectricConstant.y));
-		float2 num = sca_complex_prod(cosA, EMProperties.dielectricConstant);
+		float2 num = sca_complex_prod(cosA, dielectricConstant);
 		float2 div=num;
-		//float2 div = sca_complex_prod(cosA, EMProperties.dielectricConstant);
-
-	//	num.x -= root.x;
-	//	num.y -= root.y;
-	//	div.x += root.x;
-	//	div.y += root.y;
 		num -=root;
 		div +=root;
 		R = complex_div(num, div);
+//Rappaport version, depends on how you define the reflected ray geometrically
+//	float2 num = sca_complex_prod(cosA, make_float2(-EMProperties.dielectricConstant.x, -EMProperties.dielectricConstant.y));
+//	float2 div = sca_complex_prod(cosA, EMProperties.dielectricConstant);
+//	num.x += root.x;
+//	num.y += root.y;
+//	div.x += root.x;
+//	div.y += root.y;
+//	R = complex_div(num, div);
+//	////////////////////////////////////////
 
 		//Reflection info log (to be used in external programs)
 	//	float mycos = dot(-ray.direction, n);
-		//rtPrintf("N\t%u\t%u\t%u\t%f\t%f\t%f\t%f\t%f\t%f\n", launchIndexTriangle.x, launchIndexTriangle.y, reflections, argument.x, argument.y, root.x, root.y, R.x, R.y);
+		//rtPrintf("N\t%u\t%u\t%u\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n", launchIndexTriangle.x, launchIndexTriangle.y, reflections,(acosf(cosA)*180.0f/3.141592), argument.x, argument.y, root.x, root.y, R.x, R.y);
 	//	rtPrintf("NN dot=%f angle=%f hp=(%f,%f,%f)per=(%f,%f)rayR=(%f,%f)\n",mycos,  acosf(mycos), rayPayload.hitPoint.x, rayPayload.hitPoint.y, rayPayload.hitPoint.z, EMProperties.dielectricConstant.x, EMProperties.dielectricConstant.y, rayPayload.prodReflectionCoefficient.x, rayPayload.prodReflectionCoefficient.y);
 
 	}
@@ -192,7 +192,7 @@ RT_PROGRAM void closestHitTriangle()
 			//Attenuation
 			penPayload.hitPointAtt.w = tAtt;
 			//rtPrintf("AT cosA=%f\tatt=%f\ttAtt=%f\nr=(%f,%f,%f)\tn=(%f,%f,%f)\n",cosA,dbAtt,tAtt,ray.direction.x,ray.direction.y,ray.direction.z,n.x,n.y,n.z);
-			traceReflection<HVWavePayload>(penPayload, OPAL_RAY_REFLECTION, ch_triangle_data.hp, ray.direction, launchIndexTriangle.x,launchIndexTriangle.y);
+			traceReflection<HVWavePayload>(penPayload, ray.ray_type, ch_triangle_data.hp, ray.direction, launchIndexTriangle.x,launchIndexTriangle.y,false);
 		}
 	}
 	//Update here reflection coefficient, otherwise we multiply reflection and transmission in the transmission above

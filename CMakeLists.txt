@@ -77,6 +77,7 @@ function(OPTIX_add_sample_library target_name)
   target_link_libraries( ${target_name}
     sutil_sdk
     optix
+    #mlpack
     ${optix_rpath}
     )
 
@@ -98,6 +99,7 @@ target_link_libraries(${target_name}
   optix
   optixu
   sutil_sdk
+  #mlpack
   )
 
   if(USING_GNU_CXX)
@@ -108,142 +110,302 @@ endfunction()
 
 set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/tutils.cu
   PROPERTIES CUDA_SOURCE_PROPERTY_FORMAT OBJ
-  )
+ )
+set(OPAL_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/Config.h.in ${CMAKE_CURRENT_SOURCE_DIR}/Config.h @ONLY)
+ 
 
 # See top level CMakeLists.txt file for documentation of OPTIX_add_sample_executable.
 OPTIX_add_sample_executable( opal 
   Opal.cpp
   Opal.h
   Common.h
-  Complex.h
+  Config.h
+  util.cpp
+  util.h
   Unity.h
   Unity.cpp
   main.cpp
-  traceFunctions.h
-  multitransmitter.h
-  multitransmitter.cpp
+  transmitterManager.h
+  transmitterManager.cpp
+  opalSimulation.h
+  opalSimulation.cpp
+  basicSimulation.h
+  basicSimulation.cpp
+  flatSimulation.h
+  flatSimulation.cpp
+  curvedMeshSimulation.h
+  curvedMeshSimulation.cpp
+  curvedFlatMeshSimulation.h
+  curvedFlatMeshSimulation.cpp
+  rayDensityNormalizationSimulation.h
+  rayDensityNormalizationSimulation.cpp
   tutils.cu
   tutils.h
   timer.h
   timer.cpp
+  tests/rdn.h
+  tests/rdn.cpp
   tests/tests.h
   tests/tests.cpp
   tests/tunnels.cpp
   tests/tunnels.h
   tests/depolarization.h
   tests/depolarization.cpp
-  util.cpp
-  util.h
+  tests/curvature.h
+  tests/curvature.cpp
+  tests/tunnelsBase.h
+  tests/tunnelsBase.cpp
+  tests/dudley.h
+  tests/dudley.cpp
+  tests/diffraction.h
+  tests/diffraction.cpp
+  tests/antennaGain.h
+  tests/antennaGain.cpp
   ptxUtil.h
   ptxUtil.cpp
+  raySphere.h
+  raySphere.cpp
+  singleDiffraction.h
+  singleDiffraction.cpp
   #To see it properly in Visual Studio we should add the following. 
   optix/intersect/sphere.cu
   optix/intersect/optixGeometryTriangles.cu
   optix/intersect/optixTriangle.cu
+  optix/intersect/optixGeometryTrianglesCurved.cu
+  optix/intersect/optixTriangleCurved.cu
+  optix/intersect/exception.cu
   optix/basic/generation.cu
+  optix/basic/generationGPU.cu
   optix/basic/triangle.cu
   optix/basic/receiver.cu
   optix/polarization/generation.cu
+  optix/polarization/generationGPU.cu
   optix/polarization/receiver.cu
   optix/polarization/triangle.cu
   optix/polarization/linearPolarizationFunctions.h
+  optix/polarization/curved/curved.cu
+  optix/polarization/curved/triangle.cu
+  optix/polarization/curved/receiver.cu
+  optix/polarization/curved/generation.cu
+  optix/polarization/curved/generationGPU.cu
+  optix/polarization/rdn/curved.cu
+  optix/polarization/rdn/receiver.cu
+  optix/polarization/rdn/triangle.cu
+  optix/polarization/rdn/generation.cu
+  optix/polarization/rdn/generationGPU.cu
   optix/log/generation.cu
   optix/log/triangle.cu
   optix/log/receiver.cu
-
+  optix/log/curved.cu
+  optix/Complex.h
+  optix/penetrationFunctions.h
+  optix/traceFunctions.h
+  optix/curvedFunctions.h
+  optix/receiverFunctions.h
+  optix/triangleFunctions.h
+  optix/reflectionFunctions.h
   )
 
-target_link_libraries( opal 
+target_link_libraries( opal
      ${CUDA_LIBRARIES}
+    ${CUDA_curand_LIBRARY}
   optix
   optixu
   sutil_sdk
+  #mlpack
   )
 set(sources
+  json.hpp
   Opal.cpp
   Opal.h
   Common.h
-  Complex.h
+  Config.h
+  util.cpp
+  util.h
+  #Complex.h
   Unity.h
   Unity.cpp
   main.cpp
-  traceFunctions.h
-  multitransmitter.h
-  multitransmitter.cpp
+  #traceFunctions.h
+  #penetrationFunctions.h
+  transmitterManager.h
+  transmitterManager.cpp
+  opalSimulation.h
+  opalSimulation.cpp
+  basicSimulation.h
+  basicSimulation.cpp
+  flatSimulation.h
+  flatSimulation.cpp
+  curvedMeshSimulation.h
+  curvedMeshSimulation.cpp
+  curvedFlatMeshSimulation.h
+  curvedFlatMeshSimulation.cpp
+  rayDensityNormalizationSimulation.h
+  rayDensityNormalizationSimulation.cpp
   tutils.cu
   tutils.h
   timer.h
   timer.cpp
+  tests/rdn.h
+  tests/rdn.cpp
   tests/tests.h
   tests/tests.cpp
   tests/tunnels.cpp
   tests/tunnels.h
   tests/depolarization.h
   tests/depolarization.cpp
-  util.cpp
-  util.h
+  tests/curvature.h
+  tests/curvature.cpp
+  tests/tunnelsBase.h
+  tests/tunnelsBase.cpp
+  tests/dudley.h
+  tests/dudley.cpp
+  tests/diffraction.h
+  tests/diffraction.cpp
+  tests/antennaGain.h
+  tests/antennaGain.cpp
   ptxUtil.h
   ptxUtil.cpp
+  raySphere.h
+  raySphere.cpp
+  singleDiffraction.h
+  singleDiffraction.cpp
+  json.hpp
   #To see it properly in Visual Studio we should add the following. 
   optix/intersect/sphere.cu
   optix/intersect/optixGeometryTriangles.cu
   optix/intersect/optixTriangle.cu
+  optix/intersect/optixGeometryTrianglesCurved.cu
+  optix/intersect/optixTriangleCurved.cu
+  optix/intersect/exception.cu
   optix/basic/generation.cu
+  optix/basic/generationGPU.cu
   optix/basic/triangle.cu
   optix/basic/receiver.cu
   optix/polarization/generation.cu
+  optix/polarization/generationGPU.cu
   optix/polarization/receiver.cu
   optix/polarization/triangle.cu
   optix/polarization/linearPolarizationFunctions.h
+  optix/polarization/curved/curved.cu
+  optix/polarization/curved/triangle.cu
+  optix/polarization/curved/receiver.cu
+  optix/polarization/curved/generation.cu
+  optix/polarization/curved/generationGPU.cu
+  optix/polarization/rdn/curved.cu
+  optix/polarization/rdn/receiver.cu
+  optix/polarization/rdn/triangle.cu
+  optix/polarization/rdn/generation.cu
+  optix/polarization/rdn/generationGPU.cu
   optix/log/generation.cu
   optix/log/triangle.cu
   optix/log/receiver.cu
-
+  optix/log/curved.cu
+  optix/Complex.h
+  optix/penetrationFunctions.h
+  optix/traceFunctions.h
+  optix/curvedFunctions.h
+  optix/receiverFunctions.h
+  optix/triangleFunctions.h
+  optix/reflectionFunctions.h
 )
 OPTIX_add_sample_library( opal_s 
   Opal.cpp
   Opal.h
   Common.h
-  Complex.h
+  Config.h
+  util.cpp
+  util.h
   Unity.h
   Unity.cpp
   main.cpp
-  traceFunctions.h
-  multitransmitter.h
-  multitransmitter.cpp
+  transmitterManager.h
+  transmitterManager.cpp
+  opalSimulation.h
+  opalSimulation.cpp
+  basicSimulation.h
+  basicSimulation.cpp
+  flatSimulation.h
+  flatSimulation.cpp
+  curvedMeshSimulation.h
+  curvedMeshSimulation.cpp
+  curvedFlatMeshSimulation.h
+  curvedFlatMeshSimulation.cpp
+  rayDensityNormalizationSimulation.h
+  rayDensityNormalizationSimulation.cpp
   tutils.cu
   tutils.h
   timer.h
   timer.cpp
+  tests/rdn.h
+  tests/rdn.cpp
   tests/tests.h
   tests/tests.cpp
   tests/tunnels.cpp
   tests/tunnels.h
   tests/depolarization.h
   tests/depolarization.cpp
-  util.cpp
-  util.h
+  tests/curvature.h
+  tests/curvature.cpp
+  tests/tunnelsBase.h
+  tests/tunnelsBase.cpp
+  tests/dudley.h
+  tests/dudley.cpp
+  tests/diffraction.h
+  tests/diffraction.cpp
+  tests/antennaGain.h
+  tests/antennaGain.cpp
   ptxUtil.h
   ptxUtil.cpp
+  raySphere.h
+  raySphere.cpp
+  singleDiffraction.h
+  singleDiffraction.cpp
+  json.hpp
+  #dkm.h 
   #To see it properly in Visual Studio we should add the following. 
   optix/intersect/sphere.cu
   optix/intersect/optixGeometryTriangles.cu
   optix/intersect/optixTriangle.cu
+  optix/intersect/optixGeometryTrianglesCurved.cu
+  optix/intersect/optixTriangleCurved.cu
+  optix/intersect/exception.cu
   optix/basic/generation.cu
+  optix/basic/generationGPU.cu
   optix/basic/triangle.cu
   optix/basic/receiver.cu
   optix/polarization/generation.cu
+  optix/polarization/generationGPU.cu
   optix/polarization/receiver.cu
   optix/polarization/triangle.cu
   optix/polarization/linearPolarizationFunctions.h
+  optix/polarization/curved/curved.cu
+  optix/polarization/curved/triangle.cu
+  optix/polarization/curved/receiver.cu
+  optix/polarization/curved/generation.cu
+  optix/polarization/curved/generationGPU.cu
+  optix/polarization/rdn/curved.cu
+  optix/polarization/rdn/receiver.cu
+  optix/polarization/rdn/triangle.cu
+  optix/polarization/rdn/generation.cu
+  optix/polarization/rdn/generationGPU.cu
   optix/log/generation.cu
   optix/log/triangle.cu
   optix/log/receiver.cu
-
+  optix/log/curved.cu
+  optix/Complex.h
+  optix/penetrationFunctions.h
+  optix/traceFunctions.h
+  optix/curvedFunctions.h
+  optix/receiverFunctions.h
+  optix/triangleFunctions.h
+  optix/reflectionFunctions.h
   )
 
 target_link_libraries( opal_s 
      ${CUDA_LIBRARIES}
+    ${CUDA_curand_LIBRARY}
   optix
   optixu
   sutil_sdk
@@ -252,40 +414,93 @@ set(sources
   Opal.cpp
   Opal.h
   Common.h
-  Complex.h
+  Config.h
+  util.cpp
+  util.h
+  #Complex.h
   Unity.h
   Unity.cpp
   main.cpp
-  traceFunctions.h
-  multitransmitter.h
-  multitransmitter.cpp
+  #traceFunctions.h
+  #penetrationFunctions.h
+  transmitterManager.h
+  transmitterManager.cpp
+  opalSimulation.h
+  opalSimulation.cpp
+  basicSimulation.h
+  basicSimulation.cpp
+  flatSimulation.h
+  flatSimulation.cpp
+  curvedMeshSimulation.h
+  curvedMeshSimulation.cpp
+  curvedFlatMeshSimulation.h
+  curvedFlatMeshSimulation.cpp
+  rayDensityNormalizationSimulation.h
+  rayDensityNormalizationSimulation.cpp
   tutils.cu
   tutils.h
   timer.h
   timer.cpp
+  tests/rdn.h
+  tests/rdn.cpp
   tests/tests.h
   tests/tests.cpp
   tests/tunnels.cpp
   tests/tunnels.h
   tests/depolarization.h
   tests/depolarization.cpp
-  util.cpp
-  util.h
+  tests/curvature.h
+  tests/curvature.cpp
+  tests/tunnelsBase.h
+  tests/tunnelsBase.cpp
+  tests/dudley.h
+  tests/dudley.cpp
+  tests/diffraction.h
+  tests/diffraction.cpp
+  tests/antennaGain.h
+  tests/antennaGain.cpp
   ptxUtil.h
   ptxUtil.cpp
+  raySphere.h
+  raySphere.cpp
+  singleDiffraction.h
+  singleDiffraction.cpp
+  json.hpp
   #To see it properly in Visual Studio we should add the following. 
   optix/intersect/sphere.cu
   optix/intersect/optixGeometryTriangles.cu
   optix/intersect/optixTriangle.cu
+  optix/intersect/optixGeometryTrianglesCurved.cu
+  optix/intersect/optixTriangleCurved.cu
+  optix/intersect/exception.cu
   optix/basic/generation.cu
+  optix/basic/generationGPU.cu
   optix/basic/triangle.cu
   optix/basic/receiver.cu
   optix/polarization/generation.cu
+  optix/polarization/generationGPU.cu
   optix/polarization/receiver.cu
   optix/polarization/triangle.cu
   optix/polarization/linearPolarizationFunctions.h
+  optix/polarization/curved/curved.cu
+  optix/polarization/curved/triangle.cu
+  optix/polarization/curved/receiver.cu
+  optix/polarization/curved/generation.cu
+  optix/polarization/curved/generationGPU.cu
+  optix/polarization/rdn/curved.cu
+  optix/polarization/rdn/receiver.cu
+  optix/polarization/rdn/triangle.cu
+  optix/polarization/rdn/generation.cu
+  optix/polarization/rdn/generationGPU.cu
   optix/log/generation.cu
   optix/log/triangle.cu
   optix/log/receiver.cu
-
+  optix/log/curved.cu
+  optix/Complex.h
+  optix/penetrationFunctions.h
+  optix/traceFunctions.h
+  optix/curvedFunctions.h
+  optix/receiverFunctions.h
+  optix/triangleFunctions.h
+  optix/reflectionFunctions.h
 )

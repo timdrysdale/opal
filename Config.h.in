@@ -1,0 +1,8 @@
+/***************************************************************/
+//
+//Copyright (c) 2020 Esteban Egea-Lopez http://girtel.upct.es/~eegea
+//
+/**************************************************************/
+
+#define OPAL_SOURCE_DIR "@OPAL_SOURCE_DIR@"
+

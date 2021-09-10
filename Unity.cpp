@@ -1,6 +1,6 @@
 /***************************************************************/
 //
-//Copyright (c) 2019 Esteban Egea-Lopez http://ait.upct.es/eegea
+//Copyright (c) 2019 Esteban Egea-Lopez http://girtel.upct.es/~eegea
 //
 /**************************************************************/
 
@@ -8,9 +8,14 @@
 #include "Unity.h"
 #include <iostream>
 #include <stdlib.h>
+#include "basicSimulation.h"
+#include "flatSimulation.h"
+#include "curvedMeshSimulation.h"
+#include "curvedFlatMeshSimulation.h"
+#include "rayDensityNormalizationSimulation.h"
+#include "singleDiffraction.h"
 
 #define CHM() if (sceneManager==nullptr) return OPAL_NO_SCENE_MANAGER; //Check manager
-#define CHMT() if (sceneManager==nullptr) { return OPAL_NO_SCENE_MANAGER;} else {if (MultiTransmitter==false) return OPAL_NO_MULTI_TRANSMITTER_MANAGER;}  //Check manager
 
 
 using namespace optix;
@@ -21,24 +26,20 @@ namespace opal {
 			throw;
 		}
 		catch (opal::Exception& e) {
-#ifdef OPALDEBUG
-			std::ofstream myfile;
-			myfile.open(logFile, std::ifstream::app);
-			myfile << "Init: error occurred with message " << e.getErrorString() << std::endl;
-			myfile.close();
-#endif // OPALDEBUG
+			//std::ofstream myfile;
+			//myfile.open(logFile, std::ifstream::app);
+			std::cout << "Init: error occurred with message " << e.getErrorString() << std::endl;
+			//myfile.close();
 
 			return OPAL_EXCEPTION;
 		}
 		catch (optix::Exception& e) {
-#ifdef OPALDEBUG
-			std::ofstream myfile;
-			myfile.open(logFile, std::ifstream::app);
-			myfile << "Init: error occurred with error code "
+			//std::ofstream myfile;
+			//myfile.open(logFile, std::ifstream::app);
+			std::cout << "Init: error occurred with error code "
 				<< e.getErrorCode() << " and message "
 				<< e.getErrorString() << std::endl;
-			myfile.close();
-#endif // OPALDEBUG
+			//myfile.close();
 			return OPTIX_EXCEPTION;
 		}
 
@@ -71,8 +72,8 @@ namespace opal {
 	//Any change made in the .cu files in VS is ignored unless copied to that location.
 
 	//When building an executable with Unity, you have either to use a specific script to create the cudaDir and copy the .cu and .h files to it, or just create and copy manually after the build is done
-	//In the end, along with the Unity executable and files you need to have this specific folder and files some way
-	OPAL_API int Init(float frequency, bool useExactSpeedOfLight,bool multiTransmitter)
+	//In the end, along with the Unity executable and files you need to provide this specific folder and files some way
+	OPAL_API int Init(float frequency,int simType, int mode, bool useExactSpeedOfLight, bool useDiffraction, bool enableFastMath, bool generateRaysOnLaunch, bool enableMultiGPU, bool logTrace, bool enableMultitransmitter, bool useAntennaGain, unsigned int maxReflections, float minEpsilon )
 	{
 		try {
 			//First, set the environment to read the CUDA program files from our Plugins directory, in case we use sutil. This is actually not necessary for our programs since we use the ptxHandler
@@ -85,19 +86,59 @@ namespace opal {
 #endif // _WIN32
 
 
-			if (multiTransmitter) {
-				//Return exception until corrected
-				//throw optix::Exception("Not implemented yet");
-				MultiTransmitter=true;
-				sceneManager = new OpalSceneManagerMultiTransmitter();
-				
-			} else {
-
-				sceneManager = new OpalSceneManager();
-			}
+			sceneManager = new OpalSceneManager();
 			//TODO: add features here
-			sceneManager->setBaseDir(pluginDir);	
-			sceneManager->initContext(frequency,  useExactSpeedOfLight);
+			sceneManager->setBaseDir(pluginDir);
+			if (!useExactSpeedOfLight) {
+				sceneManager->useApproximateSpeedLight();
+			}
+			if (generateRaysOnLaunch) {
+				sceneManager->enableGenerateRaysOnLaunch();
+			}
+			if (!enableMultiGPU) {
+				sceneManager->disableMultiGPU();	
+			}
+			if (!enableFastMath) {
+				sceneManager->disableFastMath();
+			}
+			if (enableMultitransmitter) {
+				sceneManager->enableMultitransmitter();
+			}	
+			sceneManager->setUseAntennaGain(useAntennaGain);
+			sceneManager->setMaxReflections(maxReflections);
+			sceneManager->setMinEpsilon(minEpsilon);
+			OpalSimulation* sim;
+			switch (simType) {	
+				case 0:
+					sim= new BasicFlatMeshReflectionSimulation(sceneManager);
+					break;
+				case 1:
+					sim= new LPFlatMeshReflectionSimulation(sceneManager);
+					break;
+				case 2: 
+					sim= new RayDensityNormalizationSimulation(sceneManager);
+					break;
+				case 3: 
+					sim= new SingleDiffraction(sceneManager);
+					break;
+			}
+
+			ComputeMode computeMode= ComputeMode::VOLTAGE;
+			if (mode==1) {
+				computeMode= ComputeMode::FIELD;
+			}
+			sceneManager->setSimulation(sim);
+			sim->setComputeMode(computeMode);
+			sim->setEnableTraceLog(logTrace);
+			if (useDiffraction) {
+				if (simType != 3) {
+					SingleDiffraction* simd= new SingleDiffraction(sceneManager);
+					sceneManager->setSimulation(simd);
+					simd->setComputeMode(computeMode);
+					simd->setEnableTraceLog(logTrace);
+				}
+			}
+			sceneManager->initContext(frequency);
 
 
 
@@ -170,6 +211,72 @@ namespace opal {
 		sceneManager->setAttenuationLimit(l);
 		return 0;
 	}
+	OPAL_API int AddEdge(optix::float3 p, optix::float3 v, unsigned int faid, unsigned int fbid, optix::float3 face_a, optix::float3 face_b, optix::float3 normal_a, optix::float3 normal_b, UnityMaterialEMProperties emProp, int id) {
+		CHM();
+		try {
+			MaterialEMProperties prop = sceneManager->ITUparametersToMaterial(emProp.a,emProp.b,emProp.c,emProp.d);
+			optix::uint2 faces=make_uint2(faid,fbid);
+			sceneManager->addEdge(p, v, faces, face_a,  face_b,  normal_a,  normal_b,  prop, id);
+			return 0;
+		} catch (...) {
+			handle();
+		}
+	}
+	OPAL_API int AddEdgeToGroup(optix::float3 p, optix::float3 v, unsigned int faid, unsigned int fbid, optix::float3 face_a, optix::float3 face_b, optix::float3 normal_a, optix::float3 normal_b, UnityMaterialEMProperties emProp, int id, int groupId) {
+		CHM();
+		try {
+			MaterialEMProperties prop = sceneManager->ITUparametersToMaterial(emProp.a,emProp.b,emProp.c,emProp.d);
+			optix::uint2 faces=make_uint2(faid,fbid);
+			sceneManager->addEdgeToGroup(p, v, faces, face_a,  face_b,  normal_a,  normal_b,  prop, id, groupId);
+			return 0;
+		} catch (...) {
+			handle();
+		}
+	}
+	OPAL_API int AddStaticMeshWithFacesFromUnity(int meshVertexCount, optix::float3* meshVertices, int meshTriangleCount, int* meshTriangles, int faceIdCount, int* faceIds,  UnityMatrix4x4 transformationMatrix, UnityMaterialEMProperties emProp) {
+		CHM();
+		try {
+			optix::Matrix4x4 translationMatrix;
+			UnityToOptixMatrix4x4(translationMatrix, transformationMatrix);
+			//When transforming to MaterialEMProperties conductivity is multiplied by -60*wavelenght
+			MaterialEMProperties prop = sceneManager->ITUparametersToMaterial(emProp.a,emProp.b,emProp.c,emProp.d);
+			std::vector<std::pair<optix::int3, unsigned int>> triangleIndexFaceBuffer;
+			//Lots of copying again, but it is supposed to be done during intialization
+			for (int i=0; i<meshTriangleCount; i=i+3) {
+				optix::int3 tri=make_int3(meshTriangles[i],meshTriangles[i+1],meshTriangles[i+2]);
+				triangleIndexFaceBuffer.push_back(std::pair<optix::int3, unsigned int>(tri,static_cast<unsigned int>(faceIds[i])));
+				
+				
+			}
+			std::vector<optix::float3> v;
+			for (int j=0; j<meshVertexCount; ++j) {
+				v.push_back(meshVertices[j]);
+			}
+			sceneManager->addStaticMeshWithFaces(v,triangleIndexFaceBuffer, translationMatrix, prop);
+
+			return 0;
+		} catch (...) {
+			handle();
+		}
+	}
+	OPAL_API int AddStaticCurvedMeshFromUnity(int meshVertexCount, optix::float3* meshVertices, int meshTriangleCount, int* meshTriangles, int pd1Count, optix::float4* pd1, int pd2Count, optix::float4* pd2,  UnityMatrix4x4 transformationMatrix, UnityMaterialEMProperties emProp, bool makeSingleFace, int faceId) {
+		CHM();
+		try {
+			optix::Matrix4x4 translationMatrix;
+			UnityToOptixMatrix4x4(translationMatrix, transformationMatrix);
+			//When transforming to MaterialEMProperties conductivity is multiplied by -60*wavelenght
+			MaterialEMProperties prop = sceneManager->ITUparametersToMaterial(emProp.a,emProp.b,emProp.c,emProp.d);
+			std::vector<optix::float3> vertices(meshVertices, meshVertices+meshVertexCount);
+			std::vector<int> triangles(meshTriangles, meshTriangles+meshTriangleCount); 
+			std::vector<optix::float4> pd1d(pd1, pd1+pd1Count);
+			std::vector<optix::float4> pd2d(pd2, pd2+pd2Count);
+			sceneManager->addStaticCurvedMesh(vertices, triangles,pd1d,pd2d, translationMatrix,prop, makeSingleFace, faceId);
+
+			return 0;
+		} catch (...) {
+			handle();
+		}
+}
 	OPAL_API int AddStaticMeshFromUnity(int meshVertexCount, optix::float3* meshVertices, int meshTriangleCount, int* meshTriangles, UnityMatrix4x4 transformationMatrix, UnityMaterialEMProperties emProp) {
 		CHM();
 		try {
@@ -251,6 +358,30 @@ namespace opal {
 		}
 	}
 
+	OPAL_API int AddMeshWithFacesToGroupFromUnity(int id, int meshVertexCount, optix::float3* meshVertices, int meshTriangleCount, int* meshTriangles, int faceIdCount, int* faceIds,  UnityMaterialEMProperties emProp) {
+		CHM();
+		try {
+			//When transforming to MaterialEMProperties conductivity is multiplied by -60*wavelenght
+			MaterialEMProperties prop = sceneManager->ITUparametersToMaterial(emProp.a,emProp.b,emProp.c,emProp.d);
+			std::vector<std::pair<optix::int3, unsigned int>> triangleIndexFaceBuffer;
+			//TODO: Lots of copying again, this can be used more during execution, change to more efficient
+			for (int i=0; i<meshTriangleCount; i=i+3) {
+				optix::int3 tri=make_int3(meshTriangles[i],meshTriangles[i+1],meshTriangles[i+2]);
+				triangleIndexFaceBuffer.push_back(std::pair<optix::int3, unsigned int>(tri,static_cast<unsigned int>(faceIds[i])));
+				
+				
+			}
+			std::vector<optix::float3> v;
+			for (int j=0; j<meshVertexCount; ++j) {
+				v.push_back(meshVertices[j]);
+			}
+			sceneManager->addMeshWithFacesToGroup(id, v,triangleIndexFaceBuffer,  prop);
+
+			return 0;
+		} catch (...) {
+			handle();
+		}
+	}
 	OPAL_API int AddMeshToGroupFromUnity(int id, int meshVertexCount, optix::float3 * meshVertices, int meshTriangleCount, int * meshTriangles, UnityMaterialEMProperties emProp)
 	{
 		CHM();
@@ -391,6 +522,26 @@ namespace opal {
 			return OPTIX_EXCEPTION;
 		}
 	}
+	OPAL_API int SetRayRange(float initElevation, float endElevation, float initAzimuth,  float endAzimuth, int rayD) {
+		CHM();
+		try {
+			sceneManager->setRayRange(initElevation,endElevation,initAzimuth,endAzimuth,rayD,rayD);
+			return 0;
+			
+		} catch (...) {
+			handle();
+		}
+	}
+	OPAL_API int CreateRaySphereRange(float initElevation, float elevationDelta, float endElevation, float initAzimuth, float azimuthDelta, float endAzimuth) {
+		CHM();
+		try {
+			sceneManager->createRaySphere2D(initElevation, elevationDelta, endElevation, initAzimuth,azimuthDelta,endAzimuth);
+			return 0;
+			
+		} catch (...) {
+			handle();
+		}
+	}
 	OPAL_API int CreateRaySphere2D(int elevationDelta, int azimuthDelta)
 	{
 		CHM();
@@ -453,13 +604,43 @@ namespace opal {
 			return OPTIX_EXCEPTION;
 		}
 	}
+	OPAL_API float GetReceivedPower(int rxId, int txId)
+	{
+		CHM();
+		try 
+			{
+			return sceneManager->getReceivedPower(rxId, txId);
+		} catch (...) {
+			handle();
+		}
+	}
+	OPAL_API int GetReceivedE(int rxId, int txId, float* Exr, float* Exi, float* Eyr, float* Eyi,float* Ezr, float* Ezi)
+	{
+		CHM();
+		try 
+			{
+			EComponents e= sceneManager->getReceivedE(rxId, txId);
+			(*Exr)=e.Ex.x;
+			(*Exi)=e.Ex.y;
+			(*Eyr)=e.Ey.x;
+			(*Eyi)=e.Ey.y;
+			(*Ezr)=e.Ez.x;
+			(*Ezi)=e.Ez.y;
+			std::cout<<"GetReceivedE() "<<e.Ex<<","<<e.Ey<<","<<e.Ez<<std::endl;
+			return 0;
 
-	OPAL_API int AddReceiverFromUnity(int id, float3  position,  float radius, receiverCallback callback)
+		} catch (...) {
+			handle();
+		}
+	}
+
+
+	OPAL_API int AddReceiverFromUnity(int id, float3  position, float3 polarization, float radius)
 	{
 		CHM();
 		try {
-			 //TODO: at this release we do not allow to change polarization from Unity. Only basic simulation. In future releases we will fix this
-			sceneManager->addReceiver(id, position, make_float3(0.0f,1.0f,0.0f), radius, callback);
+			std::cout<<"AddReceiverFromUnity "<<id<<": position="<<position<<"polarization="<<polarization<<";radius="<<radius<<std::endl;
+			sceneManager->addReceiver(id, position, polarization, radius, nullptr);
 			return 0;
 		}
 		catch (opal::Exception& e) {
@@ -491,24 +672,14 @@ namespace opal {
 			return 0;
 		}
 		catch (opal::Exception& e) {
-#ifdef OPALDEBUG
-			std::ofstream myfile;
-			myfile.open(logFile, std::ifstream::app);
-			myfile << "Transmit: error occurred with message " << e.getErrorString() << std::endl;
-			myfile.close();
-#endif // OPALDEBUG
+			std::cout << "Transmit: error occurred with message " << e.getErrorString() << std::endl;
 
 			return OPAL_EXCEPTION;
 		}
 		catch (optix::Exception& e) {
-#ifdef OPALDEBUG
-			std::ofstream myfile;
-			myfile.open(logFile, std::ifstream::app);
-			myfile << "Transmit: error occurred with error code "
+			std::cout << "Transmit: error occurred with error code "
 				<< e.getErrorCode() << " and message "
 				<< e.getErrorString() << std::endl;
-			myfile.close();
-#endif // OPALDEBUG
 			return OPTIX_EXCEPTION;
 		}
 
@@ -573,11 +744,11 @@ namespace opal {
 		}
 	}
 
-	OPAL_API int UpdateReceiverWithRadius(int id, optix::float3 position, float radius) {
+	OPAL_API int UpdateReceiverWithRadius(int id, optix::float3 position, optix::float3 polarization, float radius) {
 		CHM();
 		try {
 
-			sceneManager->updateReceiver(id, position,radius);
+			sceneManager->updateReceiver(id, position,polarization, radius);
 			return 0;
 		}
 		catch (opal::Exception& e) {
@@ -691,10 +862,9 @@ namespace opal {
 	}
 	OPAL_API int RegisterTransmitter(int txId, optix::float3 origin, optix::float3 polarization, float transmitPower) 
 	{
-		CHMT();
+		CHM();
 		try {
-
-			static_cast<OpalSceneManagerMultiTransmitter*>(sceneManager)->registerTransmitter(txId,origin,polarization,transmitPower);
+			sceneManager->getTransmitterManager()->registerTransmitter(txId, origin, polarization, transmitPower);
 			return 0;
 		}
 		catch (...) {
@@ -703,10 +873,10 @@ namespace opal {
 	}
 	OPAL_API int RemoveTransmitter(int txId) 
 	{
-		CHMT();
+		CHM();
 		try {
 
-			static_cast<OpalSceneManagerMultiTransmitter*>(sceneManager)->removeTransmitter(txId);
+			sceneManager->getTransmitterManager()->removeTransmitter(txId);
 			return 0;
 		}
 		catch (...) {
@@ -715,10 +885,10 @@ namespace opal {
 	}
 	OPAL_API int AddTransmitterToGroup(int txId,float transmitPower, optix::float3 origin,optix::float3 polarization)
 	{
-		CHMT();
+		CHM();
 		try {
 
-			static_cast<OpalSceneManagerMultiTransmitter*>(sceneManager)->addTransmitterToGroup(txId,transmitPower,origin,polarization);
+			sceneManager->getTransmitterManager()->addTransmitterToGroup(txId,transmitPower,origin,polarization);
 			return 0;
 		}
 		catch (...) {
@@ -728,10 +898,10 @@ namespace opal {
 
 	OPAL_API int ClearGroup()
 	{
-		CHMT();
+		CHM();
 		try {
 
-			static_cast<OpalSceneManagerMultiTransmitter*>(sceneManager)->clearGroup();
+			sceneManager->getTransmitterManager()->clearGroup();
 			return 0;
 		}
 		catch (...) {
@@ -740,15 +910,50 @@ namespace opal {
 	}
 	OPAL_API int GroupTransmit()
 	{
-		CHMT();
+		CHM();
 		try {
 
-			static_cast<OpalSceneManagerMultiTransmitter*>(sceneManager)->groupTransmit();
+			sceneManager->groupTransmit();
 			return 0;
 		}
 		catch (...) {
 			handle();
 		}
 	}
+	OPAL_API int LoadAndRegisterGain(const char* path) 
+	{
+		CHM();
+		try {
+				std::cout<<"Loading from Unity gain file "<<path<<std::endl;
+				AntennaGain gains=sceneManager->loadGainsFromFileIndBPower(path);
+				int id=sceneManager->registerAntennaGain(gains);
 
+				return id;
+		}
+		catch (...) {
+			handle();
+		}
+	}
+	OPAL_API int RegisterReceiverGain(int rxId, int gainId)  
+	{
+		CHM();
+		try {
+                        sceneManager->registerReceiverGain(rxId,gainId);
+			return 0;
+		}
+		catch (...) {
+			handle();
+		}
+	}
+	OPAL_API int RegisterTransmitterGain(int txId, int gainId)  
+	{
+		CHM();
+		try {
+                        sceneManager->registerTransmitterGain(txId,gainId);
+			return 0;
+		}
+		catch (...) {
+			handle();
+		}
+	}
 }

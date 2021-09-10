@@ -1,6 +1,6 @@
 /***************************************************************/
 //
-//Copyright (c) 2019 Esteban Egea-Lopez http://ait.upct.es/eegea
+//Copyright (c) 2019 Esteban Egea-Lopez http://girtel.upct.es/~eegea
 //
 /**************************************************************/
 
@@ -63,6 +63,7 @@ RT_PROGRAM void missLogTrace()
 {
 	//rtPrintf("miss i.x=%u. iy=%u \n", receiverLaunchIndex.x, receiverLaunchIndex.y);
 	//missPayload.flags = FLAG_END;
-	missPayload.rhfr.z = FLAG_END;
+	//missPayload.rhfr.z = FLAG_END;
+	missPayload.rhfr.z |= 1u<<FLAG_END_POSITION;
 }
 

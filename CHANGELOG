@@ -1,11 +1,3 @@
-Opal-0.6.4 (March 2020)
------------
-1. Fixed bug in ptxUtil.cpp which prevented Opal from reading the .cu files from Unity.
-2. Fixed bug in Unity.cpp which made receivers have radius 0. Receiver polarization is not allowed to be set from Unity at the moment, So only basic simulation without depolarization is used from the Unity plugin. In future releases 
-we will add support for depolarization from Unity.
-Opal-0.6.3 (February 2020)
------------
-1. Fixed some issues that prevented Visual Studio from compiling Opal
 Opal-0.6 (November 2019)
 -----------
 1. Added a preprocessor tag in `Common.h` to use a technique for avoiding self-intersections. But this is going to introduce some small precision errors in the computed electric field, since the ray lengths are modified due to a displacement.  If you do not need very high accuracy (which is the usual case) you can  uncomment it. Otherwise keep it, but then you have to tune minEpsilon, which is not scale-invariant. If your simulation gets stuck in a launch, try uncommenting it.  If it is no longer stuck but you need high precision, comment it again an tune minEpsilon until it is removed.

@@ -1,13 +1,13 @@
 /***************************************************************/
 //
-//Copyright (c) 2019 Esteban Egea-Lopez http://ait.upct.es/eegea
+//Copyright (c) 2019 Esteban Egea-Lopez http://girtel.upct.es/~eegea
 //
 /**************************************************************/
 
 #ifndef DEPOLARIZATION_H
 #define DEPOLARIZATION_H
 #include "../Opal.h"
-
+#include "../util.h"
 using namespace opal;
 	//Depolarization tests
 	//Polarization test. Horizontal plane test but with arbitrary polarizations. To validate against a two-ray model

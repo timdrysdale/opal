@@ -1,6 +1,6 @@
 /***************************************************************/
 //
-//Copyright (c) 2019 Esteban Egea-Lopez http://ait.upct.es/eegea
+//Copyright (c) 2019 Esteban Egea-Lopez http://girtel.upct.es/~eegea
 //
 /**************************************************************/
 /**********************************************************
@@ -8,8 +8,10 @@
  * Functions for LINEAR polarization operations. . 
  * 
  * ********************************************************/
+#ifndef LINEARPOLARIZATIONFUNCTIONS_H
+#define LINEARPOLARIZATIONFUNCTIONS_H
 #include "../../Common.h"
-#include "../../Complex.h"
+#include "../Complex.h"
 #include <optix_world.h>
 #include  <optixu/optixu_matrix_namespace.h>
 
@@ -211,7 +213,7 @@ __forceinline__ __device__  optix::float3 getLinearPolarizationForRay(float3 pol
 		C_po.setCol(2u,make_float4(zpo));
 		C_po.setCol(3u,make_float4(0.0f,0.0f,0.0f,1.0f));
 		Matrix<4,4> Cinv_op= C_po.inverse(); //Create change of basis matrix from world to polarization;
-		const float4 temp=Cinv_op*make_float4(ray);
+		const float4 temp=Cinv_op*make_float4(ray); 
 		rayp=make_float3(temp.x,temp.y,temp.z); //Ray in polarization basis;
 	}
 	//Angles in polarization basis
@@ -260,6 +262,7 @@ __forceinline__ __device__ void getLinearPolarizationInRayBasis(float3 pol,  flo
 	//const float3 Eo3=getLinearPolarizationForRay(pol,ray);
 	const float3 Eo3=getLinearPolarizationForRaySimple(pol,ray);
 	//rtPrintf("ray=(%f,%f,%f) pol=(%f,%f,%f) Eoa=(%f,%f,%f) Eo3=(%f,%f,%f)\n",ray.x,ray.y,ray.z,pol.x,pol.y,pol.z,Eoa.x,Eoa.y,Eoa.z,Eo3.x,Eo3.y,Eo3.z);
+	//rtPrintf("ray=(%f,%f,%f) pol=(%f,%f,%f)  Eo3=(%f,%f,%f)\n",ray.x,ray.y,ray.z,pol.x,pol.y,pol.z,Eo3.x,Eo3.y,Eo3.z);
 
 	//Ray basis in world coordinates
 	//Angles in world basis. Used to compute the theta and phi unit vectors
@@ -273,6 +276,7 @@ __forceinline__ __device__ void getLinearPolarizationInRayBasis(float3 pol,  flo
 	//Project on unit vectors to get the components of the field on the ray basis in world coordinates
 	ver_o=dot(theta_o,Eo3)*theta_o;
 	hor_o=dot(phi_o,Eo3)*phi_o;
+	//rtPrintf("ver_o=(%f,%f,%f) hor_o=(%f,%f,%f) el=%f az=%f\n",ver_o.x,ver_o.y,ver_o.z,hor_o.x,hor_o.y,hor_o.z, (57.2958*elaz.x),(57.2958*elaz.y));
 	
 
 }
@@ -290,4 +294,4 @@ __forceinline__ __device__ void fillPolarization(LPWavePayload& rayPayload, floa
 
 	}	
 
-
+#endif
