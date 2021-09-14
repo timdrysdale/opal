@@ -1,3 +1,19 @@
+Opal-0.7 (September 2021)
+-----------
+1. Major changes in the design. Now different simulation types can be added to the manager. It will run them sequentially and the results will be accumulated. It allows the independent implementation and execution of different propagation mechanisms (reflection, diffraction, scattering) and alternative simulation methods.
+
+2. Support for curved surfaces added. Scenarios con use only flat, only curved or combined flat and curved elements. Only certain simulation types can be used with curved surfaces, such as Ray Density Normalization (see below).
+
+3. Ray Density Normalization (RDN) has been added as a method for the simulation of reflections with flat and curved surfaces. Different modes of operation are available for RDN. The default one is not memory bounded and supports launches very high ray density (for instance, 10^9 rays/sr)
+
+4. Single diffraction has been added. Since this is a different propagation mechanism it can be combined with any of the reflection methods (LPFlatReflection or RayDensityNormalization)
+
+5. Generation of rays on GPU has been added. It greatly increases the performance for partial launches.
+
+6. Log traces are done separately for each simulation type now saved to a file and can be visualized in the Unity editor directly.
+
+7. Many additional minor changes and reorganization of code.
+
 Opal-0.6 (November 2019)
 -----------
 1. Added a preprocessor tag in `Common.h` to use a technique for avoiding self-intersections. But this is going to introduce some small precision errors in the computed electric field, since the ray lengths are modified due to a displacement.  If you do not need very high accuracy (which is the usual case) you can  uncomment it. Otherwise keep it, but then you have to tune minEpsilon, which is not scale-invariant. If your simulation gets stuck in a launch, try uncommenting it.  If it is no longer stuck but you need high precision, comment it again an tune minEpsilon until it is removed.
