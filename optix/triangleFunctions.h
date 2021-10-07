@@ -65,6 +65,42 @@ __forceinline__ __device__ uint updateTrianglePayload(P& rayPayload, T& ch_trian
 //	return n;
 
 }
+//	template<class P>
+//__forceinline__ __device__ void updateReflectionCoefficient(P& rayPayload, optix::Ray& ray, float2& Rnorm, float2& Rpar, float3& anorm_i, float3& apar_i ) {
+//
+//	//Compute local incidence coordinate system for reflection (components parallel and normal to the incidence plane)
+//	anorm_i=normalize(cross(ray.direction,n));
+//	apar_i=normalize(cross(anorm_i,ray.direction)); 
+//	//rtPrintf("IRG\t%u\t%u\tn=(%.6e,%.6e,%.6e)|anorm_i|=(%.6e,%.6e,%.6e)=%.6e\t|apar_i|=(%.6e,%.6e,%.6e)=%.6e \n",launchIndexTriangle.x,launchIndexTriangle.y,n.x,n.y,n.z,anorm_i.x,anorm_i.y,anorm_i.z,length(anorm_i),apar_i.x,apar_i.y,apar_i.z,length(apar_i));
+//
+//
+//
+//	//Reflected ray basis
+//	const float3 anorm_r=anorm_i; 
+//	const float3 apar_r=cross(anorm_r,reflection_dir); //Should change the direction with respect to the incidence parallel
+//	//rtPrintf("RRG\t%u\t%u\tn=(%.6e,%.6e,%.6e)|anorm_r|=(%.6e,%.6e,%.6e)=%.6e\t|apar_r|=(%.6e,%.6e,%.6e)=%.6e \n",launchIndexTriangle.x,launchIndexTriangle.y,n.x,n.y,n.z,anorm_r.x,anorm_r.y,anorm_r.z,length(anorm_r),apar_r.x,apar_r.y,apar_r.z,length(apar_r));
+//
+//
+//
+//	//Get geometric  components, multiply by previous coefficients  and multiply by reflection coefficients computed above or transmission coefficients below
+//
+//	//Geometric part normal
+//	const float2 Einorm=sca_complex_prod(dot(rayPayload.hor_v,anorm_i),rayPayload.hor_coeff) + sca_complex_prod(dot(rayPayload.ver_v,anorm_i),rayPayload.ver_coeff);
+//	//Geometric part parallel
+//	const float2 Eipar=sca_complex_prod(dot(rayPayload.hor_v,apar_i),rayPayload.hor_coeff) + sca_complex_prod(dot(rayPayload.ver_v,apar_i),rayPayload.ver_coeff);
+//
+//
+//	//New horizontal (normal)  coefficient
+//	//rtPrintf("TT\t%u\t%u\tRnorm(%.6e,%.6e)  Rpar(%.6e,%.6e) hash=%u\n",launchIndexTriangle.x,launchIndexTriangle.y,rayPayload.hor_coeff.x,rayPayload.hor_coeff.y,rayPayload.ver_coeff.x,rayPayload.ver_coeff.y, rayPayload.rhfr.w);
+//	rayPayload.hor_coeff=complex_prod(Einorm,Rnorm);
+//	//New vertical (parallel)  coefficient
+//	rayPayload.ver_coeff=complex_prod(Eipar,Rpar);
+//
+//	//Update vectors
+//	rayPayload.ver_v=apar_r;
+//	rayPayload.hor_v=anorm_r;
+//}
+
 
 
 #endif

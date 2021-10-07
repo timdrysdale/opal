@@ -60,7 +60,7 @@ enum {
 //TODO: I have not found yet why changing the order of some includes break either the compilation or the nvrtc compilation..
 //#include <optix_world.h>
 //#include <optixu/optixu_math_namespace.h>
-//#include <optixu/optixu_matrix_namespace.h> 
+#include <optixu/optixu_matrix_namespace.h> 
 //#include <optixu/optixpp_namespace.h>
 #include <optixu/optixu_math_namespace.h>
 
@@ -115,6 +115,14 @@ struct HitInfo {
 	optix::float4 EEx; //Packed [E (float, float), Ex (float, float)] Use E for induced voltage and Ex for X components of incident field at receiver
 	optix::float4 EyEz; //Packed [Ey (float, float), Ez (float, float)] Ey and Ez are the X an Y components of the incident field at the receiver
 
+	
+	//Additional output. TODO: to make this properly, we should extend from this struct. But then, there is a lot of code to change in tutils.cu... change to templates..
+	optix::float4 doaD; //Packed [DoA (float3), unfolded distance float]
+	
+
+
+
+ 
 	//Equality operator: used by thrust::unique. Hits are equal if  the transmitter  and the receiver is the same and  the combined hash is equal, that is, they have hit the same sequence of faces. We get
 	//the closest one because we have previously sorted the sequence
 	__forceinline__ __host__  __device__ bool operator==(const HitInfo &h) const {
@@ -226,6 +234,7 @@ struct Transmitter {
 	int externalId;
 	//gain
 	rtBufferId<float,2> gainId;
+	optix::Matrix<4,4> transformToPolarization;
       
 };
 
@@ -270,7 +279,7 @@ inline void hash_combine_impl(SizeT &seed, SizeT value) {
 
 //Typedefs for RDN particular hits
 
-typedef struct {float4 EEx; float4 EyEz;} RDNHit;
+typedef struct {float4 EEx; float4 EyEz; /*Compute additional output. Remove if performance requires it*/ float4 doaD; float4 doDu;} RDNHit;
 
 //#ifdef OPAL_EXTENDED_HITINFO
 //	typedef struct { float2 Ex; float2 Ey; float2 Ez;} RDNHit;

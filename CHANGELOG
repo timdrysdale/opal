@@ -1,3 +1,7 @@
+Opal-0.7.1 (Octobe 2021)
+-----------
+1. Antenna gains (radiation patterns) can be now used with arbitrary linear polarizations. Previously only applied the pattern correctly for vertical polarization.
+
 Opal-0.7 (September 2021)
 -----------
 1. Major changes in the design. Now different simulation types can be added to the manager. It will run them sequentially and the results will be accumulated. It allows the independent implementation and execution of different propagation mechanisms (reflection, diffraction, scattering) and alternative simulation methods.

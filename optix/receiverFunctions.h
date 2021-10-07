@@ -99,13 +99,16 @@ __forceinline__ __device__  void fillHitInfo(T& hitPayload, HitInfo& aHit, uint 
 	aHit.rdud.y=hitPayload.initialRayDir.y; 
 	aHit.rdud.z=hitPayload.initialRayDir.z; 
 }
-__forceinline__ __device__ float getAntennaGain(float3 const  ray, rtBufferId<float, 2>& gains) {
+__forceinline__ __device__ float getAntennaGain(float3 const  ray, rtBufferId<float, 2>& gains, const Matrix<4,4>& transform) {
+
 	if (gains==RT_BUFFER_ID_NULL) {
 		//TODO: return a provided function. At the moment return 1 as isotropic for this receiver. 
 	//	rtPrintf("null gain bufferId\n");
 		return 1.0f;
 	}
-	float2 angles=getAngles(ray);
+	// Need to convert to antenna coordinate reference system, where elevation is measured from antenna axis
+	//float2 angles=getAngles(ray);
+	float2 angles=getAnglesForRayInPolarizationBasis(transform,ray);
 	float elevation=angles.x; 
 	float azimuth = angles.y;
 	size_t2 gsize=gains.size();
@@ -127,5 +130,4 @@ __forceinline__ __device__ float getAntennaGain(float3 const  ray, rtBufferId<fl
 	//return gains[make_uint2(azi,eli)];	
 	return g;
 } 
-
 #endif //RECEIVERFUNCTIONS_H

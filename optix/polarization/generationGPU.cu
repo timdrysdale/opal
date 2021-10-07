@@ -70,7 +70,7 @@ RT_PROGRAM void genRaysOnLaunch()
 	rayPayload.polarization_k=tx.polarization_k;
 	if (useAntennaGain) {
 		rtBufferId<float,2> bid=tx.gainId;
-		float g=getAntennaGain(ray_direction,bid) ;	
+		float g=getAntennaGain(ray_direction,bid,tx.transformToPolarization) ;	
 		rayPayload.electricFieldAmplitude = g; //Gain is already in electric field units, no need to convert from dB or take sqrt 
 	} else {
 		rayPayload.electricFieldAmplitude = 1.0f; //Normalized Eo=1. Antenna Gain = 1. 

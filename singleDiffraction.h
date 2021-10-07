@@ -23,6 +23,7 @@ namespace opal {
 			optix::Buffer receiverPositionsBuffer;
 			optix::Buffer hitBuffer;
 			optix::Buffer antennaGainIdBuffer;
+			optix::Buffer transformToPolarizationBuffer;
 			bool updateReceiverBuffer;
 			bool updateEdgeBuffer;
 			unsigned int diffractionEntryIndex;

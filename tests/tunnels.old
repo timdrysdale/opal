@@ -1,0 +1,1886 @@
+void xcut(OpalSceneManager* sceneManager, float width, float height, float y, float distance, float3 polarization, float sphereRadius) {
+	//Receivers grid. X cut at distance d
+	uint points=ceil(10*width/sceneManager->getChannelParameters().waveLength);
+	float xinit=-(width/2.0)+0.0001;
+	float xend=(width/2.0)-0.0001;
+	float xstep=(xend-xinit)/points;
+	optix::float3 posrx;	
+	for (int i=0;i<points;++i) {
+		//posrx=make_float3(0.0f,xinit+(i*xstep),distance);
+		posrx=make_float3(xinit+(i*xstep),y,distance);
+		sceneManager->addReceiver(i+1, posrx,polarization, sphereRadius, printPower);
+		
+		
+	}
+	
+}	
+void  ycut(OpalSceneManager* sceneManager, float width, float height, float x, float distance, float3 polarization, float sphereRadius) {
+	//Receivers grid. Y cut at distance d
+	uint points=ceil(10*height/sceneManager->getChannelParameters().waveLength);
+	float xinit=-(height/2.0)+0.0001;
+	float xend=(height/2.0)-0.0001;
+	float xstep=(xend-xinit)/points;
+	optix::float3 posrx;	
+	for (int i=0;i<points;++i) {
+		posrx=make_float3(x,xinit+(i*xstep),distance);
+		sceneManager->addReceiver(i+1, posrx,polarization, sphereRadius, printPower);
+		
+		
+	}
+
+}
+float zrun(OpalSceneManager* sceneManager, float zinit, float deltad, float x, float y, float length, float3 polarization, float sphereRadius, float deltaSphere) {
+	
+	
+	uint points=ceil((length-zinit)/deltad);
+	optix::float3 posrx;	
+	for (int i=0;i<points;++i) {
+		posrx=make_float3(x,y,zinit+(i*deltad));
+		if (deltaSphere>0) {
+			sceneManager->addReceiver(i+1, posrx,polarization, sphereRadius+(i*deltaSphere), printPower);
+		} else {
+			//Fixed radius
+			sceneManager->addReceiver(i+1, posrx,polarization, sphereRadius, printPower);
+		}
+		
+		
+	}
+	if (deltaSphere>0) {
+		return (sphereRadius+(points*deltaSphere));
+	} else {
+		return (sphereRadius);
+	}
+
+}
+void loadBasicTunnel(OpalSceneManager* sceneManager, float width, float height, float length, MaterialEMProperties emProp1) {
+	//Tunnel is a cube with the XY faces removed (entrance and exit). So tunnel runs on Z axis (front, in Unity)
+	std::cout << "Simulating tunnel with width=" <<width<<" and height="<<height<< std::endl;
+	std::vector<int> cubeind = loadTrianglesFromFile("meshes/tunnel-i.txt");
+	std::vector<float3> cubevert = loadVerticesFromFile("meshes/tunnel-v.txt");
+	//std::cout << "indices=" << cubeind.size() << "vertices=" << cubevert.size() << std::endl;
+	//Cube(4) NW
+	Matrix4x4 tm;
+	tm.setRow(0, make_float4(width, 0, 0, 0.0f));
+	tm.setRow(1, make_float4(0, height, 0, 0.0f));
+	tm.setRow(2, make_float4(0, 0, length, length/2.0f));
+	tm.setRow(3, make_float4(0, 0, 0, 1));
+	//MaterialEMProperties emProp1;
+	//emProp1.dielectricConstant = make_float2(5.0f, -60.0f*sceneManager->getChannelParameters().waveLength*0.01f);
+	//There is a dependency on the frequency again, we use -15 dB per 203 mm at 5 GHz => -75 dB/m
+	//emProp1.tattenuation = make_float2(0.1f,-75.f );
+	//emProp1.dielectricConstant = make_float2(3.75f, -0.4576f);
+	std::cout << "Adding Square tunnel tm="<<tm<<" Em="<< emProp1.dielectricConstant << std::endl;
+	sceneManager->addStaticMesh(static_cast<int>(cubevert.size()), cubevert.data(), static_cast<int>(cubeind.size()), cubeind.data(), tm, emProp1);
+
+}
+void loadHalfCylinder(OpalSceneManager* sceneManager, float radius,  float length, float height, MaterialEMProperties emProp1) {
+	std::vector<int> hcind = loadTrianglesFromFile("meshes/HalfCylinder1000-i.txt");
+	std::vector<float3> hcvert = loadVerticesFromFile("meshes/HalfCylinder1000-v.txt");
+	std::vector<float4> pd1 = loadPDFromFile("meshes/HalfCylinder1000-pd1.txt");	
+	std::vector<float4> pd2 = loadPDFromFile("meshes/HalfCylinder1000-pd2.txt");	
+	
+	//TODO: We have to properly set the curvature radius. Is there any way to do this in a general way?
+	int j=0;
+	for (uint i=0; i<pd1.size();++i) {
+		if (!std::isinf(pd1[i].w)) {
+			pd1[i].w=pd1[i].w*radius; 
+
+		}
+		//Check correctness
+	//	uint3 v_idx=make_uint3(j,j+1,j+2);
+	//	int ix=hcind[v_idx.x];	
+	//	int iy=hcind[v_idx.y];	
+	//	int iz=hcind[v_idx.z];	
+	//	const float3 p0    = hcvert[ix];
+	//	const float3 p1    = hcvert[iy];
+	//	const float3 p2    = hcvert[iz];
+	//	const float3 e0 = p1 - p0;
+	//	const float3 e1 = p0 - p2;
+	//	const float3 n  = normalize(cross( e1, e0 ));
+	//	float3 u1=make_float3(pd1[i].x,pd1[i].y,pd1[i].z);
+	//	if (abs((acosf(dot(u1,n))*180/M_PI)-90)>1e-3) {
+	//		std::cout<<i<<"n="<<n<<"|n|="<<optix::length(n)<<"u1="<<u1<<"dot(u1,n)="<<dot(u1,n)<<"p0="<<p0<<"p1="<<p1<<"p2="<<p2<<"ix="<<ix<<"iy="<<iy<<"iz"<<iz<<std::endl;
+	//		std::cout<<i<<"angle="<<(acosf(dot(u1,n))*180/M_PI)<<std::endl;
+	//	}
+	//	j+=3;
+	}
+	j=0;
+	for (size_t i=0; i<pd2.size();++i) {
+		if (!std::isinf(pd2[i].w)) {
+			pd2[i].w=pd2[i].w*radius;
+
+		}
+		//Check correctness
+		uint3 v_idx=make_uint3(j,j+1,j+2);
+		const float3 p0    = hcvert[hcind[v_idx.x]];
+		const float3 p1    = hcvert[hcind[v_idx.y]];
+		const float3 p2    = hcvert[hcind[v_idx.z]];
+		const float3 e0 = p1 - p0;
+		const float3 e1 = p0 - p2;
+		const float3 n  = normalize(cross( e1, e0 ));
+		float3 u2=make_float3(pd2[i].x,pd2[i].y,pd2[i].z);
+		if (i==8) {
+		//if (abs((acosf(dot(u2,n))*180/M_PI)-90)>1e-3) {
+			std::cout<<i<<"n="<<n<<"|n|="<<optix::length(n)<<"u2="<<u2<<"dot(u2,n)="<<dot(u2,n)<<"p0="<<p0<<"p1="<<p1<<"p2="<<p2<<std::endl;
+			std::cout<<i<<"angle="<<(acosf(dot(u2,n))*180/M_PI)<<std::endl;
+		}
+		j+=3;
+	}
+	
+	
+	std::cout << "Loading HalfCylinder with indices=" << hcind.size() << ", triangles="<<(hcind.size()/3)<<", vertices=" << hcvert.size() <<" and curvatures pd1="<<pd1.size()<<"pd2="<<pd2.size() << std::endl;
+	Matrix4x4 tm;
+	tm.setRow(0, make_float4(radius, 0, 0, 0.0f));
+	tm.setRow(1, make_float4(0, radius, 0, height));
+	tm.setRow(2, make_float4(0, 0, length, 0.0f));
+	tm.setRow(3, make_float4(0, 0, 0, 1));
+	std::cout << "Adding HalfCylinder. tm="<<tm<<"; Em="<< emProp1.dielectricConstant << std::endl;
+	//Here we add this mesh as a single face one, since  the curved mesh is used to approximate the normals of the half cylinder, but it is the same wall 
+	sceneManager->addStaticCurvedMesh(hcvert,  hcind, pd1, pd2, tm, emProp1, true);
+
+}
+void loadAnversTunnel(OpalSceneManager* sceneManager) {
+	//Anvers is a slightly curved tunnel on the z direction with a rectangular cross section of 10.2 x 6 m (width,height) a length of around 1081 m and a maximum slope in Z of 4%
+		
+	MaterialEMProperties emProp1;
+	emProp1.dielectricConstant = make_float2(5.0f, -60.0f*sceneManager->getChannelParameters().waveLength*0.01f);
+	emProp1.tattenuation = make_float2(0.1f,-75.f );
+	
+	//All the meshes are already scaled, so the transform matrices should be identities
+	//Origin is at top left corner, which means that the cross section goes from (0,0), (0,10.2), (-6,0), (-6,10.2)
+	Matrix4x4 tm = Matrix4x4::identity();
+
+	//Top wall is curved
+	std::vector<int> hcind = loadTrianglesFromFile("meshes/anvers/top-i.txt");
+	std::vector<float3> hcvert = loadVerticesFromFile("meshes/anvers/top-v.txt");
+	std::vector<float4> pd1 = loadPDFromFile("meshes/anvers/top-pd1.txt");	
+	std::vector<float4> pd2 = loadPDFromFile("meshes/anvers/top-pd2.txt");	
+	std::cout << "Loading Anvers top with indices=" << hcind.size() << ", triangles="<<(hcind.size()/3)<<", vertices=" << hcvert.size() <<" and curvatures pd1="<<pd1.size()<<"pd2="<<pd2.size() << std::endl;
+	sceneManager->addStaticCurvedMesh(hcvert,  hcind, pd1, pd2, tm, emProp1, true);
+
+	//Bottom wall is curved
+	 hcind = loadTrianglesFromFile("meshes/anvers/bottom-i.txt");
+	 hcvert = loadVerticesFromFile("meshes/anvers/bottom-v.txt");
+	 pd1 = loadPDFromFile("meshes/anvers/bottom-pd1.txt");	
+	 pd2 = loadPDFromFile("meshes/anvers/bottom-pd2.txt");	
+	std::cout << "Loading Anvers bottom with indices=" << hcind.size() << ", triangles="<<(hcind.size()/3)<<", vertices=" << hcvert.size() <<" and curvatures pd1="<<pd1.size()<<"pd2="<<pd2.size() << std::endl;
+	sceneManager->addStaticCurvedMesh(hcvert,  hcind, pd1, pd2, tm, emProp1, true);
+	 
+	//left and right walls
+	hcind = loadTrianglesFromFile("meshes/anvers/left-i.txt");
+	 hcvert = loadVerticesFromFile("meshes/anvers/left-v.txt");
+	std::cout << "Loading Anvers left with indices=" << hcind.size() << ", triangles="<<(hcind.size()/3)<<", vertices=" << hcvert.size() << std::endl;
+	sceneManager->addStaticMesh(hcvert.size(), hcvert.data(), hcind.size(), hcind.data(), tm, emProp1 );
+	
+	hcind = loadTrianglesFromFile("meshes/anvers/right-i.txt");
+	 hcvert = loadVerticesFromFile("meshes/anvers/right-v.txt");
+	std::cout << "Loading Anvers right with indices=" << hcind.size() << ", triangles="<<(hcind.size()/3)<<", vertices=" << hcvert.size() << std::endl;
+	sceneManager->addStaticMesh(hcvert.size(), hcvert.data(), hcind.size(), hcind.data(), tm, emProp1 );
+}
+void loadStraightAnversTunnel(OpalSceneManager* sceneManager) {
+	//Anvers is a slightly curved tunnel on the z direction with a rectangular cross section of 10.2 x 6 m (width,height) a length of around 1081 m and a maximum slope in Z of 4%
+		
+	MaterialEMProperties emProp1;
+	emProp1.dielectricConstant = make_float2(5.0f, -60.0f*sceneManager->getChannelParameters().waveLength*0.01f);
+	emProp1.tattenuation = make_float2(0.1f,-75.f );
+	
+	//All the meshes are already scaled, so the transform matrices should be identities
+	//Origin is at top left corner, which means that the cross section goes from (0,0), (0,10.2), (-6,0), (-6,10.2)
+	Matrix4x4 tm = Matrix4x4::identity();
+
+	std::vector<int> hcind = loadTrianglesFromFile("meshes/anvers/top-straight-i.txt");
+	std::vector<float3> hcvert = loadVerticesFromFile("meshes/anvers/top-straight-v.txt");
+	std::cout << "Loading Anvers top with indices=" << hcind.size() << ", triangles="<<(hcind.size()/3)<<", vertices=" << hcvert.size() << std::endl;
+	sceneManager->addStaticMesh(hcvert.size(), hcvert.data(), hcind.size(), hcind.data(), tm, emProp1 );
+
+	//Bottom wall is curved
+	 hcind = loadTrianglesFromFile("meshes/anvers/bottom-straight-i.txt");
+	 hcvert = loadVerticesFromFile("meshes/anvers/bottom-straight-v.txt");
+	std::cout << "Loading Anvers bottom with indices=" << hcind.size() << ", triangles="<<(hcind.size()/3)<<", vertices=" << hcvert.size() << std::endl;
+	sceneManager->addStaticMesh(hcvert.size(), hcvert.data(), hcind.size(), hcind.data(), tm, emProp1 );
+	 
+	//left and right walls
+	hcind = loadTrianglesFromFile("meshes/anvers/left-straight-i.txt");
+	 hcvert = loadVerticesFromFile("meshes/anvers/left-straight-v.txt");
+	std::cout << "Loading Anvers left with indices=" << hcind.size() << ", triangles="<<(hcind.size()/3)<<", vertices=" << hcvert.size() << std::endl;
+	sceneManager->addStaticMesh(hcvert.size(), hcvert.data(), hcind.size(), hcind.data(), tm, emProp1 );
+	
+	hcind = loadTrianglesFromFile("meshes/anvers/right-straight-i.txt");
+	 hcvert = loadVerticesFromFile("meshes/anvers/right-straight-v.txt");
+	std::cout << "Loading Anvers right with indices=" << hcind.size() << ", triangles="<<(hcind.size()/3)<<", vertices=" << hcvert.size() << std::endl;
+	sceneManager->addStaticMesh(hcvert.size(), hcvert.data(), hcind.size(), hcind.data(), tm, emProp1 );
+}
+void loadRousTunnel(OpalSceneManager* sceneManager, float radius,  float length, float height) {
+	//Roux tunnel is a dome (half cylinder and 3  cube walls with the XY faces removed (entrance and exit). So tunnel runs on Z axis (front, in Unity)
+	//Load a half cylinder and 3 quads as walls and floors
+	
+	//Get concrete
+	//MaterialEMProperties emProp1 = sceneManager->ITUparametersToMaterial(5.31,0,0.0326,0.8905);
+	//else
+	MaterialEMProperties emProp1;
+	emProp1.dielectricConstant = make_float2(5.0f, -60.0f*sceneManager->getChannelParameters().waveLength*0.01f);
+	emProp1.tattenuation = make_float2(0.1f,-75.f );
+	
+	loadHalfCylinder(sceneManager,radius,length,height, emProp1);
+
+	Matrix4x4 tm;
+	//Quad triangles
+	int quadind[6] = { 0,1,2,1,0,3 };
+	//XY quad
+	optix::float3 quadv[4] = { make_float3(-0.5f,-0.5f,0.f),make_float3(0.5f,0.5f,0.f) ,make_float3(0.5f,-0.5f,0.f) ,make_float3(-0.5f,0.5f,0.f) };
+	//Add left wall (looking from origin to end of tunnel, that is, looking forward, Z axis)
+	//Scale to length and radius and rotate 
+	tm.setRow(0, make_float4(0, 0, -1, -radius));
+	tm.setRow(1, make_float4(0, height, 0, 1.f));
+	tm.setRow(2, make_float4(length, 0, 0, length/2.0f));
+	tm.setRow(3, make_float4(0, 0, 0,  1));
+	
+	sceneManager->addStaticMesh(4, quadv, 6, quadind, tm, emProp1 );
+	
+	//Add right wall (looking from origin to end of tunnel, that is, looking forward, Z axis)
+	//Scale to length and radius 
+	tm.setRow(0, make_float4(0, 0, 1, radius));
+	tm.setRow(1, make_float4(0, height, 0, 1.f));
+	tm.setRow(2, make_float4(-length, 0, 0, length/2.0f));
+	tm.setRow(3, make_float4(0, 0, 0,  1));
+	
+	sceneManager->addStaticMesh(4, quadv, 6, quadind, tm, emProp1 );
+	//Add floor
+	//Scale to length and radius 
+	tm.setRow(0, make_float4(2.0f*radius, 0, 0, 0.f));
+	tm.setRow(1, make_float4(0, 0, -1, 0.f));
+	tm.setRow(2, make_float4(0, length, 0 ,  length/2.0f));
+	tm.setRow(3, make_float4(0, 0, 0,  1));
+
+	sceneManager->addStaticMesh(4, quadv, 6, quadind, tm, emProp1 );
+}
+void loadCircularTunnel(OpalSceneManager* sceneManager, float radius,  float length, MaterialEMProperties emProp1) {
+	//A circular tunnel represented with a full cylinder
+	//Origin is at center
+	std::vector<int> hcind = loadTrianglesFromFile("meshes/FullCylinder2000-i.txt");
+	std::vector<float3> hcvert = loadVerticesFromFile("meshes/FullCylinder2000-v.txt");
+	std::vector<float4> pd1 = loadPDFromFile("meshes/FullCylinder2000-pd1.txt");	
+	std::vector<float4> pd2 = loadPDFromFile("meshes/FullCylinder2000-pd2.txt");	
+	//std::vector<int> hcind = loadTrianglesFromFile("meshes/HalfCylinder10c-i.txt");
+	//std::vector<float3> hcvert = loadVerticesFromFile("meshes/HalfCylinder10c-v.txt");
+	//std::vector<float4> pd1 = loadPDFromFile("meshes/HalfCylinder10c-pd1.txt");	
+	//std::vector<float4> pd2 = loadPDFromFile("meshes/HalfCylinder10c-pd2.txt");	
+	
+	//TODO: We have to properly set the curvature radius. Is there any way to do this in a general way?
+	for (size_t i=0; i<pd1.size();++i) {
+		if (!std::isinf(pd1[i].w)) {
+			pd1[i].w=pd1[i].w*radius; 
+
+		}
+	}
+	for (size_t i=0; i<pd2.size();++i) {
+		if (!std::isinf(pd2[i].w)) {
+			pd2[i].w=pd2[i].w*radius;
+
+		}
+	}
+	
+	std::cout << "Loading FullCylinder with indices=" << hcind.size() << ", triangles="<<(hcind.size()/3)<<", vertices=" << hcvert.size() <<" and curvatures pd1="<<pd1.size()<<"pd2="<<pd2.size() << std::endl;
+	Matrix4x4 tm;
+	tm.setRow(0, make_float4(radius, 0, 0, 0.0f));
+	tm.setRow(1, make_float4(0, radius, 0, 0.0f));
+	tm.setRow(2, make_float4(0, 0, length, 0.0f)); //Origin is at center and at the beginning of the tunnel
+	tm.setRow(3, make_float4(0, 0, 0, 1));
+	//Get concrete
+	//MaterialEMProperties emProp1 = sceneManager->ITUparametersToMaterial(5.31,0,0.0326,0.8905);
+	
+	//Material from Dudley (2006). Fig. 8
+	std::cout << "Adding FullCylinder. Em="<< emProp1.dielectricConstant << std::endl;
+	
+	//Here we add this mesh as a single face one, since  the curved mesh is used to approximate the normals of the  cylinder, but it is the same wall 
+	//sceneManager->addStaticMesh(static_cast<int>(hcvert.size()), hcvert.data(), static_cast<int>(hcind.size()), hcind.data(), tm, emProp1, true);
+	sceneManager->addStaticCurvedMesh(hcvert,  hcind, pd1, pd2, tm, emProp1, true);
+}
+void runSingleRayRous(OpalSceneManager* sceneManager, float sphereRadius) {
+	float freq = 1e9f;
+	OpalSimulationTypes type=OpalSimulationTypes::CURVEDFLATWALLS;
+	sceneManager->setSimulationType(type);	
+	sceneManager->initContext(freq);
+
+	loadRousTunnel(sceneManager,4.0f,1200.0f,2.0f);
+	Timer timer;
+	//Receiver polarization
+	optix::float3 polarization = V; 	
+	
+	//********Single receiver
+	int j=1;	
+	////Position
+	//optix::float3 posrx = make_float3(0.0f, 3.0f, 6.0f);	
+	//optix::float3 posrx = make_float3(0.0f, 1.0f, 20.78205f);	
+	//optix::float3 posrx = make_float3(1.0f, 1.5f, 5.0f);	
+	//float3 mRay=make_float3(2.916761e-01, 7.089666e-01, 6.420992e-01);
+	//float3 mRay=make_float3(2.909448e-01, 7.175282e-01, 6.328542e-01);
+	
+	
+	optix::float3 posrx = make_float3(-1.0f, 1.5f, 5.0f);	
+	float3 mRay=make_float3(-2.909448e-01, 7.175282e-01, 6.328542e-01);
+	
+	//////Add to scene
+	sceneManager->addReceiver(j, posrx,polarization, sphereRadius, printPower);
+	//*********************
+	
+	//Transmitter
+	//optix::float3 postx = make_float3(0.0f,3.0f, 0.0f);
+	//optix::float3 postx = make_float3(0.0f,1.0f, 0.0f);
+	optix::float3 postx = make_float3(0.0f,4.5f, 0.0f);
+	float3 polarizationTx = V; 
+	std::cout <<"**** Single ray Rous ***"<<std::endl;	
+	std::cout<<"Transmitting at "<<postx<<" with polarization="<<polarizationTx<<std::endl;
+	std::cout<<"Receiving with radius="<<sphereRadius<<" with polarization="<<polarization<<std::endl;
+	sceneManager->setMinEpsilon(1e-4f);
+	
+	//***Single ray transmit****
+	//float3 mRay=normalize(make_float3(0.0,1.0f,1.0f));
+	//float3 mRay=normalize(make_float3(0.0,-1.0*sinf(M_PI/6),cosf(M_PI/6)));
+	sceneManager->createRaySphere2D(1,1,&mRay);
+	
+	//Angle for separating duplicate rays
+	float discriminateAngle=2.5f; //In degrees
+	sceneManager->setMaxAngleForDuplicateRays(discriminateAngle*M_PI/180.f);
+	//sceneManager->setUsageReport();
+	
+	sceneManager->finishSceneContext();
+	
+	//First launch
+	sceneManager->transmit(0, 1.0f, postx, polarizationTx, false);
+}
+void runAnversTests(OpalSceneManager* sceneManager, float sphereRadius, bool useDepolarization, std::string test) {
+	std::vector<float3> postx(4);
+	std::vector<float3> rx(4);
+	std::vector<float3> pol(2);
+	std::vector<float> freq(10);
+	postx[0]=make_float3(0.50f,2.52f-6.0f, 0.0f);
+	postx[1]=make_float3(0.50f,2.18f-6.0f, 0.0f);
+	postx[2]=make_float3(0.50f,1.84f-6.0f, 0.0f);
+	postx[3]=make_float3(0.50f,1.50f-6.0f, 0.0f);
+	rx[0]=make_float3(3.72f,2.7f-6.0f, 20.0f);
+	rx[1]=make_float3(3.38f,2.7f-6.0f, 20.0f);
+	rx[2]=make_float3(3.04f,2.7f-6.0f, 20.0f);
+	rx[3]=make_float3(2.7f,2.7f-6.0f, 20.0f);
+	pol[0]=V;
+	pol[1]=H;
+	float f=1.31e9;
+	for (int i=0; i<10;++i) {
+		freq[i]=f;
+		f +=8e6;
+	}
+	//Parse tests
+	std::vector<int> tokens; 
+      
+    // stringstream class check1 
+	std::stringstream check1(test); 
+      
+    std::string intermediate; 
+      
+    while(getline(check1, intermediate, '-')) 
+    { 
+        tokens.push_back(std::stoi(intermediate)); 
+    } 
+	//runAnversTunnelNoCurvedSection(sceneManager,sphereRadius,useDepolarization,freq[tokens[0]],postx[tokens[2]],rx[tokens[3]],pol[tokens[1]]);
+	//runAnversTunnel(sceneManager,sphereRadius,useDepolarization,freq[tokens[0]],postx[tokens[2]],rx[tokens[3]],pol[tokens[1]]);
+	runAnversTunnelRDN(sceneManager,sphereRadius,useDepolarization,freq[tokens[0]],postx[tokens[2]],rx[tokens[3]],pol[tokens[1]]);
+	//int i=0;
+	//int j=0;
+	//int k=0;
+	//int h=0;
+	//for (float fr :freq) {
+	//	for (float3 pp : pol) {
+	//		for (float3 pt : postx) {
+	//			for (float3 pr : rx) {
+	//				std::string name = "anvers/anvers-";
+	//				name+=std::to_string(i)+std::string("-")+std::to_string(j)+std::string("-")+std::to_string(k);
+	//				if (h==0) {
+	//					name +="VV.txt";
+	//				} else {
+	//					name +="HH.txt";
+	//				}
+	//				std::fstream file;
+	//				file.open(name, std::ios::out); 
+	//				//Redirect stdout
+	//				auto cout_buf = std::cout.rdbuf(file.rdbuf());
+	//				
+	//				runAnversTunnel(sceneManager,sphereRadius,useDepolarization,fr,pt,pr,pp);
+	//				++k;
+	//			}
+	//			++j;
+	//		}
+	//	}
+	//	++i;
+	//}
+	
+}
+void runAnversTunnelStraight(OpalSceneManager* sceneManager, float sphereRadius, bool useDepolarization) {
+	float freq = 1.31e9f;
+	OpalSimulationTypes type=OpalSimulationTypes::FLATWALLS;
+	sceneManager->setSimulationType(type);	
+	sceneManager->initContext(freq);
+	sceneManager->getSimulation()->setPrintHits(false);
+	
+	
+	//****Cube tunnel dimensions *****
+	float width=10.2f;
+	float height=6.0f;
+	float length=1100.0f;
+	//****************
+	
+	MaterialEMProperties emProp1;
+	emProp1.dielectricConstant = make_float2(5.0f, -60.0f*sceneManager->getChannelParameters().waveLength*0.01f);
+	emProp1.tattenuation = make_float2(0.1f,-75.f );
+
+	loadBasicTunnel(sceneManager, width, height, length, emProp1);
+	
+	
+	Timer timer;
+	//Receiver polarization
+	optix::float3 polarization = V; 	
+	
+	//Transmitter
+	optix::float3 postx = make_float3(-width/2.0f + 0.50f,-height/2.0f +2.52f, 0.0f);
+	float3 polarizationTx = V; 
+	//Sphere scanning
+	float initElevation=0.0f;
+	float initAzimuth=-90.0f;
+	float endElevation=180.0f;
+	float endAzimuth=90.0f;
+	float deltaEl=10.0f;
+	float deltaAz=10.0f;
+	float asEl=0.01f;
+	float asAz=0.01f;
+	float overlap=0.5f;
+	
+	std::cout<<"****+ Simulating Anvers Straight tunnel ***** "<<std::endl;
+	std::cout<<"Transmitting at "<<postx<<" with polarization="<<polarizationTx<<std::endl;
+	std::cout<<"Receiving with radius="<<sphereRadius<<" with polarization="<<polarization<<std::endl;
+	std::cout<<"Scanning the sphere with ASElevation="<<asEl<< " and ASAzimuth="<<asAz<<std::endl;
+	
+	
+	sceneManager->setMinEpsilon(1e-4f);
+	
+	
+	float currentElevation=initElevation;
+	float currentAzimuth=initAzimuth;
+	//std::cout<<"Tracing angle (el/az)="<<(currentElevation-overlap)<<","<<(currentElevation+deltaEl+overlap)<<"/"<<(currentAzimuth-overlap)<<","<<(currentAzimuth+deltaAz+overlap)<<std::endl;
+	
+	sceneManager->createRaySphere2D(currentElevation-overlap,asEl,currentElevation+deltaEl+overlap,currentAzimuth-overlap,asAz,currentAzimuth+deltaAz+overlap);
+	
+	//sceneManager->setPrintEnabled(1024*1024*1024, make_uint3(976,552,0));
+	sceneManager->finishSceneContext();
+	timer.start();
+	
+
+	
+	
+	
+	/******** With angle discrimination ********/
+	/** Sequential test. For a really large number of reflections and receivers  (that is, potential hits) have to do a sequential test, to avoid buffer overflows */
+//	sceneManager->addReceiver(1,make_float3(3.72f,2.7f-6.0f, 20.0f),polarization, sphereRadius, printPower);
+//	sceneManager->addReceiver(2,make_float3(3.72f,2.7f-6.0f, 20.0f),polarization, sphereRadius, printPower);
+//	sceneManager->addReceiver(3,make_float3(3.72f,2.7f-6.0f, 20.0f),polarization, sphereRadius, printPower);
+//	sceneManager->addReceiver(4,make_float3(3.72f,2.7f-6.0f, 20.0f),polarization, sphereRadius, printPower);
+	
+	for (int i=1;i<=500;++i) {
+		//sceneManager->addReceiver(i,make_float3(3.72f,2.7f-6.0f, 20.0f),polarization, sphereRadius, printPower);
+		sceneManager->addReceiver(i,make_float3(3.72f,- 3.0f+2.7f, 20.0f),polarization, sphereRadius, printPower);
+	}
+	
+	float zinit=20.0f;
+	uint launches=0;
+	float sphereDelta=2e-4;
+	
+	for (int i=0;i<3;++i) {
+		float3 posrx;
+		for (int j=1;j<=500;++j) {
+
+
+			posrx=make_float3(-width/2.0f + 3.72f,-height/2.0f + 2.7f,zinit );
+			//TODO: I use this flag to increase radius, change
+			if (useDepolarization) {
+				sceneManager->updateReceiver(j, posrx,sphereRadius);
+				sphereRadius += sphereDelta;
+			} else {
+				sceneManager->updateReceiver(j, posrx);
+			}
+			zinit += 0.75f;
+		}
+		//First launch
+		sceneManager->transmit(0, 1.0f, postx, polarizationTx, true);
+
+		//Now loop to fill the solid angle
+		currentAzimuth += deltaAz;
+		//Trace all elevations
+		while (currentElevation<endElevation) {
+
+			//Trace all azimuth	
+			while(currentAzimuth<endAzimuth) {
+				//std::cout<<"Tracing angle (el/az)="<<(currentElevation-overlap)<<","<<(currentElevation+deltaEl+overlap)<<"/"<<(currentAzimuth-overlap)<<","<<(currentAzimuth+deltaAz+overlap)<<std::endl;
+				sceneManager->createRaySphere2D(currentElevation-overlap,asEl,currentElevation+deltaEl+overlap,currentAzimuth-overlap,asAz,currentAzimuth+deltaAz+overlap);
+				sceneManager->transmit(0, 1.0f, postx, polarizationTx, true);
+				currentAzimuth += deltaAz;
+			}
+			currentAzimuth=initAzimuth;
+			currentElevation += deltaEl;
+		}
+		sceneManager->endPartialLaunch(1u);
+
+		currentElevation=initElevation;
+		currentAzimuth=initAzimuth;
+		++launches;
+
+	} 
+	
+	timer.stop();
+	std::cout<<"Time="<<timer.getTime()<<". Time/launch="<<(timer.getTime()/launches)<<std::endl;
+	
+}
+void runAnversTunnelNoCurvedSection(OpalSceneManager* sceneManager, float sphereRadius, bool useDepolarization, float freq, float3 postx, float3 rx, float3 pol) {
+	OpalSimulationTypes type=OpalSimulationTypes::FLATWALLS;
+	sceneManager->setSimulationType(type);	
+	sceneManager->initContext(freq);
+	sceneManager->getSimulation()->setPrintHits(false);
+
+
+	loadStraightAnversTunnel(sceneManager);
+
+	Timer timer;
+	//Receiver polarization
+	//optix::float3 polarization = H; 	
+	optix::float3 polarization = pol; 	
+	
+	//Transmitter
+	//optix::float3 postx = make_float3(0.50f,2.52f-6.0f, 0.0f);
+	//float3 polarizationTx = H; 
+	float3 polarizationTx = pol; 
+	//Sphere scanning
+	float initElevation=0.0f;
+	float initAzimuth=-90.0f;
+	float endElevation=180.0f;
+	float endAzimuth=90.0f;
+	float deltaEl=10.0f;
+	float deltaAz=10.0f;
+	float asEl=0.01f;
+	float asAz=0.01f;
+	float overlap=0.5f;
+	//float overlap=0.0f;
+	std::cout<<"****+ Simulating Anvers tunnel No Curved Sections ***** "<<std::endl;
+	std::cout<<"Transmitting at "<<postx<<" with polarization="<<polarizationTx<<std::endl;
+	std::cout<<"Receiving with radius="<<sphereRadius<<" with polarization="<<polarization<<std::endl;
+	std::cout<<"Scanning the sphere with ASElevation="<<asEl<< " and ASAzimuth="<<asAz<<std::endl;
+	sceneManager->setMinEpsilon(1e-4f);
+	
+	float currentElevation=initElevation;
+	float currentAzimuth=initAzimuth;
+	//std::cout<<"Tracing angle (el/az)="<<(currentElevation-overlap)<<","<<(currentElevation+deltaEl+overlap)<<"/"<<(currentAzimuth-overlap)<<","<<(currentAzimuth+deltaAz+overlap)<<std::endl;
+	
+	sceneManager->createRaySphere2D(currentElevation-overlap,asEl,currentElevation+deltaEl+overlap,currentAzimuth-overlap,asAz,currentAzimuth+deltaAz+overlap);
+	
+	//sceneManager->setPrintEnabled(1024*1024*1024, make_uint3(976,552,0));
+	sceneManager->finishSceneContext();
+	timer.start();
+	
+	//Angle for separating duplicate rays
+
+	float discriminateAngle=2.5f; //In degrees
+	sceneManager->setMaxAngleForDuplicateRays(discriminateAngle*M_PI/180.f);
+	
+	
+	
+	/******** With angle discrimination ********/
+	/** Sequential test. For a really large number of reflections and receivers  (that is, potential hits) have to do a sequential test, to avoid buffer overflows */
+//	sceneManager->addReceiver(1,make_float3(3.72f,2.7f-6.0f, 20.0f),polarization, sphereRadius, printPower);
+//	sceneManager->addReceiver(2,make_float3(3.72f,2.7f-6.0f, 20.0f),polarization, sphereRadius, printPower);
+//	sceneManager->addReceiver(3,make_float3(3.72f,2.7f-6.0f, 20.0f),polarization, sphereRadius, printPower);
+//	sceneManager->addReceiver(4,make_float3(3.72f,2.7f-6.0f, 20.0f),polarization, sphereRadius, printPower);
+	
+	for (int i=1;i<=500;++i) {
+		//sceneManager->addReceiver(i,make_float3(3.72f,2.7f-6.0f, 20.0f),polarization, sphereRadius, printPower);
+		sceneManager->addReceiver(i,rx,polarization, sphereRadius, printPower);
+	}
+	
+	float zinit=20.0f;
+	uint launches=0;
+	float sphereDelta=1e-4;
+	//To get the correct z
+	
+	for (int i=0;i<3;++i) {
+		float3 posrx;
+		for (int j=1;j<=500;++j) {
+
+			if (zinit<=568) {
+				posrx=make_float3(3.72f,(2.7f-6.0f)-(0.04f*zinit),zinit );
+			} else {
+
+				posrx=make_float3(3.72f,(2.7f-28.72f)+(0.04f*(zinit-568)),zinit );
+			}
+			//TODO: I use this flag to increase radius, change
+			if (useDepolarization) {
+				sceneManager->updateReceiver(j, posrx,sphereRadius);
+				sphereRadius += sphereDelta;
+			} else {
+				sceneManager->updateReceiver(j, posrx);
+			}
+			zinit += 0.75f;
+		}
+		//First launch
+		sceneManager->transmit(0, 1.0f, postx, polarizationTx, true);
+
+		//Now loop to fill the solid angle
+		currentAzimuth += deltaAz;
+		//Trace all elevations
+		while (currentElevation<endElevation) {
+
+			//Trace all azimuth	
+			while(currentAzimuth<endAzimuth) {
+				//std::cout<<"Tracing angle (el/az)="<<(currentElevation-overlap)<<","<<(currentElevation+deltaEl+overlap)<<"/"<<(currentAzimuth-overlap)<<","<<(currentAzimuth+deltaAz+overlap)<<std::endl;
+				sceneManager->createRaySphere2D(currentElevation-overlap,asEl,currentElevation+deltaEl+overlap,currentAzimuth-overlap,asAz,currentAzimuth+deltaAz+overlap);
+				sceneManager->transmit(0, 1.0f, postx, polarizationTx, true);
+				currentAzimuth += deltaAz;
+			}
+			currentAzimuth=initAzimuth;
+			currentElevation += deltaEl;
+		}
+		sceneManager->endPartialLaunch(1u);
+
+		currentElevation=initElevation;
+		currentAzimuth=initAzimuth;
+		++launches;
+
+	} 
+	
+	timer.stop();
+	std::cout<<"Time="<<timer.getTime()<<". Time/launch="<<(timer.getTime()/launches)<<std::endl;
+}
+void runAnversTunnelRDN(OpalSceneManager* sceneManager, float sphereRadius, bool useDepolarization, float freq, float3 postx, float3 rx, float3 pol) {
+	//float freq = 1.31e9f;
+	OpalSimulationTypes type=OpalSimulationTypes::RDN;
+	sceneManager->setSimulationType(type);	
+	sceneManager->initContext(freq);
+	sceneManager->getSimulation()->setPrintHits(true);
+
+
+	//loadStraightAnversTunnel(sceneManager);
+	loadAnversTunnel(sceneManager);
+
+	Timer timer;
+	//Receiver polarization
+	//optix::float3 polarization = H; 	
+	optix::float3 polarization = pol; 	
+	
+	//Transmitter
+	//optix::float3 postx = make_float3(0.50f,2.52f-6.0f, 0.0f);
+	//float3 polarizationTx = H; 
+	float3 polarizationTx = pol; 
+	//Sphere scanning
+	float initElevation=0.0f;
+	float initAzimuth=-90.0f;
+	float endElevation=180.0f;
+	float endAzimuth=90.0f;
+	float deltaEl=10.0f;
+	float deltaAz=10.0f;
+	float asEl=0.01f;
+	float asAz=0.01f;
+	float overlap=0.5f;
+	//float overlap=0.0f;
+	std::cout<<"****+ Simulating Anvers tunnel RDN ***** "<<std::endl;
+	std::cout<<"Transmitting at "<<postx<<" with polarization="<<polarizationTx<<std::endl;
+	std::cout<<"Receiving with radius="<<sphereRadius<<" with polarization="<<polarization<<std::endl;
+	std::cout<<"Scanning the sphere with ASElevation="<<asEl<< " and ASAzimuth="<<asAz<<std::endl;
+	sceneManager->setMinEpsilon(1e-4f);
+	
+	float currentElevation=initElevation;
+	float currentAzimuth=initAzimuth;
+	int rayD=1000;
+	//std::cout<<"Tracing angle (el/az)="<<(currentElevation-overlap)<<","<<(currentElevation+deltaEl+overlap)<<"/"<<(currentAzimuth-overlap)<<","<<(currentAzimuth+deltaAz+overlap)<<std::endl;
+	//sceneManager->createRaySphere2D(currentElevation-overlap,asEl,currentElevation+deltaEl+overlap,currentAzimuth-overlap,asAz,currentAzimuth+deltaAz+overlap);
+	OpalRaySphereGenerator* gen=sceneManager->getRaySphereGenerator();
+	//gen->generateRandomUniformOnDevice(initElevation,endElevation,initAzimuth,endAzimuth, rayD*rayD);
+	gen->generateRandomUniformOnDevice(currentElevation,currentElevation+deltaEl,currentAzimuth,currentAzimuth+deltaAz,rayD*rayD);
+///std::vector<float3> rays=gen->generateRandomUniform(currentElevation,currentElevation+deltaEl,currentAzimuth,currentAzimuth+deltaAz,rayD*rayD);
+//	std::string fileName=std::string("spheres/ru-")+std::to_string(initElevation)+std::string("-")+std::to_string(endElevation)+std::string("-")+std::to_string(initAzimuth)+std::string("-")+std::to_string(endAzimuth)+std::string("1e8.txt");
+//	std::string fileName=std::string("spheres/ru-")+std::to_string(currentElevation)+std::string("-")+std::to_string(currentElevation+deltaEl)+std::string("-")+std::to_string(currentAzimuth)+std::string("-")+std::to_string(currentAzimuth+deltaAz)+std::string("1e6.txt");
+//	Timer t2;
+//	t2.start();
+//	std::vector<float3> rays=gen->readFromFile(fileName);
+//	t2.stop();
+//	std::cout<<"Time to read rays="<<t2.getTime()<<std::endl;
+//	sceneManager->createRaySphere2D(rayD,rayD,rays.data());
+	sceneManager->createRaySphereFromExternalBuffer(rayD,rayD,gen->getDevicePointer());
+	RayDensityNormalizationSimulation* sim=dynamic_cast<RayDensityNormalizationSimulation*>(sceneManager->getSimulation());
+	//sim->setInitialDensity(sceneManager->getRaySphere().rayCount,initAzimuth,endAzimuth,initElevation, endElevation);
+	sim->setInitialDensity(sceneManager->getRaySphere().rayCount,currentAzimuth,currentAzimuth+deltaAz,currentElevation, currentElevation+deltaEl);
+	
+	
+	//sceneManager->setPrintEnabled(1024*1024*1024, make_uint3(976,552,0));
+	sceneManager->finishSceneContext();
+	timer.start();
+	
+
+	
+		//sceneManager->addReceiver(1,make_float3(3.72,-22.4871,569.75),polarization, sphereRadius, printPower);
+		sceneManager->addReceiver(1,make_float3(3.72,-22.4788,570.5),polarization, sphereRadius, printPower);
+	
+//	uint nrx=20;	
+//	for (int i=1;i<=nrx;++i) {
+//		//sceneManager->addReceiver(i,make_float3(3.72f,2.7f-6.0f, 20.0f),polarization, sphereRadius, printPower);
+//		sceneManager->addReceiver(i,rx,polarization, sphereRadius, printPower);
+//	}
+	
+	float zinit=422.0f;
+	uint launches=0;
+	float sphereDelta=1e-4;
+	//To get the correct z
+	float R=2900.0f;
+	float l=112.0f; //2*R*sin a/2=2*R*0.04f;
+	float h=2.32092875f; //h=R-0.5*sqrt(4*R*R-4*l*l)
+	
+//	for (int i=0;i<floor(1500/nrx);++i) {
+//		float3 posrx;
+//		if (zinit>1145) {
+//			break;
+//		}
+//		for (int j=1;j<=nrx;++j) {
+//
+//			if (zinit<=426) {
+//				posrx=make_float3(3.72f,(2.7f-6.0f)-(0.04f*zinit),zinit );
+//			} else if ((zinit>426) && (zinit<=658)) {
+//				float zp=zinit-538; //z-426+112
+//				float yp=sqrt((R*R)-(zp*zp))-R+h; 
+//				float fl=-(23.04+yp); //Floor Y coordinate on curved section
+//				posrx=make_float3(3.72f, fl+2.7f,zinit );
+//			} else {
+//
+//				posrx=make_float3(3.72f,(2.7f-23.04f)+(0.04f*(zinit-658)),zinit );
+//			}
+//			//TODO: I use this flag to increase radius, change
+//			if (useDepolarization) {
+//				sceneManager->updateReceiver(j, posrx,sphereRadius);
+//				sphereRadius += sphereDelta;
+//			} else {
+//				sceneManager->updateReceiver(j, posrx);
+//			}
+//			zinit += 0.75f;
+//		}
+		//First launch
+		//sceneManager->transmit(0, 1.0f, postx, polarizationTx, false);
+		std::cout<<"el="<<currentElevation<<std::endl;
+		std::cout<<"\t"<<currentAzimuth<<std::endl;
+		sceneManager->transmit(0, 1.0f, postx, polarizationTx, true);
+		//Now loop to fill the solid angle
+		currentAzimuth += deltaAz;
+		//Trace all elevations
+		while (currentElevation<endElevation) {
+
+			//Trace all azimuth	
+			while(currentAzimuth<endAzimuth) {
+				//std::cout<<"Tracing angle (el/az)="<<(currentElevation-overlap)<<","<<(currentElevation+deltaEl+overlap)<<"/"<<(currentAzimuth-overlap)<<","<<(currentAzimuth+deltaAz+overlap)<<std::endl;
+		//		std::vector<float3> rays=gen->generateRandomUniform(currentElevation,currentElevation+deltaEl,currentAzimuth,currentAzimuth+deltaAz,rayD*rayD);
+				//std::string fileName=std::string("spheres/ru-")+std::to_string(currentElevation)+std::string("-")+std::to_string(currentElevation+deltaEl)+std::string("-")+std::to_string(currentAzimuth)+std::string("-")+std::to_string(currentAzimuth+deltaAz)+std::string("1e6.txt");
+	//std::vector<float3> rays=gen->readFromFile(fileName);
+				//sceneManager->createRaySphere2D(rayD,rayD,rays.data());
+				
+
+				gen->generateRandomUniformOnDevice(currentElevation,currentElevation+deltaEl,currentAzimuth,currentAzimuth+deltaAz,rayD*rayD);
+				sceneManager->createRaySphereFromExternalBuffer(rayD,rayD,gen->getDevicePointer());
+				
+				sim->setInitialDensity(sceneManager->getRaySphere().rayCount,currentAzimuth,currentAzimuth+deltaAz,currentElevation, currentElevation+deltaEl);
+				//sceneManager->createRaySphere2D(currentElevation-overlap,asEl,currentElevation+deltaEl+overlap,currentAzimuth-overlap,asAz,currentAzimuth+deltaAz+overlap);
+				sceneManager->transmit(0, 1.0f, postx, polarizationTx, true);
+				currentAzimuth += deltaAz;
+				std::cout<<"\t"<<currentAzimuth<<std::endl;
+			}
+			currentAzimuth=initAzimuth;
+			currentElevation += deltaEl;
+			std::cout<<"el="<<currentElevation<<std::endl;
+			std::cout<<"\t"<<currentAzimuth<<std::endl;
+		}
+		sceneManager->endPartialLaunch(1u);
+
+		currentElevation=initElevation;
+		currentAzimuth=initAzimuth;
+		++launches;
+
+//	} 
+	
+	timer.stop();
+	std::cout<<"Time="<<timer.getTime()<<". Time/launch="<<(timer.getTime()/launches)<<std::endl;
+	
+}
+void runAnversTunnel(OpalSceneManager* sceneManager, float sphereRadius, bool useDepolarization, float freq, float3 postx, float3 rx, float3 pol) {
+	//float freq = 1.31e9f;
+	OpalSimulationTypes type=OpalSimulationTypes::CURVEDFLATWALLS;
+	sceneManager->setSimulationType(type);	
+	sceneManager->initContext(freq);
+	sceneManager->getSimulation()->setPrintHits(false);
+
+
+	loadAnversTunnel(sceneManager);
+
+	Timer timer;
+	//Receiver polarization
+	//optix::float3 polarization = H; 	
+	optix::float3 polarization = pol; 	
+	
+	//Transmitter
+	//optix::float3 postx = make_float3(0.50f,2.52f-6.0f, 0.0f);
+	//float3 polarizationTx = H; 
+	float3 polarizationTx = pol; 
+	//Sphere scanning
+	float initElevation=0.0f;
+	float initAzimuth=-90.0f;
+	float endElevation=180.0f;
+	float endAzimuth=90.0f;
+	float deltaEl=10.0f;
+	float deltaAz=10.0f;
+	float asEl=0.01f;
+	float asAz=0.01f;
+	float overlap=0.5f;
+	//float overlap=0.0f;
+	std::cout<<"****+ Simulating Anvers tunnel ***** "<<std::endl;
+	std::cout<<"Transmitting at "<<postx<<" with polarization="<<polarizationTx<<std::endl;
+	std::cout<<"Receiving with radius="<<sphereRadius<<" with polarization="<<polarization<<std::endl;
+	std::cout<<"Scanning the sphere with ASElevation="<<asEl<< " and ASAzimuth="<<asAz<<std::endl;
+	sceneManager->setMinEpsilon(1e-4f);
+	
+	float currentElevation=initElevation;
+	float currentAzimuth=initAzimuth;
+	//std::cout<<"Tracing angle (el/az)="<<(currentElevation-overlap)<<","<<(currentElevation+deltaEl+overlap)<<"/"<<(currentAzimuth-overlap)<<","<<(currentAzimuth+deltaAz+overlap)<<std::endl;
+	
+	sceneManager->createRaySphere2D(currentElevation-overlap,asEl,currentElevation+deltaEl+overlap,currentAzimuth-overlap,asAz,currentAzimuth+deltaAz+overlap);
+	
+	//sceneManager->setPrintEnabled(1024*1024*1024, make_uint3(976,552,0));
+	sceneManager->finishSceneContext();
+	timer.start();
+	
+	//Angle for separating duplicate rays
+
+	float discriminateAngle=2.5f; //In degrees
+	sceneManager->setMaxAngleForDuplicateRays(discriminateAngle*M_PI/180.f);
+	
+	
+	
+	/******** With angle discrimination ********/
+	/** Sequential test. For a really large number of reflections and receivers  (that is, potential hits) have to do a sequential test, to avoid buffer overflows */
+//	sceneManager->addReceiver(1,make_float3(3.72f,2.7f-6.0f, 20.0f),polarization, sphereRadius, printPower);
+//	sceneManager->addReceiver(2,make_float3(3.72f,2.7f-6.0f, 20.0f),polarization, sphereRadius, printPower);
+//	sceneManager->addReceiver(3,make_float3(3.72f,2.7f-6.0f, 20.0f),polarization, sphereRadius, printPower);
+//	sceneManager->addReceiver(4,make_float3(3.72f,2.7f-6.0f, 20.0f),polarization, sphereRadius, printPower);
+	
+	for (int i=1;i<=500;++i) {
+		//sceneManager->addReceiver(i,make_float3(3.72f,2.7f-6.0f, 20.0f),polarization, sphereRadius, printPower);
+		sceneManager->addReceiver(i,rx,polarization, sphereRadius, printPower);
+	}
+	
+	float zinit=20.0f;
+	uint launches=0;
+	float sphereDelta=1e-4;
+	//To get the correct z
+	float R=2900.0f;
+	float l=112.0f; //2*R*sin a/2=2*R*0.04f;
+	float h=2.32092875f; //h=R-0.5*sqrt(4*R*R-4*l*l)
+	
+	for (int i=0;i<3;++i) {
+		float3 posrx;
+		for (int j=1;j<=500;++j) {
+
+			if (zinit<=426) {
+				posrx=make_float3(3.72f,(2.7f-6.0f)-(0.04f*zinit),zinit );
+			} else if ((zinit>426) && (zinit<=658)) {
+				float zp=zinit-538; //z-426+112
+				float yp=sqrt((R*R)-(zp*zp))-R+h; 
+				float fl=-(23.04+yp); //Floor Y coordinate on curved section
+				posrx=make_float3(3.72f, fl+2.7f,zinit );
+			} else {
+
+				posrx=make_float3(3.72f,(2.7f-23.04f)+(0.04f*(zinit-658)),zinit );
+			}
+			//TODO: I use this flag to increase radius, change
+			if (useDepolarization) {
+				sceneManager->updateReceiver(j, posrx,sphereRadius);
+				sphereRadius += sphereDelta;
+			} else {
+				sceneManager->updateReceiver(j, posrx);
+			}
+			zinit += 0.75f;
+		}
+		//First launch
+		sceneManager->transmit(0, 1.0f, postx, polarizationTx, true);
+
+		//Now loop to fill the solid angle
+		currentAzimuth += deltaAz;
+		//Trace all elevations
+		while (currentElevation<endElevation) {
+
+			//Trace all azimuth	
+			while(currentAzimuth<endAzimuth) {
+				//std::cout<<"Tracing angle (el/az)="<<(currentElevation-overlap)<<","<<(currentElevation+deltaEl+overlap)<<"/"<<(currentAzimuth-overlap)<<","<<(currentAzimuth+deltaAz+overlap)<<std::endl;
+				sceneManager->createRaySphere2D(currentElevation-overlap,asEl,currentElevation+deltaEl+overlap,currentAzimuth-overlap,asAz,currentAzimuth+deltaAz+overlap);
+				sceneManager->transmit(0, 1.0f, postx, polarizationTx, true);
+				currentAzimuth += deltaAz;
+			}
+			currentAzimuth=initAzimuth;
+			currentElevation += deltaEl;
+		}
+		sceneManager->endPartialLaunch(1u);
+
+		currentElevation=initElevation;
+		currentAzimuth=initAzimuth;
+		++launches;
+
+	} 
+	
+	timer.stop();
+	std::cout<<"Time="<<timer.getTime()<<". Time/launch="<<(timer.getTime()/launches)<<std::endl;
+	
+}
+
+void runRousTunnel(OpalSceneManager* sceneManager, float sphereRadius) {
+	float freq = 1e9f;
+	OpalSimulationTypes type=OpalSimulationTypes::CURVEDFLATWALLS;
+	sceneManager->setSimulationType(type);	
+	sceneManager->initContext(freq);
+
+	sceneManager->getSimulation()->setPrintHits(false);
+	loadRousTunnel(sceneManager,4.0f,1200.0f,2.0f);
+	Timer timer;
+	//Receiver polarization
+	optix::float3 polarization = V; 	
+	
+	//Transmitter
+	optix::float3 postx = make_float3(0.0f,4.5f, 0.0f);
+	float3 polarizationTx = V; 
+	//Sphere scanning
+	float initElevation=0.0f;
+	float initAzimuth=-90.0f;
+	float endElevation=180.0f;
+	float endAzimuth=90.0f;
+	float deltaEl=10.0f;
+	float deltaAz=10.0f;
+	float asEl=0.01f;
+	float asAz=0.01f;
+	float overlap=0.5f;
+	//float overlap=0.0f;
+	std::cout<<"****+ Simulating Rous tunnel ***** "<<std::endl;
+	std::cout<<"Transmitting at "<<postx<<" with polarization="<<polarizationTx<<std::endl;
+	std::cout<<"Receiving with radius="<<sphereRadius<<" with polarization="<<polarization<<std::endl;
+	std::cout<<"Scanning the sphere with ASElevation="<<asEl<< " and ASAzimuth="<<asAz<<std::endl;
+	sceneManager->setMinEpsilon(1e-4f);
+	
+	float currentElevation=initElevation;
+	float currentAzimuth=initAzimuth;
+	//std::cout<<"Tracing angle (el/az)="<<(currentElevation-overlap)<<","<<(currentElevation+deltaEl+overlap)<<"/"<<(currentAzimuth-overlap)<<","<<(currentAzimuth+deltaAz+overlap)<<std::endl;
+	
+	sceneManager->createRaySphere2D(currentElevation-overlap,asEl,currentElevation+deltaEl+overlap,currentAzimuth-overlap,asAz,currentAzimuth+deltaAz+overlap);
+	
+	//sceneManager->setPrintEnabled(1024*1024*1024, make_uint3(976,552,0));
+	sceneManager->finishSceneContext();
+	timer.start();
+	
+	//Angle for separating duplicate rays
+
+	float discriminateAngle=2.5f; //In degrees
+	sceneManager->setMaxAngleForDuplicateRays(discriminateAngle*M_PI/180.f);
+	
+	
+	/******** With angle discrimination ********/
+	/** Sequential test. For a really large number of reflections and receivers  (that is, potential hits) have to do a sequential test, to avoid buffer overflows */
+	sceneManager->addReceiver(1,make_float3(1.0f,-1.0f, 10.f),polarization, sphereRadius, printPower);
+	float zinit=1.0f;
+	float deltar=sphereRadius;
+	uint launches=0;
+	//Longitudinal
+	for (int i=0;i<=250;++i) {
+		float3 posrx=make_float3(-2.0f,1.5f,zinit );
+		sceneManager->updateReceiver(1, posrx,deltar);
+		zinit+=2.0f;
+		//deltar+=0.01;
+
+	//Transversal
+//	float xinit=-3.5f;
+//	for (int i=-35;i<=35;++i) {
+//		float3 posrx=make_float3(i/10.0f,1.5f,5.0f);
+//		sceneManager->updateReceiver(1, posrx,deltar);
+//		xinit+=0.07f;
+//		//deltar+=0.01;
+//		
+//	//sceneManager->addReceiver(1,make_float3(-1.0f,1.5f, 5.f),polarization, sphereRadius, printPower);
+//	//sceneManager->addReceiver(2,make_float3(1.0f,1.5f, 5.f),polarization, sphereRadius, printPower);
+		
+		
+		//First launch
+		sceneManager->transmit(0, 1.0f, postx, polarizationTx, true);
+
+		//Now loop to fill the solid angle
+		currentAzimuth += deltaAz;
+		//Trace all elevations
+		while (currentElevation<endElevation) {
+
+			//Trace all azimuth	
+			while(currentAzimuth<endAzimuth) {
+				std::cout<<"Tracing angle (el/az)="<<(currentElevation-overlap)<<","<<(currentElevation+deltaEl+overlap)<<"/"<<(currentAzimuth-overlap)<<","<<(currentAzimuth+deltaAz+overlap)<<std::endl;
+				sceneManager->createRaySphere2D(currentElevation-overlap,asEl,currentElevation+deltaEl+overlap,currentAzimuth-overlap,asAz,currentAzimuth+deltaAz+overlap);
+				sceneManager->transmit(0, 1.0f, postx, polarizationTx, true);
+				currentAzimuth += deltaAz;
+			}
+			currentAzimuth=initAzimuth;
+			currentElevation += deltaEl;
+		}
+		sceneManager->endPartialLaunch(1u);
+
+		currentElevation=initElevation;
+		currentAzimuth=initAzimuth;
+		++launches;
+
+	} 
+	
+	timer.stop();
+	std::cout<<"Time="<<timer.getTime()<<". Time/launch="<<(timer.getTime()/launches)<<std::endl;
+	
+
+}
+void runSingleRayCylinder(OpalSceneManager* sceneManager, float sphereRadius) {
+	float freq = 1e9f;
+	OpalSimulationTypes type=OpalSimulationTypes::CURVEDWALLS;
+	sceneManager->setSimulationType(type);	
+	sceneManager->initContext(freq);
+	sceneManager->getSimulation()->setPrintHits(true);
+	Timer timer;
+	//Receiver polarization
+	optix::float3 polarization = V; 	
+	
+	//********Single receiver
+	int j=1;	
+	////Position
+	//optix::float3 posrx = make_float3(1.5f, 0.0f, 1.0f);	
+	optix::float3 posrx = make_float3(0.0f, 0.0f, 4);	
+	//////Add to scene
+	sceneManager->addReceiver(j, posrx,polarization, sphereRadius, printPower);
+	//*********************
+	
+	//Transmitter
+	optix::float3 postx = make_float3(0.0f,0.0f, 0.0f);
+	float3 polarizationTx = V; 
+	
+	std::cout <<"**** Single ray cylinder ***"<<std::endl;	
+	MaterialEMProperties emProp1;
+	emProp1.dielectricConstant = make_float2(5.0f, -60.0f*sceneManager->getChannelParameters().waveLength*0.01f);
+	//There is a dependency on the frequency again, we use -15 dB per 203 mm at 5 GHz => -75 dB/m
+	emProp1.tattenuation = make_float2(0.1f,-75.f );
+	loadCircularTunnel(sceneManager,2.0f,1200.0f, emProp1);
+	std::cout<<"Transmitting at "<<postx<<" with polarization="<<polarizationTx<<std::endl;
+	std::cout<<"Receiving with radius="<<sphereRadius<<" with polarization="<<polarization<<std::endl;
+	sceneManager->setMinEpsilon(1e-4f);
+	
+	//***Single ray transmit****
+	//float3 mRay=normalize(make_float3(1.0,0.0f,0.0f));
+
+	//sceneManager->createRaySphere2D(1,1,&mRay);
+	sceneManager->createRaySphere2D(45,0.1,46,0,0.1,1);
+	
+	//Angle for separating duplicate rays
+		float discriminateAngle=5.0f; //In degrees
+		sceneManager->setMaxAngleForDuplicateRays(discriminateAngle*M_PI/180.f);
+	
+	sceneManager->finishSceneContext();
+	
+	//First launch
+	sceneManager->transmit(0, 1.0f, postx, polarizationTx, false);
+	//sceneManager->endPartialLaunch(1u);
+}
+
+//void runDudley(OpalSceneManager* sceneManager, float sphereRadius) {
+void runDudley(OpalSceneManager* sceneManager, float sphereRadius, float freq, float3 postx, float3 rx) {
+	Timer timer;
+	//float freq = 1e9f;
+	//float freq = 200e6f;
+	OpalSimulationTypes type=OpalSimulationTypes::CURVEDWALLS;
+	sceneManager->setSimulationType(type);	
+	sceneManager->initContext(freq);
+
+	//sceneManager->getSimulation()->setPrintHits(true);
+	//Receiver polarization
+	optix::float3 polarization = H; 	
+	//float sphereRadius=0.1f;	
+	float distance=10.0f;
+
+	//Sphere scanning
+	float initElevation=0.0f;
+	float initAzimuth=-90.0f;
+	float endElevation=180.0f;
+	float endAzimuth=90.0f;
+	float deltaEl=10.0f;
+	float deltaAz=10.0f;
+	float asEl=0.001f;
+	float asAz=0.001f;
+	//float overlap=0.5f;
+	float overlap=0.0f;
+	
+	std::cout <<"**** Dudley Tunnel ***"<<std::endl;	
+
+	MaterialEMProperties emProp1;
+	
+	//Transmitter
+	//	Configuration Fig. 8 with f=1GHz 
+	//emProp1.dielectricConstant = make_float2(12.0f, -60.0f*sceneManager->getChannelParameters().waveLength*0.02f);
+	//optix::float3 postx = make_float3(0.0f, 0.0f, 0.0f);
+	float3 polarizationTx = H; 
+	
+	
+
+	//Configuration Fig. 14 with f=200MHz
+	emProp1.dielectricConstant = make_float2(5.0f, -60.0f*sceneManager->getChannelParameters().waveLength*0.02f);
+	//optix::float3 postx = make_float3(1.8f, 0.0f, 0.0f);
+	
+	
+	
+	
+	
+	
+	
+	emProp1.dielectricConstant = make_float2(5.0f, -60.0f*sceneManager->getChannelParameters().waveLength*0.02f);
+	emProp1.tattenuation = make_float2(0.1f,-75.f );
+	loadCircularTunnel(sceneManager,2.0f,1200.0f, emProp1);
+	
+	std::cout<<"Transmitting at "<<postx<<" with polarization="<<polarizationTx<<std::endl;
+	std::cout<<"Receiving with radius="<<sphereRadius<<" with polarization="<<polarization<<std::endl;
+	std::cout<<"Scanning the sphere with ASElevation="<<asEl<< " and ASAzimuth="<<asAz<<std::endl;
+	
+	
+	//Change this value if launch enters an infinite loop due to precision errors
+	//sceneManager->setMinEpsilon(1e-4f);
+	sceneManager->setMinEpsilon(1e-4f);
+	
+	float currentElevation=initElevation;
+	float currentAzimuth=initAzimuth;
+	//std::cout<<"Tracing angle (el/az)="<<(currentElevation-overlap)<<","<<(currentElevation+deltaEl+overlap)<<"/"<<(currentAzimuth-overlap)<<","<<(currentAzimuth+deltaAz+overlap)<<std::endl;
+	
+	//OpalRaySphereGenerator* gen=sceneManager->getRaySphereGenerator();
+	//std::vector<float3> rays=gen->generateRandomUniform(currentElevation,currentElevation+deltaEl,currentAzimuth,currentAzimuth+deltaAz,1000000);
+	//sceneManager->createRaySphere2D(1000,1000,rays.data());
+	sceneManager->createRaySphere2D(currentElevation-overlap,asEl,currentElevation+deltaEl+overlap,currentAzimuth-overlap,asAz,currentAzimuth+deltaAz+overlap);
+	
+	sceneManager->finishSceneContext();
+	timer.start();
+	
+	//Angle for separating duplicate rays
+
+	float discriminateAngle=2.5f; //In degrees
+	sceneManager->setMaxAngleForDuplicateRays(discriminateAngle*M_PI/180.f);
+	
+	uint ns=2;	
+	uint ls=100;
+	float zinit=2.0f;
+	uint launches=0;
+	rx.z=zinit;
+	sceneManager->addReceiver(1,rx,polarization, sphereRadius, printPower);
+	//sceneManager->addReceiver(1,make_float3(1.8f,0.0f, 0.0f),polarization, sphereRadius, printPower);
+	for (int n=0;n<100;++n) {
+	//for (int n=0;n<floor(ls/ns);++n) {
+		//sceneManager->clearReceivers();
+		//Configuration Fig. 14
+		//zrun(sceneManager, (n*ns)+1,1.0f,1.8f, 0.0f,ns*(n+1),polarization,sphereRadius, -1);	
+		
+		//Configuration Fig. 7
+		//zrun(sceneManager, (n*ns)+1,1.0f,0.0f, 1.8f,ns*(n+1),polarization,sphereRadius, -1);	
+		//if (n>=15) { 
+		//
+	
+		//discriminateAngle += 1.0f;
+		//sceneManager->setMaxAngleForDuplicateRays(discriminateAngle*M_PI/180.f);
+		//}
+		//}
+		//if ((n>=25) && (n<=40)) { 
+		//	sceneManager->setMaxAngleForDuplicateRays(60.0f*M_PI/180.f);
+		//}
+		rx.z=zinit;
+		//float3 posrx=make_float3(1.8f,0.0f,zinit );
+		sceneManager->updateReceiver(1, rx);
+		zinit+=1.0f;
+	
+		//First launch
+		sceneManager->transmit(0, 1.0f, postx, polarizationTx, true);
+
+		//Now loop to fill the solid angle
+		currentAzimuth += deltaAz;
+		//Trace all elevations
+		while (currentElevation<endElevation) {
+
+			//Trace all azimuth	
+			while(currentAzimuth<endAzimuth) {
+				//std::cout<<"Tracing angle (el/az)="<<(currentElevation-overlap)<<","<<(currentElevation+deltaEl+overlap)<<"/"<<(currentAzimuth-overlap)<<","<<(currentAzimuth+deltaAz+overlap)<<std::endl;
+				sceneManager->createRaySphere2D(currentElevation-overlap,asEl,currentElevation+deltaEl+overlap,currentAzimuth-overlap,asAz,currentAzimuth+deltaAz+overlap);
+			//std::vector<float3> rays=gen->generateRandomUniform(currentElevation,currentElevation+deltaEl,currentAzimuth,currentAzimuth+deltaAz,1000000);	
+			//sceneManager->createRaySphere2D(1000,1000,rays.data());
+				sceneManager->transmit(0, 1.0f, postx, polarizationTx, true);
+				currentAzimuth += deltaAz;
+				++launches;
+			}
+			currentAzimuth=initAzimuth;
+			currentElevation += deltaEl;
+		}
+		sceneManager->endPartialLaunch(1u);
+
+		currentElevation=initElevation;
+		currentAzimuth=initAzimuth;
+
+	} //Multiple zcuts for(n
+	
+	timer.stop();
+	std::cout<<"Time="<<timer.getTime()<<"Time/launch="<<(timer.getTime()/launches)<<std::endl;
+	
+}
+void cubeTunnelEquivalentToDudley(OpalSceneManager* sceneManager, float sphereRadius, bool useDepolarization) {
+	float freq = 1e9;
+
+	
+	//Init context before doing anything else
+	if (useDepolarization) {
+		sceneManager->setSimulationType(OpalSimulationTypes::FLATWALLS);
+	} else {
+		sceneManager->setSimulationType(OpalSimulationTypes::BASIC);
+	}
+	
+	
+	sceneManager->initContext(freq);
+
+
+	Timer timer;
+	
+
+	//****Cube tunnel dimensions *****
+	float width=3.54f;
+	float height=3.54f;
+	float length=1000.0f;
+	//****************
+
+	//Receiver polarization
+	optix::float3 polarization = V; 	
+	//float sphereRadius=0.1f;	
+	float distance=100.0f;
+
+
+	//Transmitter
+	optix::float3 postx = make_float3(0.0f, 0.0f, 0.0f);
+	
+	
+	float3 polarizationTx = V; 
+	
+	
+	//Sphere scanning
+	float initElevation=0.0f;
+	float initAzimuth=-90.0f;
+	float endElevation=180.0f;
+	float endAzimuth=90.0f;
+	float deltaEl=10.0f;
+	float deltaAz=10.0f;
+	float asEl=0.01f;
+	float asAz=0.01f;
+	float overlap=0.5f;
+	//float overlap=0.0f;
+
+
+	std::cout <<"**** Running Cube Tunnel equivalent to Dudley ***"<<std::endl;	
+
+	MaterialEMProperties emProp1;
+	emProp1.dielectricConstant = make_float2(12.0f, -60.0f*sceneManager->getChannelParameters().waveLength*0.02f);
+	emProp1.tattenuation = make_float2(0.1f,-75.f );
+
+	loadBasicTunnel(sceneManager, width, height, length, emProp1);
+	
+	std::cout<<"Transmitting at "<<postx<<" with polarization="<<polarizationTx<<std::endl;
+	std::cout<<"Receiving with radius="<<sphereRadius<<" with polarization="<<polarization<<std::endl;
+	std::cout<<"Scanning the sphere with ASElevation="<<asEl<< " and ASAzimuth="<<asAz<<std::endl;
+	
+	
+	//Change this value if launch enters an infinite loop due to precision errors
+	//sceneManager->setMinEpsilon(1e-4f);
+	sceneManager->setMinEpsilon(1e-4f);
+
+
+
+	//For very large launches, you should enable exceptions at least once and check that no buffer overflow has occurred
+	//sceneManager->enableExceptions();	
+
+
+	//Multiple receivers
+	
+	//xcut(sceneManager, width, height, -1.0f, distance, polarization,sphereRadius);	
+	//zrun(sceneManager.get(), 50.0f,10.0f,3.0f, -1.0f,1000.0f,polarization,sphereRadius);	
+	
+	//Create first sphere to avoid trouble with the buffers
+	//TODO: we should change this to support late creation of sphere
+	float currentElevation=initElevation;
+	float currentAzimuth=initAzimuth;
+	//std::cout<<"Tracing angle (el/az)="<<(currentElevation-overlap)<<","<<(currentElevation+deltaEl+overlap)<<"/"<<(currentAzimuth-overlap)<<","<<(currentAzimuth+deltaAz+overlap)<<std::endl;
+	
+	sceneManager->createRaySphere2D(currentElevation-overlap,asEl,currentElevation+deltaEl+overlap,currentAzimuth-overlap,asAz,currentAzimuth+deltaAz+overlap);
+
+	
+	sceneManager->finishSceneContext();
+	timer.start();
+	//xcut(sceneManager,  width,  height,  0.0f, 100.0f,  polarization,  sphereRadius);
+	
+	uint ns=100;	
+	uint ls=1000;
+	zrun(sceneManager, 700,1.0f,0.0, 0.0f,800,polarization,sphereRadius,-1.0f);	
+
+//	for (int n=0;n<floor(ls/ns);++n) {
+//		sceneManager->clearReceivers();
+//		float lastSphere=sphereRadius;
+//		if (sphereRadius<0.03) {
+//			lastSphere=zrun(sceneManager, (n*ns)+1,1.0f,0.0, 0.0f,ns*(n+1),polarization,sphereRadius, 5e-5);	
+//		} else {
+//			lastSphere=zrun(sceneManager, (n*ns)+1,1.0f,0.0, 0.0f,ns*(n+1),polarization,sphereRadius,-1.0f);	
+//		}
+
+
+		//First launch
+		sceneManager->transmit(0, 1.0f, postx, polarizationTx, true);
+
+		//Now loop to fill the solid angle
+		currentAzimuth += deltaAz;
+		//Trace all elevations
+		while (currentElevation<endElevation) {
+
+			//Trace all azimuth	
+			while(currentAzimuth<endAzimuth) {
+				std::cout<<"Tracing angle (el/az)="<<(currentElevation-overlap)<<","<<(currentElevation+deltaEl+overlap)<<"/"<<(currentAzimuth-overlap)<<","<<(currentAzimuth+deltaAz+overlap)<<std::endl;
+				sceneManager->createRaySphere2D(currentElevation-overlap,asEl,currentElevation+deltaEl+overlap,currentAzimuth-overlap,asAz,currentAzimuth+deltaAz+overlap);
+				sceneManager->transmit(0, 1.0f, postx, polarizationTx, true);
+				currentAzimuth += deltaAz;
+			}
+			currentAzimuth=initAzimuth;
+			currentElevation += deltaEl;
+		}
+		sceneManager->endPartialLaunch(1u);
+
+		currentElevation=initElevation;
+		currentAzimuth=initAzimuth;
+	//	sphereRadius=lastSphere;
+
+	//} //Multiple zcuts for(n
+	
+	timer.stop();
+	std::cout<<"Time="<<timer.getTime()<<std::endl;
+
+
+}
+void cubeTunnel(OpalSceneManager* sceneManager, float sphereRadius, bool useDepolarization) {
+	float freq = 900e6f;
+
+	
+	//Init context before doing anything else
+	if (useDepolarization) {
+		sceneManager->setSimulationType(OpalSimulationTypes::FLATWALLS);
+	} else {
+		sceneManager->setSimulationType(OpalSimulationTypes::BASIC);
+	}
+	
+	
+	sceneManager->initContext(freq);
+
+
+	Timer timer;
+	
+
+	//****Cube tunnel dimensions *****
+	float width=8.5f;
+	float height=5.0f;
+	float length=1000.0f;
+	//float width=10.0f;
+	//float height=5.0f;
+	//float width=5.0f;
+	//float height=10.0f;
+	
+	//****************
+
+	//Receiver polarization
+	optix::float3 polarization = V; 	
+	//float sphereRadius=0.1f;	
+	float distance=100.0f;
+
+
+	//Transmitter
+	//optix::float3 postx = make_float3(0.0f, 0.0f, 0.0f);
+	optix::float3 postx = make_float3(-3.85f,1.0f, 0.0f);
+	
+	
+	//*** Rous transmitter position****
+	//optix::float3 postx = make_float3(0.0f,4.5f, 0.0f);
+	
+	//optix::float3 postx = make_float3(0.0f,0.0f, 0.0f);
+	float3 polarizationTx = V; 
+	
+	
+	//Sphere scanning
+	float initElevation=0.0f;
+	float initAzimuth=-90.0f;
+	float endElevation=180.0f;
+	float endAzimuth=90.0f;
+	float deltaEl=10.0f;
+	float deltaAz=10.0f;
+	float asEl=0.01f;
+	float asAz=0.01f;
+	float overlap=0.5f;
+	//float overlap=0.0f;
+
+
+	std::cout <<"**** Running Cube Tunnel ***"<<std::endl;	
+
+
+	//Load tunnel mesh
+	MaterialEMProperties emProp1;
+	emProp1.dielectricConstant = make_float2(5.0f, -60.0f*sceneManager->getChannelParameters().waveLength*0.01f);
+	//There is a dependency on the frequency again, we use -15 dB per 203 mm at 5 GHz => -75 dB/m
+	emProp1.tattenuation = make_float2(0.1f,-75.f );
+	loadBasicTunnel(sceneManager, width, height, length, emProp1);
+	//loadHalfCylinder(sceneManager.get(), 1.0f,1.0f);
+	
+//	loadRousTunnel(sceneManager.get(),4.0f,1200.0f,2.0f);
+	//loadCircularTunnel(sceneManager.get(),2.0f,1200.0f);
+	
+	std::cout<<"Transmitting at "<<postx<<" with polarization="<<polarizationTx<<std::endl;
+	std::cout<<"Receiving with radius="<<sphereRadius<<" with polarization="<<polarization<<std::endl;
+	std::cout<<"Scanning the sphere with ASElevation="<<asEl<< " and ASAzimuth="<<asAz<<std::endl;
+	
+	
+	//Change this value if launch enters an infinite loop due to precision errors
+	//sceneManager->setMinEpsilon(1e-4f);
+	sceneManager->setMinEpsilon(1e-4f);
+
+
+
+	//For very large launches, you should enable exceptions at least once and check that no buffer overflow has occurred
+	//sceneManager->enableExceptions();	
+
+
+	//Multiple receivers
+	
+	xcut(sceneManager, width, height, -1.0f, distance, polarization,sphereRadius);	
+	//zrun(sceneManager.get(), 50.0f,10.0f,3.0f, -1.0f,1000.0f,polarization,sphereRadius);	
+	
+	//*** Rous ****
+	//zrun(sceneManager.get(), 1.0f,1.0f,-2.0f, 1.5f,250.0f,polarization,sphereRadius);	
+	
+	//** Circular tunnel
+	//zrun(sceneManager.get(), 1.0f,1.0f,0.5, 0.0f,100.0f,polarization,sphereRadius);
+
+	//zrun(sceneManager.get(), 1.0f,1.0f,0.25*2.0*cosf(M_PI/4),0.25*2.0*sinf(M_PI/4),250.0f,polarization,sphereRadius);	
+	//zrun(sceneManager.get(), 1.0f,1.0f,1.8f,0.0,250.0f,polarization,sphereRadius);	
+	
+	//********Single receiver
+//	int j=1;	
+//	////Position
+//	optix::float3 posrx = make_float3(-4.2499f, -1.0f, distance);	
+//	//////////optix::float3 posrx = make_float3(-3.012f, -1.0f, distance);	
+//	//////////optix::float3 posrx = make_float3(-4.083f, -1.0f, distance);	
+//	////
+//	//////Add to scene
+//	sceneManager->addReceiver(j, posrx,polarization, sphereRadius, printPower);
+	//*********************
+
+
+	/** Sequential test. For a really large number of reflections and receivers  (that is, potential hits) have to do a sequential test, to avoid buffer overflows */
+	//sceneManager->addReceiver(1,make_float3(-3.0f,-1.0f, 360.f),polarization, sphereRadius, printPower);
+	//uint points=ceil((500.0f-360.0f)/10.0f);
+	//for (int i=0;i<=points;++i) {
+	//	float3 posrx=make_float3(-3.0f,-1.0f,(10.0f*i) + 360.f);
+	//	//posrx=make_float3(i,0.0f,10.0f);
+	//	sceneManager->updateReceiver(1, posrx);
+	//
+	
+	//Create first sphere to avoid trouble with the buffers
+	//TODO: we should change this to support late creation of sphere
+	float currentElevation=initElevation;
+	float currentAzimuth=initAzimuth;
+	//std::cout<<"Tracing angle (el/az)="<<(currentElevation-overlap)<<","<<(currentElevation+deltaEl+overlap)<<"/"<<(currentAzimuth-overlap)<<","<<(currentAzimuth+deltaAz+overlap)<<std::endl;
+	
+	sceneManager->createRaySphere2D(currentElevation-overlap,asEl,currentElevation+deltaEl+overlap,currentAzimuth-overlap,asAz,currentAzimuth+deltaAz+overlap);
+	//sceneManager->createRaySphere2D(10,0.01f,20,30,0.01f,40);
+	
+	//***Single ray transmit****
+	//float3 mRay=make_float3(1.526963e-02f, 1.072892e-01f, 9.941105e-01f);
+	//float3 mRay=normalize(make_float3(0.57735f,0.57735f,0.57735f));
+
+	//sceneManager->createRaySphere2D(1,1,&mRay);
+	//sceneManager->createRaySphere2D(currentElevation-overlap,asEl,currentElevation+deltaEl+overlap,currentAzimuth-overlap,asAz,currentAzimuth+deltaAz+overlap);
+	
+	
+	
+
+
+
+	
+	sceneManager->finishSceneContext();
+	timer.start();
+	
+//	uint ns=1;	
+//	uint ls=500;
+
+//	for (int n=0;n<floor(ls/ns);++n) {
+//		sceneManager->clearReceivers();
+//		zrun(sceneManager.get(), (n*ns)+1,1.0f,0.5, 0.0f,ns*(n+1),polarization,sphereRadius, 5e-3);	
+		//zrun(sceneManager.get(), 1.0f,1.0f,0.25*2.0*cosf(M_PI/4),0.25*2.0*sinf(M_PI/4),250.0f,polarization,sphereRadius);	
+
+	//sceneManager->setUsageReport();
+
+	
+
+	//std::cout<<sceneManager->printSceneReport();
+	
+	//First launch
+	sceneManager->transmit(0, 1.0f, postx, polarizationTx, true);
+	//sceneManager->endPartialLaunch(1u);
+	//return sceneManager;	
+	
+	//Now loop to fill the solid angle
+	currentAzimuth += deltaAz;
+	//Trace all elevations
+	while (currentElevation<endElevation) {
+
+		//Trace all azimuth	
+		while(currentAzimuth<endAzimuth) {
+			std::cout<<"Tracing angle (el/az)="<<(currentElevation-overlap)<<","<<(currentElevation+deltaEl+overlap)<<"/"<<(currentAzimuth-overlap)<<","<<(currentAzimuth+deltaAz+overlap)<<std::endl;
+			sceneManager->createRaySphere2D(currentElevation-overlap,asEl,currentElevation+deltaEl+overlap,currentAzimuth-overlap,asAz,currentAzimuth+deltaAz+overlap);
+			sceneManager->transmit(0, 1.0f, postx, polarizationTx, true);
+			currentAzimuth += deltaAz;
+		}
+		currentAzimuth=initAzimuth;
+		currentElevation += deltaEl;
+	}
+	sceneManager->endPartialLaunch(1u);
+	
+		currentElevation=initElevation;
+		currentAzimuth=initAzimuth;
+	
+//	} //Multiple zcuts for(n
+	//* Sequential test */
+	//}
+	
+	timer.stop();
+	std::cout<<"Time="<<timer.getTime()<<std::endl;
+
+
+}
+void cubeTunnelWithCurvedCorrections(OpalSceneManager* sceneManager, float sphereRadius, bool useDepolarization) {
+	float freq = 900e6f;
+
+	
+	if (useDepolarization) {
+		sceneManager->setSimulationType(OpalSimulationTypes::FLATWALLS);
+	} else {
+		sceneManager->setSimulationType(OpalSimulationTypes::BASIC);
+	}
+	
+	
+	
+	sceneManager->initContext(freq);
+
+	dynamic_cast<LPCurvedMeshReflectionSimulation*>(sceneManager->getSimulation())->disableAngleDiscrimination();
+	Timer timer;
+	
+
+	//****Cube tunnel dimensions *****
+	float width=8.5f;
+	float height=5.0f;
+	float length=1000.0f;
+	
+	//****************
+
+	//Receiver polarization
+	optix::float3 polarization = V; 	
+	float distance=100.0f;
+
+
+	//Transmitter
+	optix::float3 postx = make_float3(-3.85f,1.0f, 0.0f);
+	float3 polarizationTx = V; 
+	
+	
+	//Sphere scanning
+	float initElevation=0.0f;
+	float initAzimuth=-90.0f;
+	float endElevation=180.0f;
+	float endAzimuth=90.0f;
+	float deltaEl=10.0f;
+	float deltaAz=10.0f;
+	float asEl=0.01f;
+	float asAz=0.01f;
+	float overlap=0.5f;
+	//float overlap=0.0f;
+
+
+	std::cout <<"**** Running Cube Tunnel With Curved Corrections***"<<std::endl;	
+
+
+	//Load tunnel mesh
+	MaterialEMProperties emProp1;
+	emProp1.dielectricConstant = make_float2(5.0f, -60.0f*sceneManager->getChannelParameters().waveLength*0.01f);
+	//There is a dependency on the frequency again, we use -15 dB per 203 mm at 5 GHz => -75 dB/m
+	emProp1.tattenuation = make_float2(0.1f,-75.f );
+	loadBasicTunnel(sceneManager, width, height, length, emProp1);
+	
+	std::cout<<"Transmitting at "<<postx<<" with polarization="<<polarizationTx<<std::endl;
+	std::cout<<"Receiving with radius="<<sphereRadius<<" with polarization="<<polarization<<std::endl;
+	std::cout<<"Scanning the sphere with ASElevation="<<asEl<< " and ASAzimuth="<<asAz<<std::endl;
+	
+	
+	//Change this value if launch enters an infinite loop due to precision errors
+	sceneManager->setMinEpsilon(1e-4f);
+
+
+
+	//For very large launches, you should enable exceptions at least once and check that no buffer overflow has occurred
+	//sceneManager->enableExceptions();	
+
+
+	//Multiple receivers
+	
+	xcut(sceneManager, width, height, -1.0f, distance, polarization,sphereRadius);	
+	
+	//********Single receiver
+//	int j=1;	
+//	////Position
+//	optix::float3 posrx = make_float3(-4.2499f, -1.0f, distance);	
+//	//////////optix::float3 posrx = make_float3(-3.012f, -1.0f, distance);	
+//	//////////optix::float3 posrx = make_float3(-4.083f, -1.0f, distance);	
+//	////
+//	//////Add to scene
+//	sceneManager->addReceiver(j, posrx,polarization, sphereRadius, printPower);
+	//*********************
+
+
+	/** Sequential test. For a really large number of reflections and receivers  (that is, potential hits) have to do a sequential test, to avoid buffer overflows */
+	//sceneManager->addReceiver(1,make_float3(-3.0f,-1.0f, 360.f),polarization, sphereRadius, printPower);
+	//uint points=ceil((500.0f-360.0f)/10.0f);
+	//for (int i=0;i<=points;++i) {
+	//	float3 posrx=make_float3(-3.0f,-1.0f,(10.0f*i) + 360.f);
+	//	//posrx=make_float3(i,0.0f,10.0f);
+	//	sceneManager->updateReceiver(1, posrx);
+	//
+	
+	//Create first sphere to avoid trouble with the buffers
+	//TODO: we should change this to support late creation of sphere
+	float currentElevation=initElevation;
+	float currentAzimuth=initAzimuth;
+	//std::cout<<"Tracing angle (el/az)="<<(currentElevation-overlap)<<","<<(currentElevation+deltaEl+overlap)<<"/"<<(currentAzimuth-overlap)<<","<<(currentAzimuth+deltaAz+overlap)<<std::endl;
+	
+	sceneManager->createRaySphere2D(currentElevation-overlap,asEl,currentElevation+deltaEl+overlap,currentAzimuth-overlap,asAz,currentAzimuth+deltaAz+overlap);
+	
+	//***Single ray transmit****
+	//float3 mRay=make_float3(1.526963e-02f, 1.072892e-01f, 9.941105e-01f);
+	//float3 mRay=normalize(make_float3(0.57735f,0.57735f,0.57735f));
+
+	//sceneManager->createRaySphere2D(1,1,&mRay);
+	//sceneManager->createRaySphere2D(currentElevation-overlap,asEl,currentElevation+deltaEl+overlap,currentAzimuth-overlap,asAz,currentAzimuth+deltaAz+overlap);
+	
+	//**********************//	
+	
+
+
+
+	
+	sceneManager->finishSceneContext();
+	timer.start();
+	
+	
+	//First launch
+	sceneManager->transmit(0, 1.0f, postx, polarizationTx, true);
+	//sceneManager->endPartialLaunch(1u);
+	//return sceneManager;	
+	
+	//Now loop to fill the solid angle
+	currentAzimuth += deltaAz;
+	//Trace all elevations
+	while (currentElevation<endElevation) {
+
+		//Trace all azimuth	
+		while(currentAzimuth<endAzimuth) {
+			std::cout<<"Tracing angle (el/az)="<<(currentElevation-overlap)<<","<<(currentElevation+deltaEl+overlap)<<"/"<<(currentAzimuth-overlap)<<","<<(currentAzimuth+deltaAz+overlap)<<std::endl;
+			sceneManager->createRaySphere2D(currentElevation-overlap,asEl,currentElevation+deltaEl+overlap,currentAzimuth-overlap,asAz,currentAzimuth+deltaAz+overlap);
+			sceneManager->transmit(0, 1.0f, postx, polarizationTx, true);
+			currentAzimuth += deltaAz;
+		}
+		currentAzimuth=initAzimuth;
+		currentElevation += deltaEl;
+	}
+	sceneManager->endPartialLaunch(1u);
+	
+		currentElevation=initElevation;
+		currentAzimuth=initAzimuth;
+	
+//	} //Multiple zcuts for(n
+	//* Sequential test */
+	//}
+	
+	timer.stop();
+	std::cout<<"Time="<<timer.getTime()<<std::endl;
+
+
+}
+void cubeTunnelWithRandomRays(OpalSceneManager* sceneManager, float sphereRadius, bool useDepolarization) {
+	float freq = 900e6f;
+
+	
+	sceneManager->setSimulationType(OpalSimulationTypes::FLATWALLS);
+	
+	sceneManager->initContext(freq);
+
+	Timer timer;
+	
+
+	//****Cube tunnel dimensions *****
+	float width=8.5f;
+	float height=5.0f;
+	float length=1000.0f;
+	
+	//****************
+
+	//Receiver polarization
+	optix::float3 polarization = V; 	
+	float distance=100.0f;
+
+
+	//Transmitter
+	optix::float3 postx = make_float3(-3.85f,1.0f, 0.0f);
+	float3 polarizationTx = V; 
+	
+	
+	//Sphere scanning
+	float initElevation=0.0f;
+	float initAzimuth=-90.0f;
+	float endElevation=180.0f;
+	float endAzimuth=90.0f;
+	float deltaEl=10.0f;
+	float deltaAz=10.0f;
+	float asEl=0.01f;
+	float asAz=0.01f;
+	float overlap=0.5f;
+	//float overlap=0.0f;
+
+
+	std::cout <<"**** Running Cube Tunnel With Random rays***"<<std::endl;	
+
+
+	//Load tunnel mesh
+	MaterialEMProperties emProp1;
+	emProp1.dielectricConstant = make_float2(5.0f, -60.0f*sceneManager->getChannelParameters().waveLength*0.01f);
+	//There is a dependency on the frequency again, we use -15 dB per 203 mm at 5 GHz => -75 dB/m
+	emProp1.tattenuation = make_float2(0.1f,-75.f );
+	loadBasicTunnel(sceneManager, width, height, length, emProp1);
+	
+	std::cout<<"Transmitting at "<<postx<<" with polarization="<<polarizationTx<<std::endl;
+	std::cout<<"Receiving with radius="<<sphereRadius<<" with polarization="<<polarization<<std::endl;
+	std::cout<<"Scanning the sphere with ASElevation="<<asEl<< " and ASAzimuth="<<asAz<<std::endl;
+	
+	
+	//Change this value if launch enters an infinite loop due to precision errors
+	sceneManager->setMinEpsilon(1e-4f);
+
+
+
+
+
+	//Multiple receivers
+	
+	xcut(sceneManager, width, height, -1.0f, distance, polarization,sphereRadius);	
+	
+	
+	//Create first sphere to avoid trouble with the buffers
+	//TODO: we should change this to support late creation of sphere
+	float currentElevation=initElevation;
+	float currentAzimuth=initAzimuth;
+	//std::cout<<"Tracing angle (el/az)="<<(currentElevation-overlap)<<","<<(currentElevation+deltaEl+overlap)<<"/"<<(currentAzimuth-overlap)<<","<<(currentAzimuth+deltaAz+overlap)<<std::endl;
+	
+	//sceneManager->createRaySphere2D(currentElevation-overlap,asEl,currentElevation+deltaEl+overlap,currentAzimuth-overlap,asAz,currentAzimuth+deltaAz+overlap);
+	OpalRaySphereGenerator* gen=sceneManager->getRaySphereGenerator();
+	std::vector<float3> rays=gen->generateRandomUniform(currentElevation,currentElevation+deltaEl,currentAzimuth,currentAzimuth+deltaAz,1000000);	
+	//std::vector<float3> rays=gen->generateTesselatedSphere(11);
+	
+	std::cout<<"rays="<<rays.size()<<"size="<<(rays.size()*sizeof(float3)/(1024.f*1024.f*1024.f))<<"el="<<(floor(rays.size()/2))<<std::endl;
+	int el=0; 
+	int az=0;
+	if (rays.size()>1000) {
+	 	el=rays.size()/1000;
+		az=1000;
+		std::cout<<"div="<<el<<"az="<<az<<std::endl;
+
+	} else {
+	 	el=rays.size()/10;
+		az=10;
+		std::cout<<"div="<<el<<"az="<<az<<std::endl;
+	}
+	sceneManager->createRaySphere2D(el,az,rays.data());
+
+
+	
+	sceneManager->finishSceneContext();
+	timer.start();
+	
+	
+	//First launch
+	sceneManager->transmit(0, 1.0f, postx, polarizationTx, true);
+	//sceneManager->endPartialLaunch(1u);
+	//return sceneManager;	
+	
+	//Now loop to fill the solid angle
+	currentAzimuth += deltaAz;
+	//Trace all elevations
+	while (currentElevation<endElevation) {
+
+		//Trace all azimuth	
+		while(currentAzimuth<endAzimuth) {
+			std::cout<<"Tracing angle (el/az)="<<(currentElevation-overlap)<<","<<(currentElevation+deltaEl+overlap)<<"/"<<(currentAzimuth-overlap)<<","<<(currentAzimuth+deltaAz+overlap)<<std::endl;
+			//sceneManager->createRaySphere2D(currentElevation-overlap,asEl,currentElevation+deltaEl+overlap,currentAzimuth-overlap,asAz,currentAzimuth+deltaAz+overlap);
+			std::vector<float3> rays=gen->generateRandomUniform(currentElevation,currentElevation+deltaEl,currentAzimuth,currentAzimuth+deltaAz,1000000);	
+			sceneManager->createRaySphere2D(1000,1000,rays.data());
+			sceneManager->transmit(0, 1.0f, postx, polarizationTx, true);
+			currentAzimuth += deltaAz;
+		}
+		currentAzimuth=initAzimuth;
+		currentElevation += deltaEl;
+	}
+	sceneManager->endPartialLaunch(1u);
+	
+		currentElevation=initElevation;
+		currentAzimuth=initAzimuth;
+	
+//	} //Multiple zcuts for(n
+	//* Sequential test */
+	//}
+	
+	timer.stop();
+	std::cout<<"Time="<<timer.getTime()<<std::endl;
+
+
+}
+
+void runTunnel(OpalSceneManager* sceneManager, float sphereRadius, bool useDepolarization, std::string test) {
+	//runSingleRayCylinder(sceneManager.get(),sphereRadius);
+	//runSingleRayRous(sceneManager.get(),sphereRadius);
+	//runRousTunnel(sceneManager.get(),sphereRadius);
+
+	//cubeTunnelEquivalentToDudley(sceneManager.get(),sphereRadius, useDepolarization);
+	
+
+	//	runAnversTests(sceneManager,sphereRadius, useDepolarization,test);
+	
+
+
+	//runAnversTunnel(sceneManager.get(),sphereRadius, useDepolarization);
+	//runDudley(sceneManager.get(),sphereRadius);
+	//runDudleyTests(sceneManager.get(),sphereRadius,useDepolarization,test);
+	//runDudleyRDN(sceneManager.get(),sphereRadius);
+	//runDidascalouConductor(sceneManager.get(),sphereRadius);
+	//runDidascalouConductorRDN(sceneManager.get(),sphereRadius);
+	//runDidascalouDielectricRDN(sceneManager,sphereRadius);
+	//cubeTunnel(sceneManager.get(),sphereRadius, useDepolarization);
+	//cubeTunnelWithCurvedCorrections(sceneManager.get(),sphereRadius, useDepolarization);
+	//cubeTunnelWithRandomRays(sceneManager.get(),sphereRadius, useDepolarization);
+	//runAnversTunnelStraight(sceneManager.get(),sphereRadius, useDepolarization);
+		
+}
+

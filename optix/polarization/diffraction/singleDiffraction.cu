@@ -28,6 +28,8 @@ rtBuffer<Edge, 1> edgeBuffer;
 //Receiver position buffer 
 rtBuffer<float4, 1> receiverPositionsBuffer;
 rtBuffer<rtBufferId<float,2>, 1> antennaGainIdBuffer;
+typedef optix::Matrix<4,4> TransMat; 
+rtBuffer<TransMat, 1> transformToPolarizationBuffer;
 
 //Hit buffer
 rtBuffer<RDNHit, 3> difBuffer; //Buffer to store all the hits
@@ -1072,21 +1074,26 @@ __forceinline__ __device__ void computeElectricFieldAtReceiver(const float4& ang
 		//This is actually the induced voltage on the antenna. From it we can compute the received power
 		float2 E=Er_beta+Er_phi;
 		if (useAntennaGain) {
-			//rtPrintf("suing useAntennaGain\n");
 
-			float g=getAntennaGain(rxRay, antennaGainIdBuffer[index.y]);	
+			float g=getAntennaGain(rxRay, antennaGainIdBuffer[index.y],transformToPolarizationBuffer[index.y]);	
 			E=sca_complex_prod(g,E);
 		}
 
 		//rtPrintf("G\t |E|=%6e index=(%u,%u,%u) %f \n",length(E),  index.x,index.y,index.z,angles.z*57.2968f);
 
-		float4 sangles=angles*57.2968f;
+		//float4 sangles=angles*57.2968f;
 		//rtPrintf("%u\t%u\t%u  sangles(beta, beta',phi, phi')=(%f,%f,%f,%f) L=%f dif=%6e  \n",launchIndex.x,launchIndex.y,launchIndex.z, sangles.x,sangles.y,sangles.z,sangles.w, L, (sangles.x-sangles.y));
 		RDNHit aHit;
 		//aHit.EEx=make_float4(E.x,E.y, 0.0f,0.0f);
 		aHit.EEx=make_float4(E.x,E.y, 1.0f,0.0f); //Use 1 on EEx.z as flag that this has been an actual hit
 		aHit.EyEz=make_float4(0.0f,0.0f,0.0f,0.0f);
+		//Additional output
+		float unfoldedPathLength = s+s_prime;
+		aHit.doaD = make_float4(rxRay.x, rxRay.y,rxRay.z, unfoldedPathLength);
+		aHit.doDu = make_float4(txRay.x, txRay.y,txRay.z, -1.0);
+	
 		difBuffer[index]=aHit;
+		
 	}
 }
 
@@ -1191,7 +1198,8 @@ RT_PROGRAM void computeSingleDiffraction() {
 				if (useAntennaGain) {
 					//rtPrintf("tx useAntennaGain\n");
 					rtBufferId<float,2> bid=tx.gainId;
-					gain=getAntennaGain(txRayDirection, bid);	
+					const Matrix<4,4> tp=tx.transformToPolarization;
+					gain=getAntennaGain(txRayDirection, bid, tp);	
 				} else {
 					gain=1.0f;
 				}

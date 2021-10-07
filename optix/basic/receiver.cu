@@ -47,6 +47,8 @@ rtDeclareVariable(float, asRadiusConstant, ,);
 //Antenna gain
 typedef rtBufferId<float,2> AGB;
 rtDeclareVariable(AGB, gainBufferId, ,);
+typedef optix::Matrix<4,4> TransMat; 
+rtDeclareVariable(TransMat, transformToPolarization, ,);
 
 
 //Closest hit program for receivers
@@ -150,7 +152,7 @@ RT_PROGRAM void closestHitReceiver()
 
 	if (useAntennaGain) {
 		
-		float g=getAntennaGain(-ray_receiver.direction, gainBufferId);	
+		float g=getAntennaGain(ray, gainBufferId,transformToPolarization);	
 		E=sca_complex_prod(g,E);
 	}
 	//Store hit information on buffer:

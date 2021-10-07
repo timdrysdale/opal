@@ -117,6 +117,7 @@ int main(int argc, char** argv)
 #endif
 		
 		//New way to initialize: first create instance
+		//std::unique_ptr<OpalSceneManager> sceneManager(new OpalSceneManager());
 	
 		OpalSceneManager* sceneManager=new OpalSceneManager();
 
@@ -151,19 +152,7 @@ int main(int argc, char** argv)
 		
 
 		
-		//Finally, run the test
-
-		//Old version
-		//sceneManager = rdnBasicTest(std::move(sceneManager),radius,useDepolarization);
-		//sceneManager = rdnPlaneTest(std::move(sceneManager),radius,useDepolarization);
-		//sceneManager = planeTest(std::move(sceneManager),radius,useDepolarization);
-		//sceneManager = planeTestProgressive(std::move(sceneManager),radius,useDepolarization);
-		//runTunnel(sceneManager,radius,useDepolarization, test);
-		//sceneManager = polarizationPlaneTest(std::move(sceneManager), printEnabled,subSteps);
-		//sceneManager = crossingTest(std::move(sceneManager), printEnabled,subSteps, useDepolarization, radius);
-		//sceneManager = crossingTestMulti(std::move(sceneManager), printEnabled,subSteps, useDepolarization, radius);
-		//sceneManager = freeSpace(std::move(sceneManager),  useDepolarization, radius);
-	//	sceneManager = planeTest(std::move(sceneManager),  useDepolarization, radius);
+		//Finally, run some of the  tests below
 
 
 //Basic tests
@@ -178,7 +167,7 @@ int main(int argc, char** argv)
 		//ct.cylinderTest();
 		//ct.symmetricDivergenceTest();
 		
-//Rectangular Tunnel tests
+//Tunnel tests
 		//CubeTunnelTests ctt(sceneManager,radius,useDepolarization);
 		//ctt.cubeTunnelRDNIsotropic(100);
 		//ctt.cubeTunnelRDN(100);
@@ -201,19 +190,18 @@ int main(int argc, char** argv)
 		//DudleyTests dud(sceneManager,radius,useDepolarization);
 		//dud.runTest(test);		
 
-
 //Diffraction tests
-		DiffractionTests dif(sceneManager,radius, useDepolarization);
+		//DiffractionTests dif(sceneManager,radius, useDepolarization);
 		//dif.semiplaneDiffraction();
 		//dif.semiplaneTotal();
 		//dif.runSWCorner(false);
-		dif.runSWCorner(true); //With multitransmitter
+		//dif.runSWCorner(true); //With multitransmitter
 		//dif.runSWAcuteCorner();
 		//dif.runCrossing();
 		//dif.addCompoundDynamicMeshes();
 //AntennaGain test
-		//AntennaGainTests ag(sceneManager, radius);
-		//ag.freeSpace(useDepolarization);
+		AntennaGainTests ag(sceneManager, radius);
+		ag.freeSpace(useDepolarization);
 		//ag.freeSpaceRDN();
 		
 		delete sceneManager;

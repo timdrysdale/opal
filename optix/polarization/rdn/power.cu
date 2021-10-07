@@ -57,6 +57,8 @@ rtDeclareVariable(uint, computeMode, ,);
 //Antenna gain
 typedef rtBufferId<float,2> AGB;
 rtDeclareVariable(AGB, gainBufferId, ,);
+typedef optix::Matrix<4,4> TransMat; 
+rtDeclareVariable(TransMat, transformToPolarization, ,);
 
 
 
@@ -309,7 +311,7 @@ RT_PROGRAM void closestHitReceiverCurved()
 
 		if (useAntennaGain) {
 		
-			float g=getAntennaGain(ray, gainBufferId);	
+			float g=getAntennaGain(ray, gainBufferId,transformToPolarization);	
 			E=sca_complex_prod(g,E);
 		}
 
@@ -317,7 +319,9 @@ RT_PROGRAM void closestHitReceiverCurved()
 		//Non-debug hit
 		//aHit.E=E;
 		aHit.EEx=make_float4(E, make_float2(0.0f,0.0f));
-		aHit.EyEz=make_float4(0.0f,0.f,0.0f,0.0f);	
+		aHit.EyEz=make_float4(0.0f,0.f,0.0f,0.0f);
+		//Additional Output	
+		aHit.doaD = make_float4(ray.x, ray.y,ray.z, unfoldedPathLength);	
 
 	}
 

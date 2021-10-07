@@ -115,21 +115,17 @@ set(OPAL_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/Config.h.in ${CMAKE_CURRENT_SOURCE_DIR}/Config.h @ONLY)
  
 
-# See top level CMakeLists.txt file for documentation of OPTIX_add_sample_executableOPTIX_add_sample_executable( tunnels 
+# See top level CMakeLists.txt file for documentation of OPTIX_add_sample_executable.
 OPTIX_add_sample_executable( opal 
-  json.hpp
   Opal.cpp
   Opal.h
   Common.h
   Config.h
   util.cpp
   util.h
-  #Complex.h
   Unity.h
   Unity.cpp
   main.cpp
-  #traceFunctions.h
-  #penetrationFunctions.h
   transmitterManager.h
   transmitterManager.cpp
   opalSimulation.h
@@ -172,7 +168,6 @@ OPTIX_add_sample_executable( opal
   raySphere.cpp
   singleDiffraction.h
   singleDiffraction.cpp
-  #dkm.h 
   #To see it properly in Visual Studio we should add the following. 
   optix/intersect/sphere.cu
   optix/intersect/optixGeometryTriangles.cu
@@ -212,7 +207,7 @@ OPTIX_add_sample_executable( opal
   optix/reflectionFunctions.h
   )
 
-target_link_libraries(opal 
+target_link_libraries( opal
      ${CUDA_LIBRARIES}
     ${CUDA_curand_LIBRARY}
   optix
@@ -277,7 +272,6 @@ set(sources
   singleDiffraction.h
   singleDiffraction.cpp
   json.hpp
-  #dkm.h 
   #To see it properly in Visual Studio we should add the following. 
   optix/intersect/sphere.cu
   optix/intersect/optixGeometryTriangles.cu
@@ -321,14 +315,11 @@ OPTIX_add_sample_library( opal_s
   Opal.h
   Common.h
   Config.h
-  #Complex.h
   util.cpp
   util.h
   Unity.h
   Unity.cpp
   main.cpp
-  #traceFunctions.h
-  #penetrationFunctions.h
   transmitterManager.h
   transmitterManager.cpp
   opalSimulation.h
@@ -475,7 +466,6 @@ set(sources
   singleDiffraction.h
   singleDiffraction.cpp
   json.hpp
-  #dkm.h 
   #To see it properly in Visual Studio we should add the following. 
   optix/intersect/sphere.cu
   optix/intersect/optixGeometryTriangles.cu

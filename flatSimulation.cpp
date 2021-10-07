@@ -13,7 +13,7 @@ namespace opal {
 	std::string LPFlatMeshReflectionSimulation::printConfigInfo() const  {
 		std::ostringstream stream;
 		stream<<"--- Simulation Type---"<<std::endl;
-		stream<<"\tUsing LPFlatMeshReflectionSimulation with depolarization"<<std::endl;
+		stream<<"\tUsing LPFlatMeshReflectionSimulation"<<std::endl;
 		stream<< "\t - Using depolarization. Transmitter and receiver can have any linear polarizations (linear antenna may be oriented in any direction) and can be different. "<<std::endl;
 		return stream.str();
 	}

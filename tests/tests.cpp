@@ -156,6 +156,8 @@ void  BasicTests::loadScenario() {
 	optix::float3 tx_m = make_float3(1040.74f, 32.89, 799.6f);
 	optix::float3 tx_e = make_float3(1633.4f, 42.3, 679.9f);
 	optix::float3 tx_f = make_float3(1520.5f, 26.836, 589.6f);
+	optix::float3 rx3 = make_float3(875.22, 4.19f, 386.65f);
+	optix::float3 tx3 = make_float3(862.62, 7.04f, 386.09f);
 	Timer timer;
 	float freq = 868e6f;
 	std::cout<<"Load from scenario"<<std::endl;
@@ -191,7 +193,8 @@ void  BasicTests::loadScenario() {
 	ScenarioLoader* loader=new ScenarioLoader(sceneManager);
         //std::string path("lora/cartagena.json");
         //std::string path("cartagena2.json");
-        std::string path("eldi.json");
+        //std::string path("eldi.json");
+        std::string path("cartagena-catastro.json");
 	loader->loadJSONScenario(path);
         //std::string path("meshes/cartagena");
 	//loader->loadMeshesFromFiles(path);
@@ -200,23 +203,26 @@ void  BasicTests::loadScenario() {
 	optix::float3 polarization = make_float3(0.0f, 1.0f, 0.0f); //Hard
 //	optix::float3 posrx = make_float3(1547.14f, 40.69f, 620.8f);
 //	float3 posrx = make_float3(1501.6, 25.1f, 609.9f);
-	float3 posrx=rx_e;
+	//float3 posrx=rx_e;
+	float3 posrx=rx3;
 	sceneManager->addReceiver(0, posrx,polarization, sphereRadius, sceneManager->printPower);
-	AntennaGain gains=sceneManager->loadGainsFromFileIndBPower("lora/gananciasAntena.txt");
-	int gainId=sceneManager->registerAntennaGain(gains);
-	sceneManager->registerReceiverGain(0,gainId);
+	
+	//AntennaGain gains=sceneManager->loadGainsFromFileIndBPower("lora/gananciasAntena.txt");
+	//int gainId=sceneManager->registerAntennaGain(gains);
+	//sceneManager->registerReceiverGain(0,gainId);
 	//***Single ray transmit****
-	float3 mRay=normalize(make_float3(-0.004128737841, -0.9902680516, 0.1391119212));
-	sceneManager->createRaySphere2D(1,1,&mRay);
+	//float3 mRay=normalize(make_float3(-0.004128737841, -0.9902680516, 0.1391119212));
+	//sceneManager->createRaySphere2D(1,1,&mRay);
 	
 	sceneManager->finishSceneContext();
 
 ////Uncomment for flat
 //
-//	sceneManager->createRaySphere2D(0.0f,0.1,180.0f,0.0f,0.1,360.0f);
+	sceneManager->createRaySphere2D(0.0f,0.1,180.0f,0.0f,0.1,360.0f);
 //	//float3 postx = make_float3(1501.6, 25.1f, 609.9f);
 //	//optix::float3 postx = make_float3(1547.14f, 40.69f, 620.8f);
-	optix::float3 postx = tx_f;
+//	optix::float3 postx = tx_f;
+	optix::float3 postx = tx3;
 	sceneManager->transmit(1, 0.0251187f, postx, polarization);
 
 //Interchange

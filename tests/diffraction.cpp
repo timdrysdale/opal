@@ -38,7 +38,7 @@ void DiffractionTests::loadSWCorner(float xsize, float ysize, float zsize, Mater
 	sceneManager->writeMeshToPLYFile("quad-dif.ply", v,ind, tm);
 
 	sceneManager->addStaticMesh(4, quadh, 6, quadind, tm, emProp1 );
-
+	
 	//Plane YZ as quad with up border at Y=0
 	int quadind2[6] = { 0,1,2,1,3,2 };
 	optix::float3 quadh2[4] = { make_float3(0.0f,0.0f,-0.5f),make_float3(0.0f,0.f,0.5f) ,make_float3(0.0f,-1.0f,-0.5f) ,make_float3(0.0f,-1.0f,0.5f) };
@@ -48,7 +48,7 @@ void DiffractionTests::loadSWCorner(float xsize, float ysize, float zsize, Mater
 	tm.setRow(1, make_float4(0, ysize, 0, 0.f));
 	tm.setRow(2, make_float4(0, 0, zsize, 0.f));
 	tm.setRow(3, make_float4(0, 0, 0,  1));
-
+	
 	std::vector<float3> v2(std::begin(quadh2), std::end(quadh2));
 	std::vector<int> ind2(std::begin(quadind2), std::end(quadind2));
 	std::cout<<"Writing quad" <<std::endl;
@@ -81,18 +81,18 @@ void DiffractionTests::loadSWCornerAsGroup(float xsize, float ysize, float zsize
 		float4 p=make_float4(v[i]);
 		p.w=1.0f;
 		quadh[i]=make_float3(tm*p);
-
+		
 		std::cout<<"quadh["<<i<<"]="<<quadh[i]<<std::endl;
 	}
 	std::vector<int> ind(std::begin(quadind), std::end(quadind));
 	std::cout<<"Writing quad" <<std::endl;
 	sceneManager->writeMeshToPLYFile("quad-dif.ply", v,ind, tm);
-
-	//Creation of dynamic meshes  requires calling these 4 functions
+		
+//Creation of dynamic meshes  requires calling these 4 functions
 	sceneManager->addDynamicMeshGroup(0);
 	sceneManager->addMeshToGroup(0, 4, quadh, 6, quadind, emProp1);  //Call for each new mesh in the group
 
-
+	
 	//Plane YZ as quad with up border at Y=0
 	int quadind2[6] = { 0,1,2,1,3,2 };
 	optix::float3 quadh2[4] = { make_float3(0.0f,0.0f,-0.5f),make_float3(0.0f,0.f,0.5f) ,make_float3(0.0f,-1.0f,-0.5f) ,make_float3(0.0f,-1.0f,0.5f) };
@@ -102,14 +102,14 @@ void DiffractionTests::loadSWCornerAsGroup(float xsize, float ysize, float zsize
 	tm.setRow(1, make_float4(0, ysize, 0, 0.f));
 	tm.setRow(2, make_float4(0, 0, zsize, 0.f));
 	tm.setRow(3, make_float4(0, 0, 0,  1));
-
+	
 	std::vector<float3> v2(std::begin(quadh2), std::end(quadh2));
 	for (int i=0; i< v2.size(); ++i) {
 		float4 p=make_float4(v2[i]);
 		p.w=1.0f;
 		quadh2[i]=make_float3(tm*p);
 		std::cout<<"quadh2["<<i<<"]="<<quadh2[i]<<std::endl;
-
+		
 	}
 	std::vector<int> ind2(std::begin(quadind2), std::end(quadind2));
 	std::cout<<"Writing quad" <<std::endl;
@@ -146,7 +146,7 @@ void DiffractionTests::loadSWAcuteCorner(float xsize, float ysize, float zsize, 
 	//sceneManager->writeMeshToPLYFile("quad-dif.ply", v,ind, tm);
 
 	sceneManager->addStaticMesh(4, quadh, 6, quadind, tm, emProp1 );
-
+	
 	//Plane YZ as quad with up border at Y=0
 	//int quadind2[6] = { 0,1,2,1,3,2 };
 	//optix::float3 quadh2[4] = { make_float3(0.0f,0.0f,-0.5f),make_float3(0.0f,0.f,0.5f) ,make_float3(0.0f,-1.0f,-0.5f) ,make_float3(0.0f,-1.0f,0.5f) };
@@ -203,7 +203,7 @@ void DiffractionTests::loadRaggedCorners(float xsize, float ysize, float zsize, 
 	//sceneManager->writeMeshToPLYFile("quad-dif.ply", v,ind, tm);
 
 	sceneManager->addStaticMesh(4, quadh, 6, quadind, tm, emProp1 );
-
+	
 	//Plane YZ as quad with up border at Y=0
 	//int quadind2[6] = { 0,1,2,1,3,2 };
 	//optix::float3 quadh2[4] = { make_float3(0.0f,0.0f,-0.5f),make_float3(0.0f,0.f,0.5f) ,make_float3(0.0f,-1.0f,-0.5f) ,make_float3(0.0f,-1.0f,0.5f) };
@@ -242,8 +242,8 @@ void DiffractionTests::loadRaggedCorners(float xsize, float ysize, float zsize, 
 	//Define origin and edge direction this way to follow edge conventions
 	sceneManager->addEdge(make_float3(0.0f,0.0f,-zsize*0.5f)+zsize*z,-zsize*z,make_uint2(0u,1u),x,face_b,y,face_b_n, emProp1);
 
-	//Second edge
-	//Displace first quad
+//Second edge
+//Displace first quad
 	Matrix4x4 dm;
 	dm.setRow(0, make_float4(1, 0, 0, 0));
 	dm.setRow(1, make_float4(0, 1, 0, -xsize*sinf(aperture*M_PIf/180.f)));
@@ -318,7 +318,7 @@ void DiffractionTests::loadCrossing(MaterialEMProperties emProp1) {
 	//lastIndex += cubeFaces;
 	lastIndex = 18;
 	//Cube(2) NE
-
+	
 	tm.setRow(0, make_float4(40.0f, 0, 0, 30.0f));
 	tm.setRow(1, make_float4(0, 40.0f, 0, 20.0f));
 	tm.setRow(2, make_float4(0, 0, 40.0f, 80.0f));
@@ -373,7 +373,7 @@ void DiffractionTests::loadCrossing(MaterialEMProperties emProp1) {
 	addCubeEdges(make_float3(10.0f,0.0f,0.0f),40.0f,12, emProp1);
 	lastIndex += cubeFaces;
 
-
+	
 	//Finally, add horizontal plane
 	//Horizontal plane as quad at origin 
 	int quadind[6] = { 0,1,2,1,0,3 };
@@ -384,7 +384,7 @@ void DiffractionTests::loadCrossing(MaterialEMProperties emProp1) {
 	tm.setRow(1, make_float4(0, 1, 0, 0.f));
 	tm.setRow(2, make_float4(0, 0, 200, 0.f));
 	tm.setRow(3, make_float4(0, 0, 0,  1));
-
+	
 	sceneManager->addStaticMesh(4, quadh, 6, quadind, tm, emProp1 );
 
 }
@@ -399,7 +399,7 @@ void DiffractionTests::addCubeEdges(float3 sw,float length, uint index, Material
 	float3 xu={1.0f,0.0f,0.0f};
 	float3 yu={0.0f,1.0f,0.0f};
 	float3 zu={0.0f,0.0f,1.0f};
-
+		
 
 	//Points
 	float3 nw=sw+z;
@@ -412,9 +412,9 @@ void DiffractionTests::addCubeEdges(float3 sw,float length, uint index, Material
 	//emProp1.dielectricConstant=make_float2(0.0f,std::numeric_limits<float>::infinity());
 	//MaterialEMProperties emProp1;
 	//emProp1.dielectricConstant = make_float2(3.75f, -60.0f*sceneManager->getChannelParameters().waveLength*0.038f);
-	//There is a dependency on the frequency again, we use -15 dB per 203 mm at 5 GHz => -75 dB/m
+		//There is a dependency on the frequency again, we use -15 dB per 203 mm at 5 GHz => -75 dB/m
 	emProp1.tattenuation = make_float2(0.1f,-75.f );
-
+	
 	//Add verticals 
 	sceneManager->addEdge(sw,up,make_uint2(index+4u,index+2u),z,x,-xu,-zu, emProp1);
 	//sceneManager->addEdge(nw,up,make_uint2(index+4u,index),-z,x,-xu,zu,emProp1);
@@ -450,12 +450,12 @@ void DiffractionTests::semiplaneDiffraction() {
 	emProp1.dielectricConstant=make_float2(0.0f,std::numeric_limits<float>::infinity());
 	//MaterialEMProperties emProp1;
 	//emProp1.dielectricConstant = make_float2(3.75f, -60.0f*sceneManager->getChannelParameters().waveLength*0.038f);
-	//There is a dependency on the frequency again, we use -15 dB per 203 mm at 5 GHz => -75 dB/m
+		//There is a dependency on the frequency again, we use -15 dB per 203 mm at 5 GHz => -75 dB/m
 	emProp1.tattenuation = make_float2(0.1f,-75.f );
 
 	//Perfect conductor half plane. Plane is on the XZ plane (normals on Y and -Y)	
 	sceneManager->addEdge(make_float3(0.0f,0.0f,0.0f),100.f*z,make_uint2(0u,1u),x,x,y,-y, emProp1);
-
+	
 	sceneManager->setMinEpsilon(1e-4f);
 
 	//receivers
@@ -466,7 +466,7 @@ void DiffractionTests::semiplaneDiffraction() {
 	for (int i=0;i<360; ++i) {
 		float phi=i*M_PIf/180.0f;
 		//float phi=210*M_PIf/180.0f;
-
+		
 		//optix::float3 posrx = make_float3(0.0f,dist, 10.0f);
 		optix::float3 posrx = make_float3(cosf(phi)*dist,sinf(phi)*dist, 10.0f);
 		sceneManager->addReceiver(i, posrx,polarization, sphereRadius, sceneManager->printPower);
@@ -525,12 +525,12 @@ void DiffractionTests::semiplaneTotal() {
 	emProp1.dielectricConstant=make_float2(0.0f,std::numeric_limits<float>::infinity());
 	//MaterialEMProperties emProp1;
 	//emProp1.dielectricConstant = make_float2(3.75f, -60.0f*sceneManager->getChannelParameters().waveLength*0.038f);
-	//There is a dependency on the frequency again, we use -15 dB per 203 mm at 5 GHz => -75 dB/m
+		//There is a dependency on the frequency again, we use -15 dB per 203 mm at 5 GHz => -75 dB/m
 	emProp1.tattenuation = make_float2(0.1f,-75.f );
 
 	//Perfect conductor half plane. Plane is on the XZ plane (normals on Y and -Y)	
 	sceneManager->addEdge(make_float3(0.0f,0.0f,0.0f),100.f*z,make_uint2(0u,1u),x,x,y,-y, emProp1);
-
+	
 	sceneManager->setMinEpsilon(1e-4f);
 
 	//Plane XZ as quad with left border at X=0 
@@ -556,7 +556,7 @@ void DiffractionTests::semiplaneTotal() {
 	for (int i=0;i<360; ++i) {
 		float phi=i*M_PIf/180.0f;
 		//float phi=60*M_PIf/180.0f;
-
+		
 		//optix::float3 posrx = make_float3(0.0f,dist, 10.0f);
 		optix::float3 posrx = make_float3(cosf(phi)*dist,sinf(phi)*dist, 10.0f);
 		sceneManager->addReceiver(i, posrx,polarization, sphereRadius, sceneManager->printPower);
@@ -566,14 +566,14 @@ void DiffractionTests::semiplaneTotal() {
 	//sceneManager->enableExceptions();
 	sceneManager->finishSceneContext();
 
-	//Uncomment for flat
+//Uncomment for flat
 	sceneManager->createRaySphere2D(0.0f,0.1,180.0f,0.0f,0.1,360.0f);
 	//Uncomment for RDN	
-	//		unsigned int rayD=10000;
-	//
-	//		sceneManager->setRayRange(0.0,180.0,0.0,360.0,rayD,rayD);
-	//		sim->setInitialDensity(((float)sceneManager->getRaySphere().rayCount)/(4*M_PIf));
-	//		sim->setFiltering(2);//Not divided by m	
+//		unsigned int rayD=10000;
+//
+//		sceneManager->setRayRange(0.0,180.0,0.0,360.0,rayD,rayD);
+//		sim->setInitialDensity(((float)sceneManager->getRaySphere().rayCount)/(4*M_PIf));
+//		sim->setFiltering(2);//Not divided by m	
 	//sceneManager->setPrintEnabled(1024 * 1024 * 1024);	
 	//sceneManager->setUsageReport();
 
@@ -622,9 +622,9 @@ void DiffractionTests::runSWCornerDynamicMesh() {
 	emProp1.dielectricConstant=make_float2(0.0f,std::numeric_limits<float>::infinity());
 	//MaterialEMProperties emProp1;
 	//emProp1.dielectricConstant = make_float2(3.75f, -60.0f*sceneManager->getChannelParameters().waveLength*0.038f);
-	//There is a dependency on the frequency again, we use -15 dB per 203 mm at 5 GHz => -75 dB/m
+		//There is a dependency on the frequency again, we use -15 dB per 203 mm at 5 GHz => -75 dB/m
 	emProp1.tattenuation = make_float2(0.1f,-75.f );
-
+	
 	//loadSWCorner(100,100,100,emProp1);	
 	loadSWCornerAsGroup(100,100,100,emProp1);	
 
@@ -638,7 +638,7 @@ void DiffractionTests::runSWCornerDynamicMesh() {
 	Matrix4x4 tr=Matrix4x4::rotate(-M_PIf/4,make_float3(0.0f, 0.0f, 1.0f));
 	sceneManager->updateTransformInGroup(0,tr);
 
-
+	
 	//Matrix4x4 tlb=Matrix4x4::translate(make_float3(0.0f, 0.0f, -50.0f));
 	//sceneManager->updateTransformInGroup(0,tlb);
 	//receivers
@@ -649,7 +649,7 @@ void DiffractionTests::runSWCornerDynamicMesh() {
 	for (int i=0;i<1; ++i) {
 		//float phi=i*M_PIf/180.0f;
 		float phi=60*M_PIf/180.0f;
-
+		
 		//optix::float3 posrx = make_float3(0.0f,dist, 10.0f);
 		optix::float3 posrx = make_float3(cosf(phi)*dist,sinf(phi)*dist, 10.0f);
 		sceneManager->addReceiver(i, posrx,polarization, sphereRadius, sceneManager->printPower);
@@ -659,7 +659,7 @@ void DiffractionTests::runSWCornerDynamicMesh() {
 	//sceneManager->enableExceptions();
 	sceneManager->finishSceneContext();
 
-	//Uncomment for flat
+//Uncomment for flat
 
 	sceneManager->createRaySphere2D(0.0f,0.1,180.0f,0.0f,0.1,360.0f);
 	//Uncomment for RDN	
@@ -668,7 +668,7 @@ void DiffractionTests::runSWCornerDynamicMesh() {
 	//	sceneManager->setRayRange(0.0,180.0,0.0,360.0,rayD,rayD);
 	//	sim->setInitialDensity(((float)sceneManager->getRaySphere().rayCount)/(4*M_PIf));
 	//	sim->setFiltering(2);//Not divided by m	
-
+	
 	//sceneManager->setPrintEnabled(1024 * 1024 * 1024);	
 	//sceneManager->setUsageReport();
 
@@ -691,8 +691,6 @@ void DiffractionTests::runSWCorner(bool multitransmitter) {
 
 	//Add reflection simulation
 	LPFlatMeshReflectionSimulation* sim= new LPFlatMeshReflectionSimulation(sceneManager);
-
-	//Uncomment for RDN
 	//RayDensityNormalizationSimulation* sim= new RayDensityNormalizationSimulation(sceneManager);
 	ComputeMode mode=ComputeMode::VOLTAGE;
 	//ComputeMode mode=ComputeMode::FIELD;
@@ -723,12 +721,12 @@ void DiffractionTests::runSWCorner(bool multitransmitter) {
 	emProp1.dielectricConstant=make_float2(0.0f,std::numeric_limits<float>::infinity());
 	//MaterialEMProperties emProp1;
 	//emProp1.dielectricConstant = make_float2(3.75f, -60.0f*sceneManager->getChannelParameters().waveLength*0.038f);
-	//There is a dependency on the frequency again, we use -15 dB per 203 mm at 5 GHz => -75 dB/m
+		//There is a dependency on the frequency again, we use -15 dB per 203 mm at 5 GHz => -75 dB/m
 	emProp1.tattenuation = make_float2(0.1f,-75.f );
-
+	
 	loadSWCorner(100,100,100,emProp1);	
 
-
+	
 	//receivers
 	optix::float3 polarization = make_float3(0.0f, 1.0f, 0.0f); //Hard
 	//optix::float3 polarization = make_float3(0.0f, 0.0f, 1.0f); //Soft
@@ -738,7 +736,7 @@ void DiffractionTests::runSWCorner(bool multitransmitter) {
 	for (int i=0;i<360; ++i) {
 		float phi=i*M_PIf/180.0f;
 		//float phi=60*M_PIf/180.0f;
-
+		
 		//optix::float3 posrx = make_float3(0.0f,dist, 10.0f);
 		//posrx = make_float3(cosf(phi)*dist,sinf(phi)*dist, -60.0f);
 		posrx = make_float3(cosf(phi)*dist,sinf(phi)*dist, 10.0f);
@@ -747,7 +745,7 @@ void DiffractionTests::runSWCorner(bool multitransmitter) {
 
 	sceneManager->finishSceneContext();
 
-	//Uncomment for flat
+//Uncomment for flat
 
 	sceneManager->createRaySphere2D(0.0f,0.1,180.0f,0.0f,0.1,360.0f);
 	//Uncomment for RDN	
@@ -756,7 +754,7 @@ void DiffractionTests::runSWCorner(bool multitransmitter) {
 	//	sceneManager->setRayRange(0.0,180.0,0.0,360.0,rayD,rayD);
 	//	sim->setInitialDensity(((float)sceneManager->getRaySphere().rayCount)/(4*M_PIf));
 	//	sim->setFiltering(2);//Not divided by m	
-
+	
 	//sceneManager->setPrintEnabled(1024 * 1024 * 1024);	
 	//sceneManager->setUsageReport();
 
@@ -777,13 +775,13 @@ void DiffractionTests::runSWCorner(bool multitransmitter) {
 		transmitterManager->addTransmitterToGroup(362,1.0f,postx,polarization);
 		std::cout<<"Transmitting with 2 transmitters from "<<postx<<" with polarization "<<polarization<<std::endl;
 		sceneManager->groupTransmit();
-
+	
 	} else {
-
+	
 		std::cout<<"Transmitting from "<<postx<<" with polarization "<<polarization<<std::endl;
 		sceneManager->transmit(361, 1.0f, postx, polarization);
 	}
-	//Interchange test
+//Interchange test
 	//sceneManager->updateReceiver(0, postx);
 	//postx=posrx;
 	//std::cout<<"Transmitting from "<<postx<<" with polarization "<<polarization<<std::endl;
@@ -824,9 +822,9 @@ void DiffractionTests::runSWAcuteCorner() {
 	MaterialEMProperties emProp1;
 	//MaterialEMProperties emProp1;
 	emProp1.dielectricConstant = make_float2(8.0f, -60.0f*sceneManager->getChannelParameters().waveLength*0.001f);
-	//There is a dependency on the frequency again, we use -15 dB per 203 mm at 5 GHz => -75 dB/m
+		//There is a dependency on the frequency again, we use -15 dB per 203 mm at 5 GHz => -75 dB/m
 	emProp1.tattenuation = make_float2(0.1f,-75.f );
-
+	
 	//loadSWAcuteCorner(100,100,100, 50,emProp1);	
 	loadRaggedCorners(100,100,100, 50,emProp1);	
 
@@ -850,7 +848,7 @@ void DiffractionTests::runSWAcuteCorner() {
 	//sceneManager->enableExceptions();
 	sceneManager->finishSceneContext();
 
-	//Uncomment for flat
+//Uncomment for flat
 
 	sceneManager->createRaySphere2D(0.0f,0.1,180.0f,0.0f,0.1,360.0f);
 	//Uncomment for RDN	
@@ -859,7 +857,7 @@ void DiffractionTests::runSWAcuteCorner() {
 	//	sceneManager->setRayRange(0.0,180.0,0.0,360.0,rayD,rayD);
 	//	sim->setInitialDensity(((float)sceneManager->getRaySphere().rayCount)/(4*M_PIf));
 	//	sim->setFiltering(2);//Not divided by m	
-
+	
 	//sceneManager->setPrintEnabled(1024 * 1024 * 1024);	
 	//sceneManager->setUsageReport();
 
@@ -888,8 +886,8 @@ void DiffractionTests::runCrossing() {
 	ComputeMode mode=ComputeMode::VOLTAGE;
 	//ComputeMode mode=ComputeMode::FIELD;
 	sim->setComputeMode(mode);
-
-	//Use antenna gains
+	
+//Use antenna gains
 	//sceneManager->setUseAntennaGain(true);
 
 	//sim->setComputeMode(ComputeMode::VOLTAGE);
@@ -914,24 +912,24 @@ void DiffractionTests::runCrossing() {
 	MaterialEMProperties emProp1;
 	//MaterialEMProperties emProp1;
 	emProp1.dielectricConstant = make_float2(3.75f, -60.0f*sceneManager->getChannelParameters().waveLength*0.038f);
-	//There is a dependency on the frequency again, we use -15 dB per 203 mm at 5 GHz => -75 dB/m
+		//There is a dependency on the frequency again, we use -15 dB per 203 mm at 5 GHz => -75 dB/m
 	emProp1.tattenuation = make_float2(0.1f,-75.f );
-
+	
 	loadCrossing(emProp1);
 
 	//receivers
 	optix::float3 polarization = make_float3(0.0f, 1.0f, 0.0f); //Hard
 	//optix::float3 polarization = make_float3(0.0f, 0.0f, 1.0f); //Soft
 
-	//Fixed receiver, transmitter moving, multiple launches
+//Fixed receiver, transmitter moving, multiple launches
 	optix::float3 posrx = make_float3(0.0f, 10.0f, 100.0f);
 	sceneManager->addReceiver(0, posrx,polarization, sphereRadius, sceneManager->printPower);
-	//Use antenna gains
-	//	AntennaGain gains=sceneManager->loadGainsFromFileIndBPower("gain.txt");
-	//	int gainId=sceneManager->registerAntennaGain(gains);
-	//	sceneManager->registerReceiverGain(0,gainId);
+//Use antenna gains
+//	AntennaGain gains=sceneManager->loadGainsFromFileIndBPower("gain.txt");
+//	int gainId=sceneManager->registerAntennaGain(gains);
+//	sceneManager->registerReceiverGain(0,gainId);
 
-	//All receivers, transmitter fixed, one launch
+//All receivers, transmitter fixed, one launch
 	//for (int i=-50;i<=50; ++i) {
 	//	
 	//	optix::float3 posrx = make_float3(i, 10.0, 50.0f);
@@ -941,30 +939,30 @@ void DiffractionTests::runCrossing() {
 
 	sceneManager->finishSceneContext();
 
-	//Uncomment for flat
+//Uncomment for flat
 
 	sceneManager->createRaySphere2D(0.0f,0.1,180.0f,0.0f,0.1,360.0f);
-	//Uncomment for RDN	
+//Uncomment for RDN	
 	//	unsigned int rayD=10000;
 
 	//	sceneManager->setRayRange(0.0,180.0,0.0,360.0,rayD,rayD);
 	//	sim->setInitialDensity(((float)sceneManager->getRaySphere().rayCount)/(4*M_PIf));
 	//	sim->setFiltering(2);//Not divided by m	
-
+	
 
 	optix::float3 postx;
 	timer.start();
-	//Antenna gain
+//Antenna gain
 	//sceneManager->registerTransmitterGain(361,gainId);
-	//All receivers, transmitter fixed, one launch
+//All receivers, transmitter fixed, one launch
 	//postx = make_float3(0.0f, 10.0f, 100.0f);
 	//postx = make_float3(-38.0f, 10.0f, 50.0f);
 
 
 	//std::cout<<"Transmitting from "<<postx<<" with polarization "<<polarization<<std::endl;
 	//sceneManager->transmit(361, 1.0f, postx, polarization);
-
-	////Fixed receiver, transmitter moving, multiple launches
+	
+////Fixed receiver, transmitter moving, multiple launches
 	for (int i=-50;i<=50; ++i) {
 		postx = make_float3(i, 10.0f, 50.0f);
 		std::cout<<"Transmitting from "<<postx<<" with polarization "<<polarization<<std::endl;
@@ -986,71 +984,71 @@ void  DiffractionTests::addCompoundDynamicMeshes() {
 		BasicFlatMeshReflectionSimulation* sim = new BasicFlatMeshReflectionSimulation(sceneManager);
 		sceneManager->setSimulation(sim);
 	}
+	
 
-
-
+	
 	sceneManager->initContext(freq);
-	//Quad
-	int quadind[6] = { 0,1,2,1,0,3 };
-	optix::float3 quadv[4] = { make_float3(-0.5f,-0.5f,0.f),make_float3(0.5f,0.5f,0.f) ,make_float3(0.5f,-0.5f,0.f) ,make_float3(-0.5f,0.5f,0.f) };
+		//Quad
+		int quadind[6] = { 0,1,2,1,0,3 };
+		optix::float3 quadv[4] = { make_float3(-0.5f,-0.5f,0.f),make_float3(0.5f,0.5f,0.f) ,make_float3(0.5f,-0.5f,0.f) ,make_float3(-0.5f,0.5f,0.f) };
 
-	//45-degrees  x-titled down -0.7 quad with respect to parent
+		//45-degrees  x-titled down -0.7 quad with respect to parent
 
-	optix::float3 quadt[4] = { make_float3(-0.5f, -1.1f, -0.9f),make_float3(0.5f, -0.3f, -0.1f) ,make_float3(0.5f, -0.3f, -0.1f) ,make_float3(0.5f, -0.3f, -0.1f) };
+		optix::float3 quadt[4] = { make_float3(-0.5f, -1.1f, -0.9f),make_float3(0.5f, -0.3f, -0.1f) ,make_float3(0.5f, -0.3f, -0.1f) ,make_float3(0.5f, -0.3f, -0.1f) };
 
-	Matrix4x4 tm;
-	tm.setRow(0, make_float4(1, 0, 0, 0.f));
-	tm.setRow(1, make_float4(0, 1, 0, 2.f));
-	tm.setRow(2, make_float4(0, 0, 1, 75.f));
-	tm.setRow(3, make_float4(0, 0, 0.f, 1));
-	MaterialEMProperties emProp1;
-	emProp1.dielectricConstant = make_float2(3.75f, -60.0f*sceneManager->getChannelParameters().waveLength*0.038f);
-	//There is a dependency on the frequency again, we use -15 dB per 203 mm at 5 GHz => -75 dB/m
-	emProp1.tattenuation = make_float2(0.1f,-75.f );
+		Matrix4x4 tm;
+		tm.setRow(0, make_float4(1, 0, 0, 0.f));
+		tm.setRow(1, make_float4(0, 1, 0, 2.f));
+		tm.setRow(2, make_float4(0, 0, 1, 75.f));
+		tm.setRow(3, make_float4(0, 0, 0.f, 1));
+		MaterialEMProperties emProp1;
+		emProp1.dielectricConstant = make_float2(3.75f, -60.0f*sceneManager->getChannelParameters().waveLength*0.038f);
+		//There is a dependency on the frequency again, we use -15 dB per 203 mm at 5 GHz => -75 dB/m
+		emProp1.tattenuation = make_float2(0.1f,-75.f );
 
-	//Creation of dynamic meshes  requires calling these 4 functions
-	sceneManager->addDynamicMeshGroup(0);
-	sceneManager->addMeshToGroup(0, 4, quadv, 6, quadind, emProp1);  //Call for each new mesh in the group
-	sceneManager->addMeshToGroup(0, 4, quadt, 6, quadind, emProp1);  //Call for each new mesh in the group
-	sceneManager->updateTransformInGroup(0, tm);
-	sceneManager->finishDynamicMeshGroup(0);
-
-
-	sceneManager->createRaySphere2D(1, 1);
-	//sceneManager->createRaySphere2DSubstep(1, 1);
-	//receivers
-	optix::float3 posrx = make_float3(0.0f, 2.0f, 50.0f);
+		//Creation of dynamic meshes  requires calling these 4 functions
+		sceneManager->addDynamicMeshGroup(0);
+		sceneManager->addMeshToGroup(0, 4, quadv, 6, quadind, emProp1);  //Call for each new mesh in the group
+		sceneManager->addMeshToGroup(0, 4, quadt, 6, quadind, emProp1);  //Call for each new mesh in the group
+		sceneManager->updateTransformInGroup(0, tm);
+		sceneManager->finishDynamicMeshGroup(0);
 
 
-	optix::float3 postx = make_float3(0.0f, 2.0f, 0.0f);
-	optix::float3 polarization = make_float3(0.0f, 1.0f, 0.0f); //Perpendicular to the floor. Assuming as in Unity that forward is z-axis and up is y-axis
-
-	std::function<void(float,int)> cb=&sceneManager->printPower;
-	sceneManager->addReceiver(1, posrx, polarization, 5.0f, cb);
-
-
-	sceneManager->finishSceneContext();
-	sceneManager->setPrintEnabled(1024 * 1024 * 1024);
-
-	sceneManager->transmit(0, 1.0f, postx, polarization);
+		sceneManager->createRaySphere2D(1, 1);
+		//sceneManager->createRaySphere2DSubstep(1, 1);
+		//receivers
+		optix::float3 posrx = make_float3(0.0f, 2.0f, 50.0f);
 
 
-	//Translated and rotated 180 degrees, ends up symmetric to the previous position
-	Matrix4x4 tm1;
-	tm1.setRow(0, make_float4(-1.f, 0, 0, 0.f));
-	tm1.setRow(1, make_float4(0, 1, 0, 2.f));
-	tm1.setRow(2, make_float4(0, 0, -1.0f, -75.f));
-	tm1.setRow(3, make_float4(0, 0, 0.f, 1));
-	sceneManager->updateTransformInGroup(0, tm1);
+		optix::float3 postx = make_float3(0.0f, 2.0f, 0.0f);
+		optix::float3 polarization = make_float3(0.0f, 1.0f, 0.0f); //Perpendicular to the floor. Assuming as in Unity that forward is z-axis and up is y-axis
 
-	std::cout << "Only quad moved. Transmit again" << std::endl;
-	sceneManager->transmit(0, 1.0f, postx, polarization);
+		std::function<void(float,int)> cb=&sceneManager->printPower;
+		sceneManager->addReceiver(1, posrx, polarization, 5.0f, cb);
 
-	posrx = make_float3(0.0f, 2.0f, -50.0f);
-	sceneManager->updateReceiver(1, posrx);
 
-	std::cout << "Symmetric situation if everything has transformed well. Expect the  same power as first transmission. Transmit again" << std::endl;
-	sceneManager->transmit(0, 1.0f, postx, polarization);
+		sceneManager->finishSceneContext();
+		sceneManager->setPrintEnabled(1024 * 1024 * 1024);
+
+		sceneManager->transmit(0, 1.0f, postx, polarization);
+
+
+		//Translated and rotated 180 degrees, ends up symmetric to the previous position
+		Matrix4x4 tm1;
+		tm1.setRow(0, make_float4(-1.f, 0, 0, 0.f));
+		tm1.setRow(1, make_float4(0, 1, 0, 2.f));
+		tm1.setRow(2, make_float4(0, 0, -1.0f, -75.f));
+		tm1.setRow(3, make_float4(0, 0, 0.f, 1));
+		sceneManager->updateTransformInGroup(0, tm1);
+
+		std::cout << "Only quad moved. Transmit again" << std::endl;
+		sceneManager->transmit(0, 1.0f, postx, polarization);
+
+		posrx = make_float3(0.0f, 2.0f, -50.0f);
+		sceneManager->updateReceiver(1, posrx);
+
+		std::cout << "Symmetric situation if everything has transformed well. Expect the  same power as first transmission. Transmit again" << std::endl;
+		sceneManager->transmit(0, 1.0f, postx, polarization);
 
 	timer.stop();
 	std::cout<<"Time="<<timer.getTime()<<std::endl;

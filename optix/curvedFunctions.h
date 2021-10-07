@@ -224,6 +224,16 @@ __forceinline__ __device__ bool computePrincipalDirections(T& rayPayload, optix:
 		float3 aux2=x2;
 		x1=xu1 -xu2;
 		x1=normalize(x1);
+		//if (isnan(x1.x) || isnan(x1.y)  || isnan(x1.z)  || isnan(x2.x) ||isnan(x2.y)  || isnan(x2.z) ) { 
+		//	rtPrintf("RP x=%uy=%u r=%u x1=(%f,%f,%f) |x1|=%f x2=(%f,%f,%f) |x2|=%f \n", launchIndexTriangle.x,launchIndexTriangle.y,rayPayload.rhfr.x, x1.x,x1.y,x1.z, length(x1),x2.x,x2.y,x2.z,length(x2));
+		//	uint ref=rayPayload.rhfr.x;
+		//	rtPrintf("CCR2 x=%uy=%u r=%u R1=%f R2=%f tpr2=%f tmr2=%f tr2=%f t21r2=%f tcr2=%f\n",launchIndexTriangle.x, launchIndexTriangle.y, ref, R1,R2, tpr2,tmr2,tr2,t21r2,tcr2);
+		//	rtPrintf("CCR1 tpr1=%f tmr1=%f tr1=%f t12r1=%f tcr1=%f\n", tpr1,tmr1,tr1,t12r1,tcr1);
+		//	rtPrintf("CC x=%uy=%u r=%u t11=%f  t12=%f t21=%f t22=%f td=%.6e\n",launchIndexTriangle.x,launchIndexTriangle.y, ref, t11,t12,t21,t22,td);
+		//	rtPrintf("X x=%uy=%u r=%u aux1=(%f,%f,%f) |aux1|=%f aux2=(%f,%f,%f) |aux2|=%f \n", launchIndexTriangle.x,launchIndexTriangle.y, ref,  aux1.x,aux1.y,aux1.z, length(aux1),aux2.x,aux2.y,aux2.z,length(aux2));
+		//	rtPrintf("U x=%uy=%u   u1=(%f,%f,%f) |u1|=%f u2=(%f,%f,%f) |u2|=%f n=(%f,%f,%f)\n", launchIndexTriangle.x,launchIndexTriangle.y,  u1.x,u1.y,u1.z, length(u1),u2.x,u2.y,u2.z,length(u2),n.x,n.y,n.z);
+		//	rtPrintf("DDD x=%uy=%u r=%u cosA=%.6e D=%.6e aux1=%.6e q22=%.6e irho1=%.6e irho2=%.6e q12=%.6e\n",launchIndexTriangle.x,launchIndexTriangle.y, ref, cosA, D,  aux1, q22,irho1,irho2,q12);
+		//}
 	} else {
 		x1=((q22-irho1)*xu1 -q12*xu2)/D;
 		x1=normalize(x1);
@@ -235,6 +245,17 @@ __forceinline__ __device__ bool computePrincipalDirections(T& rayPayload, optix:
 	//x1=normalize(x1);
 	x2=cross(-reflection_dir,x1);
 	x2=normalize(x2);
+	//rtPrintf("X r=%u x1=(%f,%f,%f) |x1|=%f x2=(%f,%f,%f) |x2|=%f\n", reflections,x1.x,x1.y,x1.z,length(x1),x2.x,x2.y,x2.z,length(x2));
+	//	if (isnan(rayPayload.radii.x) || isnan(rayPayload.radii.y) || isnan(rayPayload.divergence.x ) || isnan(rayPayload.divergence.y)) {
+	//		rtPrintf("CC r=%u u1=(%f,%f,%f) u2=(%f,%f,%f) R2=%f rayLength=%f \n", reflections,u1.x,u1.y,u1.z,u2.x,u2.y,u2.z,R2, rayLength );
+	//		rtPrintf("CC r=%u x1=(%f,%f,%f) |x1|=%f x2=(%f,%f,%f) |x2|=%f\n", reflections,x1.x,x1.y,x1.z, length(x1),x2.x,x2.y,x2.z,length(x2));
+	//		rtPrintf("CC2 r=%u\t%u\t%u  td=%.6e ref=(%f,%f,%f) \n", launchIndexTriangle.x, launchIndexTriangle.y,reflections,td, reflection_dir.x,reflection_dir.y,reflection_dir.z);
+	//		rtPrintf("CC1 r=%u\t%u\t%u  tpr2=%f tmr2=%f tr2=%f t21r2=%f tcr2=%f\n",launchIndexTriangle.x, launchIndexTriangle.y, reflections,tpr2,tmr2,tr2,t21r2,tcr2);
+	//		rtPrintf("DDD r=%u\t%u\t%u  cosA=%.6e D=%.6e aux1=%.6e q22=%.6e irho1=%.6e irho2=%.6e q12=%.6e\n",launchIndexTriangle.x, launchIndexTriangle.y,reflections, cosA, D,  aux1, q22,irho1,irho2,q12);
+	//		rtPrintf("CC3 r=%u\t%u\t%u  xu1=(%f,%f,%f) |xu1|=%f xu2=(%f,%f,%f) |xu2|=%f\n",launchIndexTriangle.x, launchIndexTriangle.y, reflections,xu1.x,xu1.y,xu1.z,length(xu1),xu2.x,xu2.y,xu2.z, length(xu2));
+	//		rtPrintf("CC4 r=%u\t%u\t%u  irho1=%f,irho2=%f\n",launchIndexTriangle.x, launchIndexTriangle.y, reflections,irho1,irho2);
+	//		rtPrintf("CC5 r=%u\t%u\t%u  x1=(%f,%f,%f) x2=(%f,%f,%f)\n",launchIndexTriangle.x, launchIndexTriangle.y, reflections,x1.x,x1.y,x1.z,x2.x,x2.y,x2.z);
+	//	}	
 
 	return true;
 }

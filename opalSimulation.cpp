@@ -650,39 +650,20 @@ namespace opal {
 
 	}
 	void  OpalSimulation::printHitInfo(HitInfo* host_hits, uint hits) {
-		//std::map<int,int> refMap;
 		for (uint i=0; i<hits; i++) {
 
-			//#ifdef OPAL_EXTENDED_HITINFO	
 			if (mode==ComputeMode::FIELD) {
 				std::cout<<i<<"\tEx="<<make_float2(host_hits->EEx.z,host_hits->EEx.w) <<std::endl;
 				std::cout<<i<<"\tEy="<<make_float2(host_hits->EyEz.x,host_hits->EyEz.y) <<std::endl;
 				std::cout<<i<<"\tEz="<<make_float2(host_hits->EyEz.z,host_hits->EyEz.w) <<std::endl;
-				//#else
 			} else {
-				//std::cout<<i<<"\tE="<<(host_hits)->E<<std::endl;
 				std::cout<<"TT\t"<<i<<"\t"<<make_float2(host_hits->EEx.x,host_hits->EEx.y)<<std::endl;
 			}
-			//#endif
 			std::cout<<i<<"\t refhash="<<(host_hits)->thrd.y<<std::endl;
 			std::cout<<i<<"\t dist="<<(host_hits)->rdud.w<<std::endl;
 			std::cout<<std::setprecision(15)<<i<<"\t dir="<<(host_hits)->rdud<<std::endl;
-			//////	    d only for debug. Uncomment in Common.h
-			//#ifdef OPAL_EXTENDED_HITINFO	
-			//std::cout<<i<<"\t reflections="<<(host_hits)->r<<std::endl;
-			//refMap[(host_hits)->r]++;
-			//#endif
-			////std::cout<<i<<"\t"<<j<<"\t divergence="<<(host_hits)->divergence<<std::endl;
-			////		std::cout<<"\t index="<<(host_hits)->in<<std::endl;
-			////		std::cout<<"\t Rnorm="<<(host_hits)->Rn<<std::endl;
-			////		std::cout<<"\t Rpar="<<(host_hits)->Rp<<std::endl;
-			////		std::cout<<"\t h="<<(host_hits)->h<<std::endl;
-			////		std::cout<<"\t v="<<(host_hits)->v<<std::endl;
 			++host_hits;
 		}
-		//	for (auto ref : refMap) {
-		//		std::cout<<ref.first<<" ref = "<<ref.second<<std::endl;
-		//	}	
 	}
 	void OpalSimulation::createLogTracePrograms() {
 		std::map<std::string, optix::Program>& defaultPrograms=myManager->getDefaultPrograms();
@@ -755,7 +736,7 @@ namespace opal {
 		for (size_t i=0; i<hits; ++i) 
 		{
 			rays_host[i]=rayDirs[i];
-			std::cout<<i<<"\t"<<rayDirs[i]<<std::endl;
+			//std::cout<<i<<"\t"<<rayDirs[i]<<std::endl;
 
 		}
 		hitRays->unmap();

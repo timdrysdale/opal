@@ -465,17 +465,47 @@ namespace opal {
 		}
 	}
 	void  RayDensityNormalizationSimulation::printHitInfo(HitInfo* host_hits, uint hits) {
-		uint dh=0;
+		//This implementation assumes that hits come ordered by transmitter and receiver previously
+		if (hits==0) {
+			return;
+		}
+		//Get first transmitter 			
+		uint currentTx=host_hits->thrd.x;
+		//Get first receiver
+		uint index=host_hits->thrd.z;
+		std::vector<Transmitter*> activeTransmitters = myManager->getActiveTransmitters();
+		std::vector<SphereReceiver*>	receivers=myManager->getReceivers(); 
 		for (uint i=0; i<hits; i++) {
-			if ((host_hits)->thrd.y==0) {
-				//std::cout<<"DH\t"<<i<<"\t"<<(host_hits)->E.x<<"\t"<<(host_hits)->E.y<<std::endl;
-				dh++;
-
+			currentTx=host_hits->thrd.x; 				
+			//New receiver,  start new accumulation 				
+			index=host_hits->thrd.z; 				
+			//std::cout<<i<<"\t refhash="<<(host_hits)->thrd.y<<std::endl;
+			if (mode==ComputeMode::FIELD) {
+				std::cout<<i<<"\tEx="<<make_float2(host_hits->EEx.z,host_hits->EEx.w) <<std::endl;
+				std::cout<<i<<"\tEy="<<make_float2(host_hits->EyEz.x,host_hits->EyEz.y) <<std::endl;
+				std::cout<<i<<"\tEz="<<make_float2(host_hits->EyEz.z,host_hits->EyEz.w) <<std::endl;
+			} else {
+				//std::cout<<i<<"\tE="<<(host_hits)->E<<std::endl;
+				float4 doad=host_hits->doaD;
+				float4 dod=host_hits->rdud;
+				float2 E=make_float2(host_hits->EEx.x,host_hits->EEx.y);	
+				Transmitter* tx=activeTransmitters[currentTx];
+			//Print ray number, E, DOA, unfolded distance, rxId, txId, DOD
+				std::cout<<std::setprecision(15)<<"DOA\t"<<i<<"\t"<<E.x<<"\t"<<E.y<<"\t"<<doad.x<<"\t"<<doad.y<<"\t"<<doad.z<<"\t"<<doad.w<<"\t"<<receivers[index]->externalId<<"\t"<<tx->externalId<<"\t"<<dod.x<<"\t"<<dod.y<<"\t"<<dod.z<<std::endl;
 			}
-
 			++host_hits;
 		}
-		std::cout<<"DH\t"<<dh<<std::endl;
+		//uint dh=0;
+		//for (uint i=0; i<hits; i++) {
+		//	if ((host_hits)->thrd.y==0) {
+		//		//std::cout<<"DH\t"<<i<<"\t"<<(host_hits)->E.x<<"\t"<<(host_hits)->E.y<<std::endl;
+		//		dh++;
+
+		//	}
+
+		//	++host_hits;
+		//}
+		//std::cout<<"DH\t"<<dh<<std::endl;
 	}
 	std::string RayDensityNormalizationSimulation::printInternalBuffersState() {
 		std::ostringstream stream;

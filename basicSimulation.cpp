@@ -41,6 +41,10 @@ namespace opal {
 		return stream.str();
 	}
 	void BasicFlatMeshReflectionSimulation::executeTransmitLaunch(uint numTransmitters,bool partial) {
+		if (myManager->isUsingCurvedMeshes()) {
+			std::cout<<"BasicFlatMeshReflectionSimulation::executeTransmitLaunch() BasicFlatMeshReflectionSimulation and LPFlatMeshReflectionSimulation cannot be used with curved meshes. Try another method such as Ray Density Normalization"<<std::endl;
+			throw opal::Exception("BasicFlatMeshReflectionSimulation::executeTransmitLaunch() BasicFlatMeshReflectionSimulation and LPFlatMeshReflectionSimulation cannot be used with curved meshes. Try another method such as Ray Density Normalization");
+		}
 		//Transmission launch
 		Timer timer;
 		timer.start();

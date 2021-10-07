@@ -1,6 +1,6 @@
 # Opal
 
-Opal is a library to simulate multipath channel propagation on GPUs with NVIDIA Optix for multiple moving transmitters and receivers.
+Opal is a library to simulate on GPUs multipath channel propagation with NVIDIA Optix for multiple moving transmitters and receivers.
 Opal is a 3D ray-launching based, deterministic radio-
 frequency propagation simulator. With Ray-launching methods, 
 also called shooting and bouncing (SBR), electromagnetic waves are simulated by rays launched from
@@ -15,16 +15,10 @@ dynamical scene,
 which is built from meshes loaded from files or from another application, such 
 as a game engine.
 
-Reflections and single-order diffraction are computed. 
-
-It implements conventional SBR methods with duplicate ray filtering and the Ray Density Normalization method. It can be extended with different types of 
-simulations to introduce new propagation mechanisms or provide alternative methods for a mechanism. Simulation can be combined and  enabled or disabled.
-
-It supports flat, curved or combined flat-curved scenario elements.
+At the moment, only reflections are computed. In future releases we will add difraction.
 
 It supports simultaneous transmissions from multiple transmitters to multiple receivers.
 
-It supports very high ray density generation (rays/stererorad)
 
 It can be used as a standalone application or as a Unity plugin. If used as
 a Unity plugin, a Unity program will send the meshes and update the transforms 
@@ -32,15 +26,6 @@ of the elements of the scene. The Unity related code can be found in
 our   [Veneris repository](https://gitlab.com/esteban.egea/veneris).
 
 For more information visit the [Veneris project website](http://pcacribia.upct.es/veneris).
-
-### Features
-* Multiple transmitters and receivers
-* Multichannel
-* Moving objects
-* Flexible ray generation on CPU or GPU
-* Antenna radiation patterns
-* Multi-GPU support
-
 
 ## Installation
 
@@ -103,13 +88,13 @@ Make sure that you do that for both Debug and Release configurations, or any oth
 
 
 ## Usage
-As a standalone application, you can find a `main.cpp`  with some tests. You can do your own, include it in your application, and 
+As a standalone application, you can find an `main` method in `tests.cpp` with some tests. You can do your own, include it in your application, and 
 so on. Recompile and execute. 
 
 As a library link appropriately and go. 
 
 As a Unity plugin, drop the generated .dll in the Plugins folder and create an `Opal` subdirectory. If the target platform is Linux, do the same but with the .so. Put in that folder  
-the `optix` folder (see below). You have to copy the `Common.h` file also in the `Opal` folder. 
+the `optix` folder (see below). You have to copy the `Common.h`, `Complex.h` and  `traceFunctions.h` also in the `Opal` folder. 
 
 Note that CUDA programs are compiled at runtime with NVRTC. They are inside the `optix` folder.  
 They are read with the `baseDir` variable and `optixPrograms` variables or  from the `OPTIX_SAMPLES_SDK_DIR` location if sutil is used.  See also `sutil.cpp` in the Optix SDK, lines 848 and 335.
@@ -118,15 +103,16 @@ With Unity, even recompiling, any  change made in the .cu files is ignored unles
 When building an executable with Unity, you have either to use a specific script to create the cudaDir and copy the .cu and .h files to it, or just create and copy manually after the build is done. In the end, along with the Unity executable and files you need to have this specific folder and files 
 
 ### Usage remarks
-* Take a look at the `main.cpp` and the files in the `tests` folder for examples of use.
+* Take a look at the `main.cpp` and the files in the `tests` folder for examples of use. **That is the first thing you should do. There are alternative ways to set up a simulation and 
+different simulation types**.
 * Sometimes the simulation enters in an infinite tracing loop due to precision errors in the intersections. Changing the value of the minEpsilon parameter usually solve this issue. We have added a 
 preprocessor tag in `Common.h` to use a technique for avoiding self-intersections. But this is going to introduce some small precision errors in the computed electric field, since the ray lengths are modified due to a displacement.
 If you do not need very high accuracy (which is the usual case) you can  uncomment it. Otherwise keep it, but then you have to tune minEpsilon, which is not scale-invariant. If your simulation gets stuck in a launch, try uncommenting it.  If it is no longer stuck but you need high precision, comment it again an tune minEpsilon until it is removed.
 * Avoid placing receivers so that the radius of the receiver sphere overlaps walls or other interacting elements. Depending on the particular case, the result may be incorrect. This is specially important if you use penetration. In general, if the radius do not overlap, the 
 result will be correct. 
-* If you the basic simulation, the results are correct for horizontal and vertical elements (or just slightly leaning) in the scene, because we are assuming it for the polarization and reflections. In addition, we assume that transmitter and receiver have the same polarization.
-* Arbitrary LINEAR polarizations for transmitter and receiver and leaning walls and environement elements can be used. 
-* Diffraction can be used together with any of the reflection methods.
+* If you do not enable depolarization, the results are correct for horizontal and vertical elements (or just slightly leaning) in the scene, because we are assuming it for the polarization and reflections. In addition, we assume that transmitter and receiver have the same polarization.
+* If you enable depolarization, arbitrary LINEAR polarizations for transmitter and receiver and leaning walls and environment elements can be used.
+* Diffraction can be used together with any of the reflection methods
 
 
 

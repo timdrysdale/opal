@@ -42,11 +42,13 @@ void AntennaGainTests::freeSpace(bool useDepolarization) {
 	sceneManager->initContext(freq);
 	timer.start();
 	optix::float3 postx = make_float3(0.0f, 10.0f, 0.0f);
-	optix::float3 polarizationTx = make_float3(0.0f, 1.0f, 0.0f); //Perpendicular to the floor. Assuming as in Unity that forward is z-axis and up is y-axis
-	optix::float3 polarization = make_float3(0.0f, 1.0f, 0.0f); //Perpendicular to the floor. Assuming as in Unity that forward is z-axis and up is y-axis
+	//optix::float3 polarizationTx = make_float3(0.0f, 1.0f, 0.0f); //Perpendicular to the floor. Assuming as in Unity that forward is z-axis and up is y-axis
+	optix::float3 polarizationTx = normalize(make_float3(1.0f, 1.0f, 0.0f)); //Perpendicular to the floor. Assuming as in Unity that forward is z-axis and up is y-axis
+	optix::float3 polarization = normalize(make_float3(1.0f, 1.0f, 0.0f)); //Perpendicular to the floor. Assuming as in Unity that forward is z-axis and up is y-axis
 	optix::float3 posrx = make_float3(0.0f, 10.0f, 10.0f);
 	sceneManager->addReceiver(1, posrx, polarization, sphereRadius, sceneManager->printPower);
-	AntennaGain gains=sceneManager->loadGainsFromFileIndBPower("gain17514.txt");
+	//AntennaGain gains=sceneManager->loadGainsFromFileIndBPower("gain17514.txt");
+	AntennaGain gains=sceneManager->loadGainsFromFileIndBPower("dipole.txt");
 	int gainId=sceneManager->registerAntennaGain(gains);
 	sceneManager->registerReceiverGain(1,gainId);
 	sceneManager->registerTransmitterGain(0,gainId);
@@ -54,7 +56,7 @@ void AntennaGainTests::freeSpace(bool useDepolarization) {
 	
 
 	//***Single ray transmit****
-	float3 mRay=normalize(make_float3(0.0,0.0,1));
+	float3 mRay=normalize(make_float3(0.0,0,1));
 	sceneManager->createRaySphere2D(1,1,&mRay);
 	
 	sceneManager->finishSceneContext();

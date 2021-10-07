@@ -102,14 +102,16 @@ RT_PROGRAM void genRaysOnLaunch()
 	//TODO: Add possibilty of differentInitialFieldAmplitude;	
 	if (useAntennaGain) {
 		rtBufferId<float,2> bid=tx.gainId;
-		float g=getAntennaGain(ray_direction,bid) ;	
+		const Matrix<4,4> tp=tx.transformToPolarization;
+		float g=getAntennaGain(ray_direction,bid,tp) ;	
+
 		rayPayload.electricFieldAmplitude = g; //Gain is already in electric field units, no need to convert from dB or take sqrt 
 	} else {
 		rayPayload.electricFieldAmplitude = 1.0f; //Normalized Eo=1. Antenna Gain = 1. 
 	}
 	//rayPayload.accumulatedAttenuation=0.0f;
 	rayPayload.rhfr=make_uint4(0u,0u,FLAG_NONE,initialHash);
-	//rayPayload.initialRayDir=ray_direction;
+	rayPayload.initialRayDir=make_float4(ray_direction);
 
 	//Curvature data and divergence
 	rayPayload.radii=make_float2(0.0f,0.0f);

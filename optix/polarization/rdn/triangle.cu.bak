@@ -1,0 +1,287 @@
+/***************************************************************/
+//
+//Copyright (c) 2019 Esteban Egea-Lopez http://girtel.upct.es/~eegea
+//
+/**************************************************************/
+
+//License from NVIDIA parts
+/*
+ * Copyright (c) 2016, NVIDIA CORPORATION. All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ *  * Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ *  * Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *  * Neither the name of NVIDIA CORPORATION nor the names of its
+ *    contributors may be used to endorse or promote products derived
+ *    from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+ * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+ * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+#include "../../../Common.h"
+#include "../../../Complex.h"
+#include "../../../traceFunctions.h"
+#include "../reflectionFunctions.h"
+#include <optix.h>
+#include <optixu/optixu_math_namespace.h>
+#include <optixu/optixu_aabb_namespace.h>
+#include "curvedFunctions.h"
+using namespace optix;
+
+//Launch variables
+rtDeclareVariable(uint3, launchIndexTriangle, rtLaunchIndex, );
+rtDeclareVariable(RDNLPWavePayload, rayPayload, rtPayload, );
+rtDeclareVariable(optix::Ray, ray, rtCurrentRay, );
+rtDeclareVariable(TriangleHit, ch_triangle_data, attribute triangle_hit_data, );
+
+//Per-mesh local variables 
+rtDeclareVariable(MaterialEMProperties, EMProperties, , );
+rtDeclareVariable(uint, meshId, , );
+rtDeclareVariable(uint, curvedMesh, , );
+
+//Penetration configuration
+rtDeclareVariable(uint, usePenetration, , );
+rtDeclareVariable(float, attenuationLimit, , );
+
+RT_PROGRAM void closestHitFlatMesh()
+{
+
+	/*************************
+	  const float rayLength = ch_triangle_data.geom_normal_t.w;
+	  const float3 hp= ray.origin + rayLength * ray.direction ;
+	  rayPayload.hitPointAtt.x=hp.x;
+	  rayPayload.hitPointAtt.y=hp.y;
+	  rayPayload.hitPointAtt.z=hp.z;
+	  const float3 gn=make_float3(ch_triangle_data.geom_normal_t.x,ch_triangle_data.geom_normal_t.y,ch_triangle_data.geom_normal_t.z);	
+	  const float3 n = normalize(rtTransformNormal(RT_OBJECT_TO_WORLD,gn )); //Plane normal
+	  const float3 reflection_dir=reflect(ray.direction, n);
+	  const float aux=rayPayload.ndtd.w;
+	  rayPayload.ndtd = make_float4(reflection_dir); //initialized with float3, w is set to 0. and updated below
+	//hash_combine_impl<uint>(rayPayload.refhash,ch_triangle_data.faceId);
+	//rtPrintf("HASH \t%u\t%u\t%u\t%u\n",ch_triangle_date.faceId,rayPayload.reflections,rayPayload.hits,rayPayload.refhash);
+	//Use reflections and hits to create hash
+	//hash_combine_impl<uint>(rayPayload.refhash,ch_triangle_data.faceId+rayPayload.reflections+rayPayload.hits);
+	uint reflections=rayPayload.rhfr.x;
+	uint hits=rayPayload.rhfr.y;
+	uint hash=rayPayload.rhfr.w;
+	hash_combine_impl<uint>(hash,ch_triangle_data.faceId+reflections+hits);
+	rayPayload.ndtd.w = aux+ rayLength;
+	rayPayload.lrhpd =make_float4(hp); //lastReflectionHitPoint;
+	rayPayload.lrhpd.w = rayPayload.ndtd.w; //totalDistanceTillLastReflection;
+
+	 ***************************/
+
+
+	//Update payload
+	//const float rayLength = ch_triangle_data.geom_normal_t.w;
+	//const float3 hp= ray.origin + rayLength * ray.direction ;
+	//rayPayload.hitPoint =hp;
+	//Get the hitpoint from the barycentric coordinates computed in the triangle hit. This should get us a point always on the surface and help avoid self-intersection
+	//See https://www.realtimerendering.com/raytracinggems/ 6.1
+	//const float rayLength=length(ch_triangle_data.hp-rayPayload.hitPoint);
+	//rayPayload.hitPoint =ch_triangle_data.hp;
+	const float3 lastHP=make_float3(rayPayload.hitPointAtt.x,rayPayload.hitPointAtt.y,rayPayload.hitPointAtt.z);
+	//we could use t of ray, but if we shift the ray over the normal to avoid self-intersection we introduce an error in the electric field
+
+
+	//Segment length from last physical interaction to this physical interaction
+	const float3 lastReflectionHitPoint = make_float3(rayPayload.lrhpd.x,rayPayload.lrhpd.y,rayPayload.lrhpd.z);
+	const float s_prime=length(ch_triangle_data.hp-lastReflectionHitPoint);
+
+	//The rayLength is the distance from the last hit point to this hit point. Notice that, for instance, if the last hp is on a sphere receiver, there was no actual physical interaction with 
+	//any element. In that case, this rayLength is different from s_prime. It is only used to update the total distance (unfolded) of this ray. 
+	//TODO: it is used in the basic setup, for curved may be removed
+	const float rayLength=length(ch_triangle_data.hp-lastHP);
+	rayPayload.hitPointAtt.x =ch_triangle_data.hp.x;
+	rayPayload.hitPointAtt.y =ch_triangle_data.hp.y;
+	rayPayload.hitPointAtt.z =ch_triangle_data.hp.z;
+	//rtPrintf("THP\t%u\t%u\th=(%.6e,%.6e,%.6e)bary=(%.6e,%.6e,%.6e)\n",launchIndexTriangle.x,launchIndexTriangle.y,hp.x,hp.y,hp.z,ch_triangle_data.hp.x,ch_triangle_data.hp.y,ch_triangle_data.hp.z);
+	const float3 gn=make_float3(ch_triangle_data.geom_normal_t.x,ch_triangle_data.geom_normal_t.y,ch_triangle_data.geom_normal_t.z);	
+	const float3 n = normalize(rtTransformNormal(RT_OBJECT_TO_WORLD,gn )); //Plane normal
+
+
+#ifdef OPAL_AVOID_SI
+	rayPayload.lastNormal=n;
+#endif	
+	const float3 reflection_dir=reflect(ray.direction, n);
+	const float aux=rayPayload.ndtd.w;
+	rayPayload.ndtd = make_float4(reflection_dir); //initialized with float3, w is set to 0. and updated below
+	//hash_combine_impl<uint>(rayPayload.refhash,ch_triangle_data.faceId);
+	//rtPrintf("HASH \t%u\t%u\t%u\t%u\n",ch_triangle_date.faceId,rayPayload.reflections,rayPayload.hits,rayPayload.refhash);
+
+
+
+
+	//Use reflections and hits to create hash
+
+	uint reflections=rayPayload.rhfr.x;
+	uint hits=rayPayload.rhfr.y;
+	uint hash=rayPayload.rhfr.w;
+	hash_combine_impl<uint>(hash,ch_triangle_data.faceId+reflections+hits);
+	//hash_combine_impl<uint>(rayPayload.refhash,ch_triangle_data.faceId+rayPayload.reflections+rayPayload.hits);
+	rayPayload.ndtd.w = aux+ rayLength;
+	rayPayload.lrhpd =make_float4(ch_triangle_data.hp); //lastReflectionHitPoint;
+	rayPayload.lrhpd.w = rayPayload.ndtd.w; //totalDistanceTillLastReflection;
+
+
+
+	//Compute reflection coefficient
+
+	//Incidence angle (ai) is defined with respect to the surface, we use the complementary, which is 90-ai, and is the angle between ray and normal
+	//WARNING: Assuming ray direction is normalized: dot(r,n)=cos(angle(r,n))
+	//We use the fabs() because if a ray hits an internal face, the normal is reversed. The cos would be negative. For "closed" meshes this should not happen. However, in the borders, due to precision
+	//it happens: a ray is not detected as hitting a face and gets inside the mesh, hitting an internal face later.
+	//With penetration we can hit internal faces in closed meshes. This way, we also get the correct incidence angle again.
+
+	//Compute local incidence coordinate system for reflection (components parallel and normal to the incidence plane)
+	const float3 anorm_i=normalize(cross(ray.direction,n));
+	const float3 apar_i=normalize(cross(anorm_i,ray.direction)); 
+	//rtPrintf("IRG\t%u\t%u\tn=(%.6e,%.6e,%.6e)|anorm_i|=(%.6e,%.6e,%.6e)=%.6e\t|apar_i|=(%.6e,%.6e,%.6e)=%.6e \n",launchIndexTriangle.x,launchIndexTriangle.y,n.x,n.y,n.z,anorm_i.x,anorm_i.y,anorm_i.z,length(anorm_i),apar_i.x,apar_i.y,apar_i.z,length(apar_i));
+
+
+
+	//Reflected ray basis
+	const float3 anorm_r=anorm_i; 
+	const float3 apar_r=cross(anorm_r,reflection_dir); //Should change the direction with respect to the incidence parallel
+	//rtPrintf("RRG\t%u\t%u\tn=(%.6e,%.6e,%.6e)|anorm_r|=(%.6e,%.6e,%.6e)=%.6e\t|apar_r|=(%.6e,%.6e,%.6e)=%.6e \n",launchIndexTriangle.x,launchIndexTriangle.y,n.x,n.y,n.z,anorm_r.x,anorm_r.y,anorm_r.z,length(anorm_r),apar_r.x,apar_r.y,apar_r.z,length(apar_r));
+
+	float cosA = fabs(dot(-ray.direction, n));
+	float2 Rnorm;
+	float2 Rpar;
+	getReflectionCoefficient(cosA, EMProperties,Rnorm,Rpar);
+	// getPerfectConductor(Rnorm,Rpar);
+
+
+	//rtPrintf("RTG\t%u\t%u\t%d\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n", launchIndexTriangle.x, launchIndexTriangle.y, rayPayload.reflections, cosA, ray.direction.x, ray.direction.y, ray.direction.z, n.x, n.y, n.z, rayPayload.lrhpd.w);
+
+	//Compute the reflection coefficients (only depend on incidence angle and dielectric properties)
+	//Complex arithmetic: sum
+	//float2 argument = make_float2(EMProperties.dielectricConstant.x + (cosA*cosA) - 1.0f, EMProperties.dielectricConstant.y);
+	//float2 root = complex_sqrt(argument);
+	//
+	//
+	////Soft reflection. 
+	////Normal reflection coefficient (Electric field not in plane of incidence)
+	//const float2 Rnorm = complex_div(make_float2(cosA-root.x,-root.y),make_float2(cosA+root.x,root.y));
+
+
+	////Reflection info log (to be used in external programs)
+	////rtPrintf("H\t%u\t%u\t%d\t%d\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n", launchIndexTriangle.x, launchIndexTriangle.y, rayPayload.reflections, rayPayload.faceId, argument.x, argument.y, root.x, root.y, R.x, R.y, tR.x, tR.y);
+
+
+	////Hard reflection.  
+	////Parallel reflection coefficient (Electric field in plane of incidence)
+	//float2 num = sca_complex_prod(cosA, EMProperties.dielectricConstant);
+	//float2 div=num;
+	//num -=root;
+	//div +=root;
+
+	//Rappaport version, depends on how you define the reflected ray geometrically
+	//	float2 num = sca_complex_prod(cosA, make_float2(-EMProperties.dielectricConstant.x, -EMProperties.dielectricConstant.y));
+	//	float2 div = sca_complex_prod(cosA, EMProperties.dielectricConstant);
+	//	num.x += root.x;
+	//	num.y += root.y;
+	//	div.x += root.x;
+	//	div.y += root.y;
+	//	////////////////////////////////////////
+
+
+	//const float2	Rpar = complex_div(num, div);
+
+
+	//perfect conductor
+	//	const float2 Rnorm=make_float2(-1.0f,0.0);
+	//	const float2 Rpar=make_float2(-1.0f,0.0);
+
+	//Reflection info log (to be used in external programs)
+	//	float mycos = dot(-ray.direction, n);
+	//	rtPrintf("S\t%u\t%u\t%d\t%d\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n", launchIndexTriangle.x, launchIndexTriangle.y, rayPayload.reflections, rayPayload.faceId, argument.x, argument.y, root.x, root.y, R.x, R.y, tR.x, tR.y);
+	//	rtPrintf("NN dot=%f angle=%f hp=(%f,%f,%f)per=(%f,%f)rayR=(%f,%f)\n",mycos,  acosf(mycos), rayPayload.hitPoint.x, rayPayload.hitPoint.y, rayPayload.hitPoint.z, EMProperties.dielectricConstant.x, EMProperties.dielectricConstant.y, rayPayload.prodReflectionCoefficient.x, rayPayload.prodReflectionCoefficient.y);
+
+
+
+	//Get geometric  components, multiply by previous coefficients  and multiply by reflection coefficients computed above or transmission coefficients below
+
+	//Geometric part normal
+	const float2 Einorm=sca_complex_prod(dot(rayPayload.hor_v,anorm_i),rayPayload.hor_coeff) + sca_complex_prod(dot(rayPayload.ver_v,anorm_i),rayPayload.ver_coeff);
+	//Geometric part parallel
+	const float2 Eipar=sca_complex_prod(dot(rayPayload.hor_v,apar_i),rayPayload.hor_coeff) + sca_complex_prod(dot(rayPayload.ver_v,apar_i),rayPayload.ver_coeff);
+
+	//Update here reflection coefficient, otherwise we multiply reflection and transmission in the transmission above
+
+	//New horizontal (normal)  coefficient
+	//rtPrintf("TT\t%u\t%u\tRnorm(%.6e,%.6e)  Rpar(%.6e,%.6e) hash=%u\n",launchIndexTriangle.x,launchIndexTriangle.y,rayPayload.hor_coeff.x,rayPayload.hor_coeff.y,rayPayload.ver_coeff.x,rayPayload.ver_coeff.y, rayPayload.rhfr.w);
+	rayPayload.hor_coeff=complex_prod(Einorm,Rnorm);
+	//New vertical (parallel)  coefficient
+	rayPayload.ver_coeff=complex_prod(Eipar,Rpar);
+
+	//WARNING: ASSUMING spherical wave, 
+	if (reflections==0) {
+		//For the first hit, we should incorporate the first segment attenuation to the divergence, just 1/unfolded_path
+		rayPayload.divergence=rayPayload.divergence*(1.0f/(s_prime)); //The total distance has already been updated.
+		rayPayload.rayDensity =rayPayload.rayDensity/(s_prime*s_prime); //Initial ray density already includes rayNumber/solidAngle
+	} else {	
+
+		//On a flat wall we do not have to change the principal directions. Already on the payload	
+		//	if (rayPayload.updateDivergence>0u) {
+
+		//We have to incorporate the previous segment
+		float rho1=rayPayload.radii.x;
+		float rho2=rayPayload.radii.y;
+		float2 divergence=computeDivergence(rho1,rho2,s_prime,rayPayload.divergence,launchIndexTriangle.x,launchIndexTriangle.y,reflections);
+		if (isnan(divergence.x) || isnan(divergence.y)) {
+			rtPrintf("CDR \t%u\t%u\tref=%d ray=(%f,%f,%f)\n",launchIndexTriangle.x,launchIndexTriangle.y,reflections, ray.direction.x,ray.direction.y,ray.direction.z); 
+			//Kill ray at the moment
+			rayPayload.rhfr.z |= 1u<<FLAG_END_POSITION;
+			//rayPayload.rhfr.z= FLAG_END;
+			return;
+		}	
+		rayPayload.divergence=divergence;
+		float sq1=rho1/(rho1+s_prime);
+		float sq2=rho2/(rho2+s_prime);
+		//What if caustics are infinity
+		//If we apply the L'Hôpital rule, the fraction goes to 1...
+		if (isinf(rho1)) {
+			sq1=1;
+		}
+		if (isinf(rho2)) {
+			sq2=1;
+		}
+
+		rayPayload.rayDensity = rayPayload.rayDensity * abs(sq1*sq2);
+	}
+	//Update payload now
+	//rtPrintf("CC r=%u irho1=%f,irho2=%f\n", reflections,irho1,irho2);
+	//float irhoi1=(1.0f/(rayPayload.radii.x+rayLength));
+	//float irhoi2=(1.0f/(rayPayload.radii.y+rayLength));
+	//rayPayload.radii=make_float2(1.0f/irho1,1.0f/irho2);
+	rayPayload.radii=make_float2(rayPayload.radii.x+s_prime,rayPayload.radii.y+s_prime);
+	//rayPayload.updateDivergence+=1u;	
+
+	//Update vectors
+	rayPayload.ver_v=apar_r;
+	rayPayload.hor_v=anorm_r;
+	//++rayPayload.reflections;
+	++reflections;
+	rayPayload.rhfr=make_uint4(reflections,hits,rayPayload.rhfr.z,hash);
+
+
+	}
+
+
+

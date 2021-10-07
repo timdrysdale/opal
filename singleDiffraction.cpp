@@ -5,6 +5,8 @@
 /**************************************************************/
 
 #include "singleDiffraction.h"
+#include <iomanip>
+#include <optixu/optixu_matrix_namespace.h> 
 namespace opal {
 	SingleDiffraction::SingleDiffraction(OpalSceneManager* m) : OpalSimulation(m) {
 		this->withPolarization=true;
@@ -16,6 +18,7 @@ namespace opal {
 		this->updateEdgeBuffer = true;
 		this->edgeBuffer=nullptr;
 		this->hitBuffer = nullptr;
+		this->transformToPolarizationBuffer = nullptr;
 		this->receiverPositionsBuffer=nullptr;
 		this->mode=ComputeMode::VOLTAGE;
 		this->diffractionRayIndex=0u;
@@ -119,18 +122,24 @@ namespace opal {
 	void SingleDiffraction::fillAntennaGainIdBuffer() {
 		std::vector<SphereReceiver*>  rx=myManager->getReceivers();
 		antennaGainIdBuffer->setSize(static_cast<unsigned int>(rx.size()));
+		transformToPolarizationBuffer->setSize(static_cast<unsigned int>(rx.size()));
 		int* b = static_cast<int*>(antennaGainIdBuffer->map());
+		optix::Matrix<4,4>* m=static_cast<optix::Matrix<4,4>*>(transformToPolarizationBuffer->map());
 		for (int i=0; i<rx.size(); i++) {
 			int gainId = rx[i]->antennaGainId;
 			if (gainId>=0) {
 				optix::Buffer buffer=myManager->getAntennaGainBuffer(gainId);
 				b[i]=buffer->getId();	
+				optix::Matrix<4,4> pol_t=myManager->computeMatrixFromWorldToPolarization(rx[i]->polarization);
+				m[i]=pol_t;
 				
 			} else {
 				b[i]=RT_BUFFER_ID_NULL;	
+				m[i]=optix::Matrix<4,4>::identity();
 			}
 		}
 		antennaGainIdBuffer->unmap();
+		transformToPolarizationBuffer->unmap();
 	}
 	void SingleDiffraction::transformEdge(Edge* e, optix::Matrix4x4 t) {
 		updateEdgeBuffer=true;
@@ -160,6 +169,9 @@ namespace opal {
 		myManager->getContext()["traceAtomicIndexDiffraction"]->set(traceAtomicIndexBuffer);
 		antennaGainIdBuffer = myManager->getContext()->createBuffer(RT_BUFFER_INPUT, RT_FORMAT_BUFFER_ID,1u);
 		myManager->getContext()["antennaGainIdBuffer"]->set(antennaGainIdBuffer);	
+		transformToPolarizationBuffer = myManager->getContext()->createBuffer(RT_BUFFER_INPUT, RT_FORMAT_USER,1u);
+		transformToPolarizationBuffer->setElementSize(sizeof(optix::Matrix<4,4>));
+		myManager->getContext()["transformToPolarizationBuffer"]->set(transformToPolarizationBuffer);
 		if (generateTraceLog) {
 			myManager->getContext()["traceDiffraction"]->setUint(1u);
 		} else {
@@ -240,11 +252,16 @@ namespace opal {
 					unsigned int i=(z*w*he)+(y*w)+x;
 					if (mode==ComputeMode::VOLTAGE) {
 						float2 E=make_float2(h[i].EEx.x,h[i].EEx.y);
-						std::cout<<"processDiffractionLaunch() E("<<x<<","<<receivers[y]->externalId<<","<<activeTransmitters[z]->externalId<<")="<<E<<std::endl;
+						//std::cout<<"processDiffractionLaunch() E("<<x<<","<<receivers[y]->externalId<<","<<activeTransmitters[z]->externalId<<")="<<E<<std::endl;
 						if (h[i].EEx.z==1.0f) {
 							//std::cout<<"["<<x<<","<<y<<","<<z<<"]"<<std::endl;
 							//computeReceivedPower(E,y,z, 1u); 
 							++realHits;
+							if (printHits) {
+								float4 doad=h[i].doaD;
+								float4 dod=h[i].doDu;
+								std::cout<<std::setprecision(15)<<"DIFD\t"<<E.x<<"\t"<<E.y<<"\t"<<doad.x<<"\t"<<doad.y<<"\t"<<doad.z<<"\t"<<doad.w<<"\t"<<receivers[y]->externalId<<"\t"<< activeTransmitters[z]->externalId<<"\t"<<dod.x<<"\t"<<dod.y<<"\t"<<dod.z<<std::endl;
+							}
 						}
 						if (info) {
 							info->updateField(E,receivers[y]->externalId,activeTransmitters[z]->externalId,y,1u); 			

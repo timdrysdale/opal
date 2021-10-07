@@ -98,15 +98,22 @@ __forceinline__ __device__ float2 getAngles(float3 const ray  ) {
 
 	const float EPSILON=1.0e-6f;
 	//Get angles from ray r=[sin(e)sin(a) cos(e) cos(a)sin(e)]
-	//Since elevation is between 0 and 180 degrees we always get the right value
-	float el=acosf(ray.y); //In radians
-	float az;
-	if ((fabs(1.0f-ray.y)<EPSILON) || (fabs(-1.0f-ray.y)<EPSILON)) {
-		//Vertical ray (elevation=0 or 180). All the azimuth angles result in the same vectors, just use 0
 
+	//Since elevation is between 0 and 180 degrees we always get the right value
+	float el; //In radians
+	float az;
+	if (fabs(1.0f-ray.y)<EPSILON) {
+		el=0;
 		az=0.0f;
+	} else 	if  (fabs(-1.0f-ray.y)<EPSILON) {
+		//Vertical ray (elevation=0 or 180). All the azimuth angles result in the same vectors, just use 0
+		el=M_PIf;
+		az=0.0f;
+
+
 	} else {
 
+		el=acosf(ray.y); //In radians
 		//We need to get the right quadrant
 		az=atan2f(ray.x/sinf(el),ray.z/sinf(el));//In radians	
 	}
@@ -293,5 +300,21 @@ __forceinline__ __device__ void fillPolarization(LPWavePayload& rayPayload, floa
 
 
 	}	
+//Get the angles  for a given ray direction in the polarization basis.
+//The transformation matrix is precomputed
+__forceinline__ __device__  optix::float2 getAnglesForRayInPolarizationBasis(const Matrix<4,4>& Cinv_op, float3 ray) {
+	const float4 temp=Cinv_op*make_float4(ray); 
+	//for (int i=0; i<4; i++) {
+	//	float4 r=Cinv_op.getRow(i);
+	//	printf("C[%d]=(%f,%f,%f,%f)\n",i, r.x,r.y,r.z,r.w);	
+	//	
+	//	//printf("c[%d]=%f\n",i,c[i]);
+	//	
+	//}
+	const float3 rayp=make_float3(temp.x,temp.y,temp.z); //Ray in polarization basis;
+	//printf("rayp=(%f,%f,%f)\n", rayp.x,rayp.y,rayp.z);	
+	//Angles in polarization basis
+	return getAngles(rayp); //[elevation,azimuth]
+}
 
 #endif

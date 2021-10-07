@@ -9,6 +9,7 @@
 #include "Opal.h"
 #include <optixu/optixu_math_namespace.h>
 #include <optixu/optixu_matrix_namespace.h> 
+#include <optixu/optixu_quaternion_namespace.h> 
 #include <optixu/optixpp_namespace.h>
 #include "sutil.h"
 
@@ -242,6 +243,7 @@ void OpalSceneManager::initMembers() {
 	this->sceneGraphCreated = false;
 	this->sceneFinished = false;
 	this->contextInitialized = false;
+	this->usingCurvedMeshes = false;
 
 	this->txOriginBuffer = nullptr;
 	this->rayRangeBuffer = nullptr;
@@ -281,6 +283,9 @@ void OpalSceneManager::setUseAntennaGain(bool use) {
 	}
 	this->options.useAntennaGain=use;
 
+}
+bool OpalSceneManager::isUsingCurvedMeshes() const {
+	return this->usingCurvedMeshes;
 }
 void OpalSceneManager::setExecuteCallback(bool execute) {
 	this->options.executeCallbacks=execute;
@@ -363,7 +368,7 @@ void OpalSceneManager::createDefaultPrograms() {
 #endif
 	defaultPrograms.insert(std::pair<std::string, optix::Program>("receiverIntersection", createIntersectionSphere()));
 	defaultPrograms.insert(std::pair<std::string, optix::Program>("receiverBounds", createBoundingBoxSphere()));
-
+	
 	defaultPrograms.insert(std::pair<std::string, optix::Program>("exceptionReflection", createExceptionReflectionProgram()));
 
 
@@ -526,14 +531,14 @@ Edge* OpalSceneManager::addEdge(optix::float3 p, optix::float3 v, optix::uint2 f
 		std::cout<<"ub="<<ub<<"normal_b="<<normal_b<<"bna="<<(bna/deg2rad)<<std::endl;
 		throw  opal::Exception("addEdge(): Angle from face B to A negative. Is normal B pointing out of the internal angle?");
 	}
-	/***
+/***
 	//We do not assume that the edge is perpendicular to the plane of the faces, so compute here the normal
 	//const float3 nf=cross(normal_a,ua); // This defines the side of the angle measured to be the opposite of the one the normal points at
 	//float angle=atan2(dot(cross(ua,ub),nf), dot(ua,ub));
 	//if (angle<0) {
 	//	angle = 2*M_PI-angle;
 	//}
-	 **/
+**/
 	if (isnan(angle) || isinf(angle)) {	
 		std::cout<<"uv="<<uv<<"ua="<<ua<<"normal_a="<<normal_a<<"ub="<<ub<<"normal_b"<<normal_b<<"angle="<<(angle/deg2rad)<<std::endl;
 		throw  opal::Exception("addEdge(): Angle from face B to A is nan or inf. Correct or remove the edge");
@@ -581,28 +586,11 @@ void OpalSceneManager::addMeshWithFacesToGroup(int groupId, std::vector<optix::f
 		return;
 	}
 	//Now check the face ids are unique
-	std::set<unsigned int> faceIds;
-	for (auto tf: triangleIndexFaceBuffer) {
-		//	std::cout<<"OpalSceneManager::addStaticMeshWithFaces(): adding face id "<<tf.second<<std::endl;
-		faceIds.insert(tf.second);
-	}
-	std::vector<unsigned int> v(faceIds.size());
-	auto ls = std::set_intersection(faceIds.begin(), faceIds.end(),globalFaces.begin(), globalFaces.end(), v.begin());
-	if (ls-v.begin()>0) {
-		auto it=v.begin();
-		while (it!=ls) {
-			std::cout<<"OpalSceneManager::addMeshWithFacesToGroup(): duplicate face id="<<(*it)<<std::endl;
-			++it;		
-		}
+	int uniqueFaces=0;
+	if (!checkFaceIds(triangleIndexFaceBuffer, uniqueFaces)) {
 		throw opal::Exception("OpalSceneManager::addMeshWithFacesToGroup(): Duplicate face ids");
-	} else {
-		globalFaces.insert(faceIds.begin(), faceIds.end());
-		//for (auto i: globalFaces) {
-		//	std::cout<<"OpalSceneManager::addStaticMeshWithFaces(): globalFaces  "<<i<<std::endl;
-		//}
-		numberOfFaces += faceIds.size();
-	}
-	std::cout << "-- Add  mesh to group:"<<groupId<<" with " << meshVertices.size() << " vertices,  " << triangleIndexFaceBuffer.size() << " indices and " <<faceIds.size()<<" faces. totalNumberOfFaces="<<numberOfFaces<< std::endl;
+	} 
+	std::cout << "-- Add  mesh to group:"<<groupId<<" with " << meshVertices.size() << " vertices,  " << triangleIndexFaceBuffer.size() << " indices and " <<uniqueFaces<<" faces. totalNumberOfFaces="<<numberOfFaces<< std::endl;
 
 #ifdef OPAL_USE_TRI
 	OpalMesh mesh=setMeshOnDevice(meshVertices.size(), meshVertices.data(), triangleIndexFaceBuffer,  defaultPrograms.at("triangleAttributes"), defaultPrograms.at("triangleAttributes"));
@@ -794,6 +782,37 @@ OpalMesh OpalSceneManager::addStaticMesh(std::vector<optix::float3>& meshVertice
 	return addStaticMesh(meshVertices.size(),meshVertices.data(),meshTriangles.size(),meshTriangles.data(), transformationMatrix,emProp,makeSingleFace);
 }
 
+bool OpalSceneManager::checkFaceIds(std::vector<std::pair<optix::int3, unsigned int>> &triangleIndexFaceBuffer, int& uniqueFaces ) {
+	std::set<unsigned int> faceIds;
+	for (auto tf: triangleIndexFaceBuffer) {
+	//	std::cout<<"OpalSceneManager::addStaticMeshWithFaces(): adding face id "<<tf.second<<std::endl;
+		faceIds.insert(tf.second);
+	}
+	//for (auto i: faceIds) {
+	//	std::cout<<"OpalSceneManager::addStaticMeshWithFaces(): faceIds  "<<i<<std::endl;
+	//}
+	std::vector<unsigned int> v(faceIds.size());
+	auto ls = std::set_intersection(faceIds.begin(), faceIds.end(),globalFaces.begin(), globalFaces.end(), v.begin());
+	if (ls-v.begin()>0) {
+		auto it=v.begin();
+		while (it!=ls) {
+			std::cout<<"checkFaceIds(): duplicate face id="<<(*it)<<std::endl;
+			++it;		
+		}
+		uniqueFaces = faceIds.size();
+		return false;
+	} else {
+		globalFaces.insert(faceIds.begin(), faceIds.end());
+		//for (auto i: globalFaces) {
+		//	std::cout<<"checkFaceIds(): global faces  "<<i<<"numberOfFaces="<<numberOfFaces<<std::endl;
+		//}
+		numberOfFaces += faceIds.size();
+		std::cout<<"\t Added new "<<faceIds.size()<<"faces. numberOfFaces="<<numberOfFaces<<std::endl;
+		uniqueFaces = faceIds.size();
+		return true;
+	}
+}
+
 //Creates and add a static mesh with face ids provided by user. Materials are set in the simulation classes
 OpalMesh OpalSceneManager::addStaticMeshWithFaces(std::vector<optix::float3> &meshVertices,std::vector<std::pair<optix::int3, unsigned int>> &triangleIndexFaceBuffer,  optix::Matrix4x4 transformationMatrix, MaterialEMProperties emProp) {
 	//A new copy in case the mesh is being reused with different transforms
@@ -820,31 +839,11 @@ OpalMesh OpalSceneManager::addStaticMeshWithFaces(std::vector<optix::float3> &me
 	//In our case, the normals are computed from the transformed vertices at the triangle intersections, so there is no problem, but if the normals are precomputed and stored in a buffer, this must be applied
 
 	//Now check the face ids are unique
-	std::set<unsigned int> faceIds;
-	for (auto tf: triangleIndexFaceBuffer) {
-		//	std::cout<<"OpalSceneManager::addStaticMeshWithFaces(): adding face id "<<tf.second<<std::endl;
-		faceIds.insert(tf.second);
-	}
-	//for (auto i: faceIds) {
-	//	std::cout<<"OpalSceneManager::addStaticMeshWithFaces(): faceIds  "<<i<<std::endl;
-	//}
-	std::vector<unsigned int> v(faceIds.size());
-	auto ls = std::set_intersection(faceIds.begin(), faceIds.end(),globalFaces.begin(), globalFaces.end(), v.begin());
-	if (ls-v.begin()>0) {
-		auto it=v.begin();
-		while (it!=ls) {
-			std::cout<<"OpalSceneManager::addStaticMeshWithFaces(): duplicate face id="<<(*it)<<std::endl;
-			++it;		
-		}
+	int uniqueFaces=0;
+	if (!checkFaceIds(triangleIndexFaceBuffer, uniqueFaces)) {
 		throw opal::Exception("OpalSceneManager::addStaticMeshWithFaces(): Duplicate face ids");
-	} else {
-		globalFaces.insert(faceIds.begin(), faceIds.end());
-		//for (auto i: globalFaces) {
-		//	std::cout<<"OpalSceneManager::addStaticMeshWithFaces(): globalFaces  "<<i<<std::endl;
-		//}
-		numberOfFaces += faceIds.size();
 	}
-	std::cout << "-- Create mesh: with " << meshVertices.size() << " vertices,  " << triangleIndexFaceBuffer.size() << " indices and " <<faceIds.size()<<" faces. totalNumberOfFaces="<<numberOfFaces<< std::endl;
+	std::cout << "-- Create mesh: with " << meshVertices.size() << " vertices,  " << triangleIndexFaceBuffer.size() << " indices and " <<uniqueFaces<<" faces. totalNumberOfFaces="<<numberOfFaces<< std::endl;
 
 #ifdef OPAL_USE_TRI
 	OpalMesh mesh=setMeshOnDevice(transformedVertices.size(), transformedVertices.data(), triangleIndexFaceBuffer,  defaultPrograms.at("triangleAttributes"), defaultPrograms.at("triangleAttributes"));
@@ -893,7 +892,7 @@ OpalMesh OpalSceneManager::addStaticMesh(int meshVertexCount, optix::float3* mes
 	//See  Dorst, L. "Geometric algebra for computing science", sect. 4.3.6, 
 	//See also: https://www.scratchapixel.com/lessons/mathematics-physics-for-computer-graphics/geometry/transforming-normals
 	//In our case, the normals are computed from the transformed vertices at the triangle intersections, so there is no problem, but if the normals are precomputed and stored in a buffer, this must be applied
-
+	
 	//We are only transforming points here (vertices)
 	//A new copy in case the mesh is being reused with different transforms
 	std::vector<optix::float3> transformedVertices(meshVertexCount);
@@ -1129,6 +1128,7 @@ OpalMesh OpalSceneManager::addStaticCurvedMesh(std::vector<optix::float3>& meshV
 	setMeshEMProperties(mesh.geom_instance, emProp);
 	addStaticMesh(mesh);
 	std::cout<<"\t \t Curved Mesh added" <<std::endl;
+	this->usingCurvedMeshes = true;
 	return mesh;
 }
 
@@ -1152,7 +1152,7 @@ void OpalSceneManager::extractFaces(optix::float3* meshVertices, std::vector<std
 		lastId=(*(--globalFaces.end())) +1;
 	}
 	unsigned int faceId=lastId;
-	std::cout<<"faceId="<<faceId<<"globalFaces.size()="<<globalFaces.size()<<std::endl;
+	std::cout<<"extractFaces():: faceId="<<faceId<<"globalFaces.size()="<<globalFaces.size()<<std::endl;
 	for (size_t i = 0; i < triangleIndexBuffer.size(); i++)
 	{
 		//Get the normal of the triangle plane
@@ -1282,7 +1282,7 @@ OpalMesh OpalSceneManager::createMesh(int meshVertexCount, optix::float3* meshVe
 	}
 	if (makeSingleFace) {
 		//Increment current number of faces, that is, faceId
-		++numberOfFaces;
+		//++numberOfFaces;
 	} else {
 
 		extractFaces(meshVertices, triangleIndexBuffer);
@@ -1293,31 +1293,10 @@ OpalMesh OpalSceneManager::createMesh(int meshVertexCount, optix::float3* meshVe
 
 	//  }
 
-	//Check face id
-	std::set<unsigned int> faceIds;
-	for (auto tf: triangleIndexBuffer) {
-		//std::cout<<"OpalSceneManager::createMesh(): adding face id "<<tf.second<<std::endl;
-		faceIds.insert(tf.second);
-	}
-	for (auto i: faceIds) {
-		//std::cout<<"OpalSceneManager::createMesh(): faceIds  "<<i<<std::endl;
-	}
-	std::vector<unsigned int> v(faceIds.size());
-	auto ls = std::set_intersection(faceIds.begin(), faceIds.end(),globalFaces.begin(), globalFaces.end(), v.begin());
-	if (ls-v.begin()>0) {
-		auto it=v.begin();
-		while (it!=ls) {
-			std::cout<<"OpalSceneManager::createMesh(): duplicate face id="<<(*it)<<std::endl;
-			++it;
-
-		}
+	//Check face id and increase number of faces
+	int uniqueFaces=0;
+	if (!checkFaceIds(triangleIndexBuffer, uniqueFaces)) {
 		throw opal::Exception("OpalSceneManager::createMesh(): Duplicate face ids");
-	} else {
-		globalFaces.insert(faceIds.begin(), faceIds.end());
-		numberOfFaces +=faceIds.size();
-		//for (auto i: globalFaces) {
-		//	std::cout<<"OpalSceneManager::createMesh(): globalFaces  "<<i<<std::endl;
-		//}
 	}
 
 	return setMeshOnDevice(meshVertexCount,meshVertices,triangleIndexBuffer, intersectionProgram, boundingBoxProgram);
@@ -1719,6 +1698,17 @@ void OpalSceneManager::createRaySphere2DSubstep(int elevationDelta, int azimuthD
 	//Standard sphere, only trace one up and one down ray
 	setRaySphereParameters(elevationSteps,azimuthSteps,1u);
 
+	//float asRadiusConstant;
+	//if (elevationDelta<azimuthDelta) {
+	//	asRadiusConstant=elevationDelta*deg2rad*0.1f;
+	//} else {
+	//	std::cout <<"\t Substep Sphere: azimuthDelta="<<azimuthDelta<<"deg2rad="<<deg2rad<<std::endl; 	
+	//	asRadiusConstant=azimuthDelta*deg2rad*0.1f;
+	//	std::cout <<"\t Substep Sphere: asRadiusConstant="<<asRadiusConstant<<std::endl;
+	//}
+	//context["asRadiusConstant"]->setFloat(asRadiusConstant);
+	//std::cout <<"Substep Sphere: asRadiusConstant="<<asRadiusConstant<<". raySphere.azimuthSteps=" << raySphere.azimuthSteps << ". raySphere.elevationSteps =" << raySphere.elevationSteps << "raySphere.rayCount=" << raySphere.rayCount <<  std::endl;
+
 	rays->unmap();
 	raySphere.raySphereBuffer = rays;
 #ifdef OPALDEBUG
@@ -1807,6 +1797,16 @@ void OpalSceneManager::createRaySphere2D(float initElevation, float elevationDel
 	//context["raySphereSize"]->setUint(make_uint2(elevationSteps, azimuthSteps));
 	//Not standard sphere, trace all
 	setRaySphereParameters(elevationSteps,azimuthSteps,0u);
+	//	float asRadiusConstant;
+	//	if (elevationDelta<azimuthDelta) {
+	//		asRadiusConstant=elevationDelta*deg2rad;
+	//	} else {
+	//		//std::cout <<"\t Substep Sphere: azimuthDelta="<<azimuthDelta<<"deg2rad="<<deg2rad<<std::endl; 	
+	//		asRadiusConstant=azimuthDelta*deg2rad;
+	//		//std::cout <<"\t Substep Sphere: asRadiusConstant="<<asRadiusConstant<<std::endl;
+	//	}
+	//context["asRadiusConstant"]->setFloat(asRadiusConstant);
+	//std::cout <<"Substep Sphere: asRadiusConstant="<<asRadiusConstant<<". raySphere.azimuthSteps=" << raySphere.azimuthSteps << ". raySphere.elevationSteps =" << raySphere.elevationSteps << "raySphere.rayCount=" << raySphere.rayCount <<  std::endl;
 
 	rays->unmap();
 	raySphere.raySphereBuffer = rays;
@@ -1865,7 +1865,7 @@ int OpalSceneManager::registerAntennaGain(AntennaGain& gain) {
 		throw  opal::Exception("Antenna gain has to be provided as a matrix of azimuth/elevation (rows/columns) values. Number of rows is 0");
 	}
 	unsigned int elevationGains=gain[0].size(); //Number of columns
-
+	
 	std::cout<<"Creating antennaGain buffer with "<<azimuthGains<<" azimuthGains values and "<<elevationGains<<"elevation values"<<std::endl;
 	optix::Buffer b = context->createBuffer(RT_BUFFER_INPUT, RT_FORMAT_FLOAT, azimuthGains, elevationGains);
 	float* gain_device = reinterpret_cast<float*>  (b->map());
@@ -1911,7 +1911,7 @@ void OpalSceneManager::registerReceiverGain(int rxId, int gainId) {
 	for (auto simulation : simulations) {
 		simulation->registerReceiverGain(rxId,gainId);
 	}
-
+	
 }
 void OpalSceneManager::registerTransmitterGain(int txId, int gainId) {
 	if (!options.useAntennaGain) {
@@ -1940,9 +1940,17 @@ void OpalSceneManager::addReceiver(int id, float3  position, float3 polarization
 	for (auto simulation : simulations) {
 		simulation->addReceiver(id, position,polarization, radius, callback, optix_materials);
 	}
-	if (defaultReceiverMaterial->getClosestHitProgram(0)) {
-		std::cout<<"OpalSceneManager::addReceiver() defaultReceiverMaterial count="<<std::endl;
-	}
+//	if (defaultReceiverMaterial->getClosestHitProgram(0)) {
+//		std::cout<<"OpalSceneManager::addReceiver() defaultReceiverMaterial count="<<std::endl;
+//	}
+	//optix::Program chrx = defaultPrograms.at("receiverClosestHit");
+	//optix::Material mat = context->createMaterial();
+	//	mat->setClosestHitProgram(OPAL_RAY_REFLECTION, chrx);
+	//
+	//#ifdef OPAL_LOG_TRACE
+	//	mat->setClosestHitProgram(OPAL_RAY_LOG_TRACE_RAY, defaultPrograms.at("closestHitReceiverLogTrace"));
+	//#endif
+	//	optix_materials.push_back(mat);
 	if (optix_materials.size()==0) {
 		optix_materials.push_back(defaultReceiverMaterial);
 		std::cout<<"WARNING: OpalSceneManager::addReceiver() no material for receiver added in simulations. Adding defaultReceiverMaterial"<<std::endl;
@@ -1968,7 +1976,9 @@ void OpalSceneManager::addReceiver(int id, float3  position, float3 polarization
 	for (auto simulation : simulations) {
 		if (simulation->usesPolarization()) {
 			geom_instance["receiverPolarization"]->setFloat(polarization);
-			std::cout<<"\t Using depolarization. Receiver polarization is "<<polarization << std::endl;
+			Matrix<4,4> pol_t=computeMatrixFromWorldToPolarization(polarization);
+			geom_instance["transformToPolarization"]->setMatrix4x4fv(false,pol_t.getData());
+			std::cout<<"\t Using depolarization. Receiver polarization is "<<polarization << " and polarization transform matrix = "<<pol_t<<std::endl;
 			break;
 		}
 	}
@@ -2004,6 +2014,52 @@ void OpalSceneManager::addReceiver(int id, float3  position, float3 polarization
 	//Do not really need transform since the geometry (sphere) has no structure apart from position and radius...?
 	//optix::Transform transform = sceneManager->sceneContext->createTransform();
 	//TODO: we could use transforms to place the receivers and update their positions
+
+}
+
+
+optix::Matrix<4,4> OpalSceneManager::computeMatrixFromWorldToPolarization(float3 pol) {
+	const float3 polarization=normalize(pol); //In case it is not normalized
+
+
+	const float EPSILON=1.0e-7f;
+	const float3 up=make_float3(0.0f,1.0f,0.0f);
+	const float3 forward=make_float3(0.0f,0.0f,1.0f);
+	const float3 right=make_float3(1.0f,0.0f,0.0f);
+	optix::Matrix<4,4> C_po = optix::Matrix<4,4>::identity(); //Change of basis matrix from polarization to world;	
+	if (fabs(polarization.x-up.x)<EPSILON && fabs(polarization.y-up.y)<EPSILON && fabs(polarization.z-up.z)<EPSILON) {
+		//Already aligned, no need to create additional reference frame
+		std::cout<<"C="<<C_po<<std::endl;
+		return C_po;
+	} else {	
+		//Set a reference frame aligned with linear polarization, so that Y' (up') is aligned with the polarization in that base
+		float3 ypo;	
+		float3 xpo;
+		float3 zpo;	
+		//We get the parameters to compute the rotation of the axis
+		const float t = acosf(dot(up,polarization));
+		//Rotation axis: normal to the vectors
+		const float3 n = normalize(cross(up, polarization));
+		//Directly compute the quaternion
+		const float s=sinf(t/2.0f);
+		const float c=cosf(t/2.0f);
+		const Quaternion q(n.x*s, n.y*s, n.z*s, c);
+		
+		
+		ypo=q*up; // y' axis in world coordinates=polarization vector
+		zpo=normalize(q*forward);
+		xpo=normalize(q*right); 
+		//std::cout<<"ypo="<<ypo<<"xpo="<<xpo<<"zpo="<<zpo<<std::endl;
+
+		//Create change of basis matrix from polarization basis to world;
+		C_po.setCol(0u,make_float4(xpo));
+		C_po.setCol(1u,make_float4(ypo));
+		C_po.setCol(2u,make_float4(zpo));
+		C_po.setCol(3u,make_float4(0.0f,0.0f,0.0f,1.0f));
+		Matrix<4,4> Cinv_op= C_po.inverse(); //Create change of basis matrix from world to polarization;
+		//std::cout<<"C="<<Cinv_op<<std::endl;
+		return Cinv_op;
+	}
 
 }
 void OpalSceneManager::removeReceiver(int id) {
@@ -2165,6 +2221,8 @@ void OpalSceneManager::updateReceiver(int id, float3 position, float3 polarizati
 	for (auto simulation : simulations) {
 		if (simulation->usesPolarization()) {
 			r->geomInstance["receiverPolarization"]->setFloat(polarization);
+			Matrix<4,4> pol_t=computeMatrixFromWorldToPolarization(polarization);
+			r->geomInstance["transformToPolarization"]->setMatrix4x4fv(false,pol_t.getData());
 			break;
 		}
 	}
@@ -2218,6 +2276,10 @@ void OpalSceneManager::transmit(int txId, float txPower,  float3 origin, float3 
 	host_tx->externalId = txId;
 	if (options.useAntennaGain) {
 		host_tx->gainId=currentTransmitter.gainId;
+		Matrix<4,4> t=computeMatrixFromWorldToPolarization(polarization);
+		//std::cout<<"Transmitter transform pol="<<t<<std::endl;
+		host_tx->transformToPolarization =t; 	
+		
 	} else {
 		host_tx->gainId=RT_BUFFER_ID_NULL;
 	}
@@ -2508,15 +2570,23 @@ void OpalSceneManager::finishSceneContext() {
 	for (auto simulation : simulations) {
 		simulation->finishSceneContext();
 	}
+	//context->setRayGenerationProgram(OPAL_RAY_REFLECTION, defaultPrograms.at("rayGeneration")); //Generation
+	//context->setMissProgram(OPAL_RAY_REFLECTION, defaultPrograms.at("miss"));
+	//
+	//#ifdef OPAL_LOG_TRACE
+	//context->setRayGenerationProgram(OPAL_RAY_LOG_TRACE_RAY, defaultPrograms.at("rayGenerationLogTrace")); //Generation
+	//context->setMissProgram(OPAL_RAY_LOG_TRACE_RAY, defaultPrograms.at("missLogTrace"));
+
+	//#endif
 
 
 	std::cout<<"Validating the context ..."<< std::endl;
 	try {
 		context->validate();
 	}	catch (optix::Exception& e) {
-		std::cout << "Validating context error occurred with error code "
-			<< e.getErrorCode() << " and message "
-			<< e.getErrorString() << std::endl;
+			std::cout << "Validating context error occurred with error code "
+				<< e.getErrorCode() << " and message "
+				<< e.getErrorString() << std::endl;
 		throw;
 
 	}
@@ -2540,7 +2610,7 @@ void OpalSceneManager::enableExceptions() {
 std::string opal::OpalSceneManager::printSceneReport()  {
 	std::ostringstream stream;
 	stream << "--- Scene Summary ---" << std::endl;
-	stream << "\t numberOfFaces=" << numberOfFaces << ". minEpsilon= " << minEpsilon << ". maxReflections=" << maxReflections << ". useExactSpeedOfLight="<<this->options.useExactSpeedOfLight<<std::endl;
+	stream << "\t numberOfFaces=" << numberOfFaces <<". globalFaces = "<<globalFaces.size()<< ". minEpsilon= " << minEpsilon << ". maxReflections=" << maxReflections << ". useExactSpeedOfLight="<<this->options.useExactSpeedOfLight<<std::endl;
 	stream << "\t Receivers=" << receivers.size() <<  std::endl;
 	stream << "\t RayCount=" << raySphere.rayCount << ". azimuthSteps=" << raySphere.azimuthSteps << ". elevationSteps=" << raySphere.elevationSteps << std::endl;
 	if (options.usePenetration) {
@@ -2566,7 +2636,7 @@ std::string opal::OpalSceneManager::printSceneReport()  {
 	stream << "\t max_interactions=" << context["max_interactions"]->getUint() << std::endl;
 	optix::GeometryGroup gg  = rootGroup->getChild<optix::GeometryGroup>(0);
 	//Static meshes
-
+	 
 	for (unsigned int i = 0; i <gg->getChildCount(); i++)
 	{
 		optix::GeometryInstance gi = gg->getChild(i);
@@ -2576,13 +2646,13 @@ std::string opal::OpalSceneManager::printSceneReport()  {
 		stream << "\t StaticMesh[" << i << "].EMProperties=" << em.dielectricConstant<< std::endl;
 	}
 	stream << "\t Static meshes loaded=" << gg->getChildCount() << std::endl;
-
+	
 	//Face ids
 	stream<<"\t Face ids used in scene: " <<globalFaces.size()<<std::endl;;
-	//	for (auto f : globalFaces) {
-	//		stream<<f<<",";
-	//	}	
-	//	stream<<std::endl;
+//	for (auto f : globalFaces) {
+//		stream<<f<<",";
+//	}	
+//	stream<<std::endl;
 	//Edges
 	stream<<"\t Number of edges loaded: " <<edges.size()<<std::endl;
 
@@ -2688,7 +2758,6 @@ void OpalSceneManager::buildSceneGraph()
 	//context["staticMeshes"]->set(staticMeshesGroup);
 #ifdef OPAL_USE_TRI
 	staticMeshesGroup->setVisibilityMask(OPAL_STATIC_MESH_MASK);
-//Test for mask bug
 	//staticMeshesGroup->setVisibilityMask(0u);
 	//std::cout<<"setVisibilityMask="<<OPAL_STATIC_MESH_MASK<<"RT_VISIBILITY_ALL="<<RT_VISIBILITY_ALL<<std::endl;
 #endif
@@ -2713,11 +2782,15 @@ void OpalSceneManager::buildSceneGraph()
 
 
 
-
+	
 	//Create root
 	rootGroup = context->createGroup();
+	//rootGroup->setChildCount(2+ statc);
 	rootGroup->addChild(staticMeshesGroup);
 	rootGroup->addChild(receiversGroup);
+	//Group g = context->createGroup();
+	//g->setAcceleration(context->createAcceleration("NoAccel"));
+	//rootGroup->addChild(g);
 	//Add dynamic meshes
 	for (auto val : dynamicMeshes)
 	{
@@ -2726,8 +2799,6 @@ void OpalSceneManager::buildSceneGraph()
 	}
 
 	rootGroup->setAcceleration(context->createAcceleration("Trbvh")); //All Groups and GeometryGroups MUST have an acceleration
-
-//Test for mask bug
 	//rootGroup->setVisibilityMask(RT_VISIBILITY_ALL);
 	//std::cout<<"static meshes="<<staticMeshesGroup->getVisibilityMask()<<"receiver="<<receiversGroup->getVisibilityMask()<<"root Mask"<<rootGroup->getVisibilityMask()<<std::endl;
 	//std::cout<<"static meshes*OPAL="<<(staticMeshesGroup->getVisibilityMask() & OPAL_STATIC_MESH_MASK)<<"RT_VISIBILITY_ALL*OPAL_STATIC_MESH_MASK"<<(staticMeshesGroup->getVisibilityMask() & RT_VISIBILITY_ALL)<<std::endl;
@@ -3027,214 +3098,6 @@ void OpalSceneManager::printFieldComponents(optix::float2 Ex, optix::float2 Ey, 
 
 }
 
-//Antenna gains must come as a matrix of azimuth (rows)/elevation (columns) gains in dB power, with columns separated by tabs.Ranges of azimuth go from [0, 2pi] and elevation from [0, pi]. So 
-//a file with 360*180 values correspond to steps of 1 degree and a matrix of 3600*1800 values correspond to steps of 0.1 degrees
-//Since the gain is applied to the EM field, the values are passed to linear and then the square root is taken 
-AntennaGain OpalSceneManager::loadGainsFromFileIndBPower(const char* file) {
-	std::ifstream infile(file);
-	if (!infile.good()) {
-		std::cout<<"Error opening "<<file<<std::endl;
-		throw  opal::Exception("loadGainsFromFileIndBPower: error opening file");
-
-	} 
-	float x, y;
-	//char c;
-	AntennaGain gains;
-	std::string line;
-	std::string delimiters("\t");
-	unsigned int azi=0;
-	unsigned int eli=0;
-	for (std::string line; std::getline(infile, line); ) {
-		std::vector<float> az;
-		std::istringstream iline(line);
-		std::string val;
-		//std::cout<<line<<std::endl;
-		while(std::getline(iline,val,'\t')) {
-			float db= std::stof(val);
-
-			float g=pow(10, db/20.0f); 
-			//std::cout<<"\t"<<val<<"db"<<db<<"g="<<g<<std::endl;
-			if (isnan(g)) {
-				std::cout<<"\t"<<val<<"db"<<db<<"g="<<g<<"azi="<<azi<<"eli"<<eli<<std::endl;
-				throw  opal::Exception("loadGainsFromFileIndBPower(): value is nan");
-			}
-			az.push_back(g);
-			++eli;
-		}
-		gains.push_back(az);
-		++azi;
-	}	
-
-	if (gains.size()==0) {
-		std::cout<<"WARNING: loaded an empty gaing!!!"<<std::endl;
-		throw  opal::Exception("loadGainsFromFileIndBPower(): empty gain file");
-	} else {
-		std::cout << "Loaded " << gains.size() << " azimuth values and "<<gains[0].size() <<"elevation values  from " << file << std::endl;
-	}
-	infile.close();
-	return gains;
-
-}
-std::vector<float3>  OpalSceneManager::loadRaysFromFile(const char* file) {
-	std::ifstream infile(file);
-	if (!infile.good()) {
-		std::cout<<"Error opening "<<file<<std::endl;
-		throw  opal::Exception("loadRaysFromFile(): error opening file");
-
-	} 
-	float x, y, z;
-	//char c;
-	std::vector<float3> vertices;
-	std::string line;
-
-
-	while (std::getline(infile, line)) {
-
-		//std::cout << line << std::endl;
-		std::string delimiters = "\t";
-		size_t current;
-		size_t next = -1;
-		int p = 0;
-		do
-		{
-			current = next + 1;
-			next = line.find_first_of(delimiters, current);
-			if (p == 0) {
-				x = std::stof(line.substr(current, next - current));
-			}
-			if (p == 1) {
-				y = std::stof(line.substr(current, next - current));
-			}
-			if (p == 2) {
-				z = std::stof(line.substr(current, next - current));
-			}
-
-			//std::cout << line.substr(current, next - current) <<"\t"<< std::endl;
-			p++;
-		} while (next != std::string::npos);
-
-		vertices.push_back(make_float3(x, y, z));
-	}
-	//	std::cout << "Loaded " << vertices.size() << " rays from " << file << std::endl;
-	infile.close();
-	if (vertices.size()==0) {
-		std::cout<<"WARNING: loaded zero rays!!!"<<std::endl;
-	}
-	return vertices;
-}
-
-std::vector<float3>  OpalSceneManager::loadVerticesFromFile(const char* file) {
-	std::ifstream infile(file);
-	if (!infile.good()) {
-		std::cout<<"Error opening "<<file<<std::endl;
-		throw  opal::Exception("loadVerticesFromFile(): error opening file");
-
-	} 
-	float x, y, z;
-	//char c;
-	std::vector<float3> vertices;
-	std::string line;
-
-
-	while (std::getline(infile, line)) {
-
-		//std::cout << line << std::endl;
-		std::string delimiters = "\t";
-		size_t current;
-		size_t next = -1;
-		int p = 0;
-		do
-		{
-			current = next + 1;
-			next = line.find_first_of(delimiters, current);
-			if (p == 0) {
-				x = std::stof(line.substr(current, next - current));
-			}
-			if (p == 1) {
-				y = std::stof(line.substr(current, next - current));
-			}
-			if (p == 2) {
-				z = std::stof(line.substr(current, next - current));
-			}
-
-			//std::cout << line.substr(current, next - current) <<"\t"<< std::endl;
-			p++;
-		} while (next != std::string::npos);
-
-		vertices.push_back(make_float3(x, y, z));
-	}
-	std::cout << "Loaded " << vertices.size() << " vertices from " << file << std::endl;
-	infile.close();
-	if (vertices.size()==0) {
-		std::cout<<"WARNING: loaded an empty mesh!!!"<<std::endl;
-	}
-	return vertices;
-}
-std::vector<int>  OpalSceneManager::loadTrianglesFromFile(const char* file) {
-	std::ifstream infile(file);
-	if (!infile.good()) {
-		std::cout<<"Error opening "<<file<<std::endl;
-		throw  opal::Exception("loadTrianglesFromFile(): error opening file");
-
-	} 
-	int i;
-	std::vector<int> triangles;
-
-	while (infile>>i) {
-		//std::cout << i << std::endl;
-		triangles.push_back(i);
-	}
-	std::cout << "Loaded " << triangles.size() << "indices from " << file << std::endl;
-	infile.close();
-	return triangles;
-}
-void  OpalSceneManager::writeMeshToPLYFile(std::string fileName, std::vector<float3>& vertices, std::vector<int>& indices, Matrix4x4& transformationMatrix) {
-	std::ofstream outFile(fileName.c_str(),std::ofstream::out);
-
-	if ( !outFile )
-	{
-		throw  opal::Exception("writeMeshToPLYFile(): Error opening output file");
-	}
-
-	////
-	// Header
-	////
-
-	std::vector<optix::float3> transformedVertices(vertices.size());
-	//Apply first transformation matrix
-	for (size_t i = 0; i < vertices.size(); i++)
-	{
-
-		//std::cout <<"vertex=("<< meshVertices[i].x <<","<< meshVertices[i].y <<","<< meshVertices[i].z <<")"<< std::endl;
-		const float3 v = optix::make_float3(transformationMatrix*optix::make_float4(vertices[i], 1.0f));
-		std::cout<<"v="<<v<<std::endl;
-		transformedVertices[i]=v;
-	}
-
-	outFile << "ply" << std::endl;
-	outFile << "format ascii 1.0" << std::endl;
-	outFile << "element vertex " << vertices.size() << std::endl;
-	outFile << "property float x" << std::endl;
-	outFile << "property float y" << std::endl;
-	outFile << "property float z" << std::endl;
-	outFile << "element face " << (indices.size()/3) << std::endl;
-	outFile << "property list uchar int vertex_indices" << std::endl;
-	outFile << "end_header" << std::endl;
-	for (auto p : transformedVertices) {
-		outFile<< p.x <<" "<<p.y<<" "<<p.z<<std::endl;
-	}
-	for (int i=0; i<indices.size(); i=i+3) {
-		outFile<<"3 "<<indices[i]<<" "<<indices[i+1]<<" "<<indices[i+2]<<std::endl;
-
-	}
-	outFile.close();
-
-
-}
-
-void OpalSceneManager::printPower(float power, int txId ) {
-	std::cout << "PR\t" << power << std::endl;
-}
 
 // Copyright NVIDIA Corporation 2011
 // Redistribution and use in source and binary forms, with or without
@@ -3350,7 +3213,7 @@ std::vector<float4>  OpalSceneManager::loadPDFromFile(const char* file) {
 	if (!infile.good()) {
 		std::cout<<"Error opening "<<file<<std::endl;
 		throw  opal::Exception("loadPDFromFile(): error opening file");
-
+		
 	} 
 	float x, y, z,w;
 	//char c;
@@ -3394,6 +3257,216 @@ std::vector<float4>  OpalSceneManager::loadPDFromFile(const char* file) {
 		std::cout<<"WARNING: loaded an  mesh with empty curvature information!!!"<<std::endl;
 	}
 	return pd;
+}
+//Antenna gains must come as a matrix of azimuth (rows)/elevation (columns) gains in dB power, with columns separated by tabs.Ranges of azimuth go from [0, 2pi[ and elevation from [0, pi]. 
+//So a file with 360*181 values correspond to steps of 1 degree and a matrix of 3600*1800 values correspond to steps of 0.1 degrees
+//We assume that elevations are measured from Y axis (UP) and azimuth from Z to X clockwise in our left-hand reference system X right, Y up, Z forward.
+//Since the gain is applied to the EM field, the values are passed to linear and then the square root is taken 
+AntennaGain OpalSceneManager::loadGainsFromFileIndBPower(const char* file) {
+	std::ifstream infile(file);
+	if (!infile.good()) {
+		std::cout<<"Error opening "<<file<<std::endl;
+		throw  opal::Exception("loadGainsFromFileIndBPower: error opening file");
+		
+	} 
+	float x, y;
+	//char c;
+	AntennaGain gains;
+	std::string line;
+	std::string delimiters("\t");
+	unsigned int azi=0;
+	unsigned int eli=0;
+	for (std::string line; std::getline(infile, line); ) {
+		std::vector<float> az;
+		std::istringstream iline(line);
+		std::string val;
+		//std::cout<<line<<std::endl;
+		while(std::getline(iline,val,'\t')) {
+			float db= std::stof(val);
+		
+			float g=pow(10, db/20.0f); 
+			//std::cout<<"\t"<<val<<"db"<<db<<"g="<<g<<std::endl;
+			if (isnan(g)) {
+				std::cout<<"\t"<<val<<"db"<<db<<"g="<<g<<"azi="<<azi<<"eli"<<eli<<std::endl;
+				throw  opal::Exception("loadGainsFromFileIndBPower(): value is nan");
+			}
+	       		az.push_back(g);
+			++eli;
+		}
+		gains.push_back(az);
+		++azi;
+    	}	
+	
+	if (gains.size()==0) {
+		std::cout<<"WARNING: loaded an empty gaing!!!"<<std::endl;
+		throw  opal::Exception("loadGainsFromFileIndBPower(): empty gain file");
+	} else {
+		std::cout << "--- Antenna Gain **  " <<std::endl;
+		std::cout << "\t Loaded " << gains.size() << " azimuth values and "<<gains[0].size() <<"elevation values  from " << file << std::endl;
+	}
+	infile.close();
+	return gains;
+
+}
+std::vector<float3>  OpalSceneManager::loadRaysFromFile(const char* file) {
+	std::ifstream infile(file);
+	if (!infile.good()) {
+		std::cout<<"Error opening "<<file<<std::endl;
+		throw  opal::Exception("loadRaysFromFile(): error opening file");
+		
+	} 
+	float x, y, z;
+	//char c;
+	std::vector<float3> vertices;
+	std::string line;
+
+
+	while (std::getline(infile, line)) {
+
+		//std::cout << line << std::endl;
+		std::string delimiters = "\t";
+		size_t current;
+		size_t next = -1;
+		int p = 0;
+		do
+		{
+			current = next + 1;
+			next = line.find_first_of(delimiters, current);
+			if (p == 0) {
+				x = std::stof(line.substr(current, next - current));
+			}
+			if (p == 1) {
+				y = std::stof(line.substr(current, next - current));
+			}
+			if (p == 2) {
+				z = std::stof(line.substr(current, next - current));
+			}
+
+			//std::cout << line.substr(current, next - current) <<"\t"<< std::endl;
+			p++;
+		} while (next != std::string::npos);
+
+		vertices.push_back(make_float3(x, y, z));
+	}
+	//	std::cout << "Loaded " << vertices.size() << " rays from " << file << std::endl;
+	infile.close();
+	if (vertices.size()==0) {
+		std::cout<<"WARNING: loaded zero rays!!!"<<std::endl;
+	}
+	return vertices;
+}
+
+std::vector<float3>  OpalSceneManager::loadVerticesFromFile(const char* file) {
+	std::ifstream infile(file);
+	if (!infile.good()) {
+		std::cout<<"Error opening "<<file<<std::endl;
+		throw  opal::Exception("loadVerticesFromFile(): error opening file");
+		
+	} 
+	float x, y, z;
+	//char c;
+	std::vector<float3> vertices;
+	std::string line;
+
+
+	while (std::getline(infile, line)) {
+
+		//std::cout << line << std::endl;
+		std::string delimiters = "\t";
+		size_t current;
+		size_t next = -1;
+		int p = 0;
+		do
+		{
+			current = next + 1;
+			next = line.find_first_of(delimiters, current);
+			if (p == 0) {
+				x = std::stof(line.substr(current, next - current));
+			}
+			if (p == 1) {
+				y = std::stof(line.substr(current, next - current));
+			}
+			if (p == 2) {
+				z = std::stof(line.substr(current, next - current));
+			}
+
+			//std::cout << line.substr(current, next - current) <<"\t"<< std::endl;
+			p++;
+		} while (next != std::string::npos);
+
+		vertices.push_back(make_float3(x, y, z));
+	}
+	std::cout << "Loaded " << vertices.size() << " vertices from " << file << std::endl;
+	infile.close();
+	if (vertices.size()==0) {
+		std::cout<<"WARNING: loaded an empty mesh!!!"<<std::endl;
+	}
+	return vertices;
+}
+std::vector<int>  OpalSceneManager::loadTrianglesFromFile(const char* file) {
+	std::ifstream infile(file);
+	if (!infile.good()) {
+		std::cout<<"Error opening "<<file<<std::endl;
+		throw  opal::Exception("loadTrianglesFromFile(): error opening file");
+		
+	} 
+	int i;
+	std::vector<int> triangles;
+
+	while (infile>>i) {
+		//std::cout << i << std::endl;
+		triangles.push_back(i);
+	}
+	std::cout << "Loaded " << triangles.size() << "indices from " << file << std::endl;
+	infile.close();
+	return triangles;
+}
+void  OpalSceneManager::writeMeshToPLYFile(std::string fileName, std::vector<float3>& vertices, std::vector<int>& indices, Matrix4x4& transformationMatrix) {
+	std::ofstream outFile(fileName.c_str(),std::ofstream::out);
+
+	if ( !outFile )
+	{
+		throw  opal::Exception("writeMeshToPLYFile(): Error opening output file");
+	}
+
+	////
+	// Header
+	////
+
+	std::vector<optix::float3> transformedVertices(vertices.size());
+	//Apply first transformation matrix
+	for (size_t i = 0; i < vertices.size(); i++)
+	{
+
+		//std::cout <<"vertex=("<< meshVertices[i].x <<","<< meshVertices[i].y <<","<< meshVertices[i].z <<")"<< std::endl;
+		const float3 v = optix::make_float3(transformationMatrix*optix::make_float4(vertices[i], 1.0f));
+		std::cout<<"v="<<v<<std::endl;
+		transformedVertices[i]=v;
+	}
+
+	outFile << "ply" << std::endl;
+	outFile << "format ascii 1.0" << std::endl;
+	outFile << "element vertex " << vertices.size() << std::endl;
+	outFile << "property float x" << std::endl;
+	outFile << "property float y" << std::endl;
+	outFile << "property float z" << std::endl;
+	outFile << "element face " << (indices.size()/3) << std::endl;
+	outFile << "property list uchar int vertex_indices" << std::endl;
+	outFile << "end_header" << std::endl;
+	for (auto p : transformedVertices) {
+		outFile<< p.x <<" "<<p.y<<" "<<p.z<<std::endl;
+	}
+	for (int i=0; i<indices.size(); i=i+3) {
+		outFile<<"3 "<<indices[i]<<" "<<indices[i+1]<<" "<<indices[i+2]<<std::endl;
+
+	}
+	outFile.close();
+
+
+}
+
+void OpalSceneManager::printPower(float power, int txId ) {
+	std::cout << "PR\t" << power << std::endl;
 }
 
 

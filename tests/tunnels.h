@@ -13,7 +13,7 @@
 using namespace opal;
 namespace opal {
 //Simulate propagation inside a tunnel. Used to exemplify partial launches with low angular separation (precise angular sampling). To be run with a high number of reflections, such as 20 or 30
-	class CubeTunnelTests : TunnelsBase {
+	class CubeTunnelTests : public TunnelsBase {
 		protected:
 			void xcut( float width, float height, float y, float distance, float3 polarization ); 
 			void ycut( float width, float height, float x, float distance, float3 polarization) ;
