@@ -151,7 +151,7 @@ RT_PROGRAM void closestHitReceiver()
 	}
 
 	if (useAntennaGain) {
-		
+		const float3 ray=-ray_receiver.direction;
 		float g=getAntennaGain(ray, gainBufferId,transformToPolarization);	
 		E=sca_complex_prod(g,E);
 	}
