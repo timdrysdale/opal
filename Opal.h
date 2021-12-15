@@ -120,10 +120,10 @@ namespace opal {
 	struct face_compare
 	{
 		const float epsilon = 1e-6f;
-                bool esentiallyEqual(float a,  float b) {
+                bool esentiallyEqual(float a,  float b) const {
 			return fabs(a - b) <= ( (fabs(a) > fabs(b) ? fabs(b) : fabs(a)) * epsilon);
 		}
-		bool operator() (const optix::float3 first, const optix::float3 second) {
+		bool operator() (const optix::float3 first, const optix::float3 second) const {
 			//const float xa = fabs(first.x - second.x);
 			//const float ya = fabs(first.y - second.y);
 			//const float za = fabs(first.z - second.z);

@@ -39,7 +39,7 @@
 #define PTXUTIL_H
 #include <map>
 #include <vector>
-
+#include <string>
 namespace opal {
 	//We copy some functions from sutil.cpp in order to be able to disable fast math and other NVRTC compiler options at runtime without modifying the SDK.
 	class PtxUtil {	
