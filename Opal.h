@@ -495,6 +495,7 @@ namespace opal {
 
 		//Internal buffers
 			void setInternalBuffers();
+			void setRayBuffers();
 			optix::Buffer setTransmitterBuffer(optix::uint tx);
 			optix::Buffer setRayRangeBuffer();
 			optix::Buffer setRaySphereParametersBuffer();

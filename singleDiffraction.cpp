@@ -211,6 +211,12 @@ namespace opal {
 		
 	}
 	void SingleDiffraction::executeTransmitLaunch(uint numTransmitters, bool partial) {
+		if (partial) {
+                        //TODO:Partial launches are not well defined so far for diffraction. We just compute all the edges in one launch, do not discriminate by zones
+                        //this is something that can be done in the future. At the moment we just do not do nothing and delay until the end of partial launch
+                        std::cout<<"Partial launch for diffraction. Delaying computation until end of partial launch"<<std::endl;
+                        return;
+                }
 		uint ne=myManager->getNumberOfEdges();
 		uint nrx=myManager->getNumberOfReceivers();
 		if (ne==0) {
@@ -322,6 +328,10 @@ namespace opal {
 		updateReceiverBuffer=true;
 	}
 	void SingleDiffraction::endPartialLaunch(uint numTransmitters) {
+		 //Compute now delayed diffraction launc
+                std::cout<<"Called endPartialLaunch for diffraction. Executing diffraction launch now"<<std::endl;
+                executeTransmitLaunch(numTransmitters, false);
+
 	}
 	//void SingleDiffraction::setDefaultPrograms() {
 	////void SingleDiffraction::setDefaultPrograms(std::map<std::string,optix::Program>& defaultPrograms, optix::Material& defaultMeshMaterial) {

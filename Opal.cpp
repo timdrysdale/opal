@@ -1835,16 +1835,17 @@ void OpalSceneManager::setRayRange(float initElevation, float elevationDelta,  f
 		}
 	}
 	std::cout << "rays=" << raySphere.rayCount << ". elevationSteps=" << raySphere.elevationSteps << ". azimtuhSteps=" << raySphere.azimuthSteps << std::endl;
-	if (rayRangeBuffer) {
+	if (!rayRangeBuffer) {
+		setRayBuffers();
+	} else {
+		//std::cout<<"setRayRange(): rayRangeBuffer not created yet, call finishSceneContext before setting the ray range"<< std::endl;
+		//throw  opal::Exception("setRayRange(): rayRangeBuffer not created yet, call finishSceneContext before setting the ray range");
+	}
+
 		optix::float4* range = reinterpret_cast<optix::float4*>  (rayRangeBuffer->map());
 		range[0]=make_float4(initElevation,elevationDelta,initAzimuth,azimuthDelta)*deg2rad; //In radians
 		std::cout<<"Setting the value of the rayRangeBuffer to "<<range[0]<<std::endl; 
 		rayRangeBuffer->unmap();
-	} else {
-		std::cout<<"setRayRange(): rayRangeBuffer not created yet, call finishSceneContext before setting the ray range"<< std::endl;
-		throw  opal::Exception("setRayRange(): rayRangeBuffer not created yet, call finishSceneContext before setting the ray range");
-	}
-
 
 
 }
@@ -2463,15 +2464,22 @@ void OpalSceneManager::setInternalBuffers() {
 	} else {
 		txOriginBuffer=setTransmitterBuffer(1u);	
 	}
-	if (options.generateRaysOnLaunch) {
-		rayRangeBuffer=setRayRangeBuffer();
-	} else {
-		raySphereParametersBuffer = setRaySphereParametersBuffer();
-	}
+	setRayBuffers();
 	for (auto simulation : simulations) {
 		simulation->setInternalBuffers();
 	}
 
+}
+void OpalSceneManager::setRayBuffers() {
+        if (options.generateRaysOnLaunch) {
+                if (!rayRangeBuffer) {
+                        rayRangeBuffer=setRayRangeBuffer();
+                }
+        } else {
+                if (!raySphereParametersBuffer) {
+                        raySphereParametersBuffer = setRaySphereParametersBuffer();
+                }
+        }
 }
 
 
